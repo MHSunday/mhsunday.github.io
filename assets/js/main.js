@@ -1,53 +1,48 @@
 // assets/js/main.js
 (function(global){
+  // 從全域物件中解構出需要的模組
   const { APP_CONFIG, Api, AppState, UI, Admin } = global;
 
+  // 當整個頁面（包括所有資源）載入完成後執行
   window.onload = () => {
-    // 設定 Google Sign-In client id
-    // assets/js/main.js
-(function(global){
-  const { APP_CONFIG, Api, AppState, UI, Admin } = global;
+    // 1. 初始化 Google Sign-In
+    // 確保 APP_CONFIG 和 OAUTH_CLIENT_ID 存在
+    if (window.google?.accounts?.id && APP_CONFIG?.OAUTH_CLIENT_ID) {
+      google.accounts.id.initialize({
+        client_id: APP_CONFIG.OAUTH_CLIENT_ID,
+        callback: global.onGoogleSignIn // 指定登入成功後的回呼函式
+      });
 
-  window.onload = () => {
-    // 使用 JavaScript 初始化 Google Sign-In
-    google.accounts.id.initialize({
-      client_id: APP_CONFIG.OAUTH_CLIENT_ID,
-      callback: global.onGoogleSignIn // 確保 onGoogleSignIn 是全域函式
-    });
+      // 將 Google 登入按鈕渲染到指定的 HTML 元素上
+      const googleButtonContainer = document.getElementById("google-signin-button");
+      if (googleButtonContainer) {
+        google.accounts.id.renderButton(
+          googleButtonContainer,
+          { theme: "outline", size: "large", text: "sign_in_with", shape: "pill" } // 按鈕樣式
+        );
+      } else {
+        console.error("找不到 ID 為 'google-signin-button' 的元素來渲染 Google 登入按鈕。");
+      }
+    } else {
+      console.error("Google GSI 腳本或 OAUTH_CLIENT_ID 未載入，無法初始化登入功能。");
+    }
 
-    // 將按鈕渲染到指定的元素上
-    google.accounts.id.renderButton(
-      document.getElementById("google-signin-button"),
-      { theme: "outline", size: "large", text: "sign_in_with", shape: "pill" } // 按鈕樣式
-    );
-
-    // 綁定 UI
+    // 2. 綁定 UI 事件
     UI.bindTabs();
-    UI.loadCalendar();
+    UI.loadCalendar(); // 載入靜態行事曆 iframe
 
-    // 事件：登出、選班
+    // 3. 綁定其他全域事件
     document.getElementById("signout").addEventListener("click", signOut);
-    document.getElementById("class").addEventListener("change", ()=> UI.loadAll());
+    document.getElementById("class").addEventListener("change", () => UI.loadAll());
   };
 
-  // ... onGoogleSignIn 和 signOut 函式保持不變 ...
-
-})(window);
-
-    // 綁定 UI
-    UI.bindTabs();
-    UI.loadCalendar();
-
-    // 事件：登出、選班
-    document.getElementById("signout").addEventListener("click", signOut);
-    document.getElementById("class").addEventListener("change", ()=> UI.loadAll());
-  };
-
-  // Google Sign-In callback（由 GIS 呼叫）
-  global.onGoogleSignIn = async (response)=>{
-    try{
+  // Google Sign-In callback（由 Google 的腳本在登入成功後呼叫）
+  global.onGoogleSignIn = async (response) => {
+    try {
       const idToken = response.credential;
-      const data = await Api.whoami(idToken);
+      const data = await Api.whoami(idToken); // 驗證 token 並取得使用者資料
+
+      // 將使用者資料存入全域狀態
       AppState.auth = {
         idToken,
         email: data.email,
@@ -55,32 +50,49 @@
         classes: data.classes || [],
         defaultClass: data.defaultClass || ""
       };
+
+      // 更新 UI 介面
       UI.renderUserUI();
-      Admin.fillClassDropdowns();
+      Admin.fillClassDropdowns(); // 填充管理介面的班級下拉選單
       Admin.bindAdminEvents();
-      if(AppState.auth.role === "admin"){
+
+      // 如果是管理員，載入管理員專屬的公告列表
+      if (AppState.auth.role === "admin") {
         await Admin.loadAdminAnnouncements();
       }
+      
+      // 載入所有與使用者相關的資料（公告、文件等）
       await UI.loadAll();
-    }catch(e){
+
+    } catch (e) {
       console.error(e);
       alert("登入失敗，請再試一次。");
     }
   };
 
-  function signOut(){
-    AppState.auth = { idToken:null, email:null, role:null, classes:[], defaultClass:"" };
+  // 登出函式
+  function signOut() {
+    // 1. 清除全域狀態中的認證資訊
+    AppState.auth = { idToken: null, email: null, role: null, classes: [], defaultClass: "" };
+
+    // 2. 還原 UI 到登出狀態
     document.getElementById("signin-container").classList.remove("hidden");
     document.getElementById("user-box").classList.add("hidden");
     document.getElementById("user-email").textContent = "";
     document.getElementById("class").classList.add("hidden");
 
-    // 清空畫面
+    // 3. 清空頁面上的資料
     document.getElementById("ann-body").innerHTML = "";
     document.getElementById("docs-list").innerHTML = "";
     document.getElementById("reminders").innerHTML = "";
     document.getElementById("classinfo-iframe").src = "about:blank";
     document.getElementById("att-iframe").src = "about:blank";
+
+    // 4. 如果管理員分頁存在，也將其隱藏
+    const adminTab = document.querySelector('.tab[data-tab="admin"]');
+    if (adminTab) {
+      adminTab.classList.add("hidden");
+    }
   }
 
 })(window);
