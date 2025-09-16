@@ -27,23 +27,18 @@
       </div>
       
       <div class="auth-section">
-        <div id="signin-container" class="signin-wrapper">
-         <!-- <div id="g_id_onload"
-               data-client_id=""
-               data-auto_prompt="false"
-               data-callback="onGoogleSignIn">
-          </div>-->
-			<!-- 只需要一個容器來放置按鈕 -->
-			<div id="google-signin-button"></div>
-          <div class="g_id_signin"
-               data-type="standard"
-               data-size="large"
-               data-theme="outline"
-               data-text="sign_in_with"
-               data-shape="pill"
-               data-logo_alignment="left">
-          </div>
-        </div>
+        <!-- index.html -->
+<div id="signin-container">
+  <!-- 移除舊的 div，換成下面這個標準的 g_id_signin div -->
+  <div class="g_id_signin"
+       data-type="standard"
+       data-size="large"
+       data-theme="outline"
+       data-text="sign_in_with"
+       data-shape="pill"
+       data-logo_alignment="left">
+  </div>
+</div>
         
         <div id="user-box" class="user-info hidden">
           <div class="user-details">
@@ -312,4 +307,5 @@
 </body>
 
 </html>
+
 
