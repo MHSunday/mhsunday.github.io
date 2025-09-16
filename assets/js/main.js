@@ -4,8 +4,35 @@
 
   window.onload = () => {
     // 設定 Google Sign-In client id
-    const onloadEl = document.getElementById("g_id_onload");
-    onloadEl?.setAttribute("data-client_id", APP_CONFIG.OAUTH_CLIENT_ID);
+    // assets/js/main.js
+(function(global){
+  const { APP_CONFIG, Api, AppState, UI, Admin } = global;
+
+  window.onload = () => {
+    // 使用 JavaScript 初始化 Google Sign-In
+    google.accounts.id.initialize({
+      client_id: APP_CONFIG.OAUTH_CLIENT_ID,
+      callback: global.onGoogleSignIn // 確保 onGoogleSignIn 是全域函式
+    });
+
+    // 將按鈕渲染到指定的元素上
+    google.accounts.id.renderButton(
+      document.getElementById("google-signin-button"),
+      { theme: "outline", size: "large", text: "sign_in_with", shape: "pill" } // 按鈕樣式
+    );
+
+    // 綁定 UI
+    UI.bindTabs();
+    UI.loadCalendar();
+
+    // 事件：登出、選班
+    document.getElementById("signout").addEventListener("click", signOut);
+    document.getElementById("class").addEventListener("change", ()=> UI.loadAll());
+  };
+
+  // ... onGoogleSignIn 和 signOut 函式保持不變 ...
+
+})(window);
 
     // 綁定 UI
     UI.bindTabs();
@@ -55,4 +82,5 @@
     document.getElementById("classinfo-iframe").src = "about:blank";
     document.getElementById("att-iframe").src = "about:blank";
   }
+
 })(window);
