@@ -6,21 +6,6 @@
   // 當整個頁面（包括所有資源）載入完成後執行
  // main.js
 window.onload = () => {
-  // 1. 初始化 Google Sign-In (這部分仍然需要)
-  if (window.google?.accounts?.id && APP_CONFIG?.OAUTH_CLIENT_ID) {
-    google.accounts.id.initialize({
-      client_id: APP_CONFIG.OAUTH_CLIENT_ID,
-      callback: global.onGoogleSignIn,
-      ux_mode: 'redirect' // <--- 新增這一行
-
-    });
-  } else {
-    console.error("Google GSI 腳本或 OAUTH_CLIENT_ID 未載入，無法初始化登入功能。");
-  }
-
-  // 2. 移除 renderButton 的呼叫，因為 HTML 會自動處理
-  // google.accounts.id.renderButton(...)  <-- 刪除這一段
-
   // 3. 綁定 UI 事件 (保持不變)
   UI.bindTabs();
   UI.loadCalendar();
@@ -90,6 +75,7 @@ window.onload = () => {
   }
 
 })(window);
+
 
 
 
