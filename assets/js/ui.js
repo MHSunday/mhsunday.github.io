@@ -21,6 +21,63 @@
     });
   }
 
+// assets/js/ui.js (additions/changes inside IIFE)
+async function loadCalendarEvents(){
+  try{
+    const data = await Api.getCalendarEvents(AppState.auth.idToken, 14);
+    renderCalendarEvents(data.items || []);
+  }catch(e){
+    console.error(e);
+    renderCalendarEvents([]);
+  }
+}
+
+function renderCalendarEvents(items){
+  const section = document.getElementById("week");
+  // Replace any iframe usage with a list container
+  let list = section.querySelector(".event-list");
+  if(!list){
+    const content = section.querySelector(".card-content");
+    content.innerHTML = '<div class="event-list"></div>';
+    list = content.querySelector(".event-list");
+  }
+  list.innerHTML = "";
+
+  if(!items.length){
+    list.innerHTML = `
+      <div class="empty-state">
+        <span class="empty-icon">📭</span>
+        <p>近期沒有行事曆事件</p>
+      </div>`;
+    return;
+  }
+
+  items.forEach(ev=>{
+    const div = document.createElement("div");
+    div.className = "item"; // Card style
+    div.innerHTML = `
+      <div class="big-label">${esc(ev.title || "未命名事件")}</div>
+      <div class="muted">${esc(ev.start)} → ${esc(ev.end)}</div>
+      ${ev.location ? `<div class="muted">地點：${esc(ev.location)}</div>` : ""}
+      ${ev.description ? `<div style="margin-top:6px">${nl2br(esc(ev.description))}</div>` : ""}
+    `;
+    list.appendChild(div);
+  });
+}
+
+// Modify loadAll to call loadCalendarEvents instead of loadCalendar iframe
+async function loadAll(){
+  const klass = AppState.currentClass;
+  await Promise.all([
+    loadAnnouncements(klass),
+    loadDocuments(klass),
+    loadReminders(klass),
+    loadCalendarEvents()
+  ]);
+  loadClassSheets(klass);
+}
+
+// Remove or ignore previous loadCalendar() calls used for iframe
   // 行事曆
   function loadCalendar(){
     document.getElementById("calendar-iframe").src = GOOGLE_CAL_EMBED;

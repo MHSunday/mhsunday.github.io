@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>主日學 • 管理後台</title>
+  <meta name="color-scheme" content="light only" />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+<body>
+<header>
+  <div class="header-container">
+    <div class="header-content">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div class="brand-text">
+          <h1>管理後台</h1>
+          <p class="subtitle">公告設定與維護</p>
+        </div>
+      </div>
+      <div class="auth-section">
+        <div id="signin-container" class="signin-wrapper">
+          <div id="g_id_onload"
+               data-client_id=""
+               data-auto_prompt="false"
+               data-callback="onGoogleSignIn">
+          </div>
+          <div class="g_id_signin"
+               data-type="standard"
+               data-size="large"
+               data-theme="outline"
+               data-text="sign_in_with"
+               data-shape="pill"
+               data-logo_alignment="left">
+          </div>
+        </div>
+        <div id="user-box" class="user-info hidden">
+          <div class="user-details">
+            <div class="user-avatar"><span id="user-initial">U</span></div>
+            <div class="user-meta">
+              <span id="user-email" class="user-email"></span>
+              <span id="user-role" class="user-role"></span>
+            </div>
+          </div>
+          <button id="signout" class="btn-signout">登出</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="main-container">
+  <div class="content-wrapper">
+
+    <section class="content-card">
+      <div class="card-header">
+        <h2 class="card-title"><span class="title-icon">⚙</span> 公告管理</h2>
+        <button id="reload-admin" class="btn-secondary btn-small">↻ 重新載入</button>
+      </div>
+      <div class="card-content">
+        <div class="admin-form">
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="a-title">標題 <span class="required">*</span></label>
+              <input id="a-title" type="text" placeholder="輸入公告標題" />
+            </div>
+            <div class="form-field span-2">
+              <label for="a-body">內容</label>
+              <textarea id="a-body" rows="4" placeholder="輸入公告內容"></textarea>
+            </div>
+            <div class="form-field">
+              <label for="a-class">目標班級</label>
+              <select id="a-class">
+                <option value="">選擇班級</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="a-audience">目標對象</label>
+              <select id="a-audience">
+                <option value="All">全部</option>
+                <option value="Teachers">所有老師</option>
+                <option value="Coordinators">協調同工</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="a-priority">優先級</label>
+              <select id="a-priority">
+                <option value="normal">一般</option>
+                <option value="warn">提醒</option>
+                <option value="danger">緊急</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="a-start">開始日期</label>
+              <input id="a-start" type="date" />
+            </div>
+            <div class="form-field">
+              <label for="a-end">結束日期</label>
+              <input id="a-end" type="date" />
+            </div>
+          </div>
+          <div class="form-actions">
+            <button id="a-save" class="btn-primary">💾 儲存</button>
+            <button id="a-clear" class="btn-secondary">🗑 清除</button>
+          </div>
+        </div>
+
+        <div class="admin-list">
+          <h3 class="section-title">現有公告</h3>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>標題</th>
+                  <th>對象</th>
+                  <th>開始</th>
+                  <th>結束</th>
+                  <th>優先</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="admin-ann-list"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="footer-content">
+    <p>© 2025 主日學 • 管理後台</p>
+  </div>
+</footer>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/state.js"></script>
+<script src="assets/js/ui-admin-shell.js"></script>
+<script src="assets/js/admin.js"></script>
+<script src="assets/js/admin.main.js"></script>
+</body>
+</html>
