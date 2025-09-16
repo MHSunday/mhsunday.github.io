@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>主日學老師平台</title>
+  <meta name="color-scheme" content="light only" />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <h1>主日學老師平台</h1>
+          <div class="help">請使用 Google 帳號登入，然後選擇您的班級。</div>
+        </div>
+      </div>
+      <div class="controls">
+        <div id="signin-container">
+          <div id="g_id_onload"
+               data-client_id=""
+               data-auto_prompt="false"
+               data-callback="onGoogleSignIn">
+          </div>
+          <div class="g_id_signin"
+               data-type="standard"
+               data-size="large"
+               data-theme="outline"
+               data-text="sign_in_with"
+               data-shape="pill"
+               data-logo_alignment="left">
+          </div>
+        </div>
+        <div id="user-box" class="hidden">
+          <span id="user-email" class="pill"></span>
+          <button id="signout" class="secondary">登出</button>
+        </div>
+        <select id="class" class="hidden" aria-label="選擇班級">
+          <option value="">選擇班級</option>
+        </select>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="功能分頁">
+      <button class="tab active" data-tab="ann">公告</button>
+      <button class="tab" data-tab="week">本週行事曆</button>
+      <button class="tab" data-tab="classinfo">班級資料</button>
+      <button class="tab" data-tab="att">出席表</button>
+      <button class="tab" data-tab="docs">文件下載</button>
+      <button class="tab" data-tab="global">全校提醒</button>
+      <button class="tab hidden" data-tab="admin">管理（公告）</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="ann" class="card">
+    <div class="row">
+      <h2>公告</h2>
+      <div class="spacer"></div>
+      <span id="ann-count" class="pill">—</span>
+    </div>
+    <div id="ann-body" class="list"></div>
+    <div id="ann-empty" class="empty">目前沒有公告。</div>
+  </section>
+
+  <section id="week" class="card hidden">
+    <div class="row">
+      <h2>本週行事曆</h2>
+      <div class="spacer"></div>
+      <span class="pill">Google 行事曆</span>
+    </div>
+    <iframe id="calendar-iframe" title="行事曆"></iframe>
+  </section>
+
+  <section id="classinfo" class="card hidden">
+    <div class="row">
+      <h2>班級資料</h2>
+      <div class="spacer"></div>
+      <span class="pill" id="ci-class">—</span>
+    </div>
+    <div class="help">手機操作建議：用兩指在表格內滑動；若需更寬視圖可橫置手機。</div>
+    <iframe id="classinfo-iframe" title="班級資料"></iframe>
+  </section>
+
+  <section id="att" class="card hidden">
+    <div class="row">
+      <h2>出席表</h2>
+      <div class="spacer"></div>
+      <span class="pill" id="att-class">—</span>
+    </div>
+    <iframe id="att-iframe" title="出席表"></iframe>
+  </section>
+
+  <section id="docs" class="card hidden">
+    <div class="row">
+      <h2>文件下載</h2>
+      <div class="spacer"></div>
+      <span class="pill" id="docs-count">—</span>
+    </div>
+    <div id="docs-list" class="list"></div>
+    <div id="docs-empty" class="empty">目前沒有可下載的文件。</div>
+  </section>
+
+  <section id="global" class="card hidden">
+    <div class="row">
+      <h2>全校提醒</h2>
+    </div>
+    <div id="reminders" class="list"></div>
+    <div id="rem-empty" class="empty">目前沒有提醒。</div>
+  </section>
+
+  <section id="admin" class="card hidden">
+    <div class="row">
+      <h2>管理 • 公告設定</h2>
+      <div class="spacer"></div>
+      <button id="reload-admin" class="secondary btn-small">重新載入</button>
+    </div>
+    <div class="admin-panel">
+      <div class="field">
+        <label for="a-title">標題</label>
+        <input id="a-title" placeholder="公告標題" />
+      </div>
+      <div class="field">
+        <label for="a-body">內容</label>
+        <textarea id="a-body" rows="4" class="textarea" placeholder="公告內容"></textarea>
+      </div>
+      <div class="field">
+        <label>對象（以班級為主）</label>
+        <div class="row">
+          <select id="a-class">
+            <option value="">選擇班級（或留白改用下列對象）</option>
+          </select>
+          <select id="a-audience">
+            <option value="All">全部</option>
+            <option value="Teachers">所有老師</option>
+            <option value="Coordinators">協調同工</option>
+          </select>
+          <select id="a-priority">
+            <option value="normal">一般</option>
+            <option value="warn">提醒</option>
+            <option value="danger">緊急</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>期間（可選）</label>
+        <div class="row">
+          <input id="a-start" type="date" />
+          <input id="a-end" type="date" />
+          <button id="a-save">新增 / 更新</button>
+          <button id="a-clear" class="secondary">清除表單</button>
+        </div>
+      </div>
+    </div>
+    <h3 class="sub-title">已有公告</h3>
+    <div class="help">點「編輯」會帶入上方表單；「刪除」將永久移除。</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>標題</th><th>對象</th><th>開始</th><th>結束</th><th>優先</th><th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="admin-ann-list"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer>
+  © 主日學。若需協助請聯絡協調同工。
+</footer>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/state.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/admin.js"></script>
+<script src="assets/js/main.js"></script>
+</body>
+</html>
