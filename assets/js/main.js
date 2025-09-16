@@ -4,37 +4,29 @@
   const { APP_CONFIG, Api, AppState, UI, Admin } = global;
 
   // 當整個頁面（包括所有資源）載入完成後執行
-  window.onload = () => {
-    // 1. 初始化 Google Sign-In
-    // 確保 APP_CONFIG 和 OAUTH_CLIENT_ID 存在
-    if (window.google?.accounts?.id && APP_CONFIG?.OAUTH_CLIENT_ID) {
-      google.accounts.id.initialize({
-        client_id: APP_CONFIG.OAUTH_CLIENT_ID,
-        callback: global.onGoogleSignIn // 指定登入成功後的回呼函式
-      });
+ // main.js
+window.onload = () => {
+  // 1. 初始化 Google Sign-In (這部分仍然需要)
+  if (window.google?.accounts?.id && APP_CONFIG?.OAUTH_CLIENT_ID) {
+    google.accounts.id.initialize({
+      client_id: APP_CONFIG.OAUTH_CLIENT_ID,
+      callback: global.onGoogleSignIn
+    });
+  } else {
+    console.error("Google GSI 腳本或 OAUTH_CLIENT_ID 未載入，無法初始化登入功能。");
+  }
 
-      // 將 Google 登入按鈕渲染到指定的 HTML 元素上
-      const googleButtonContainer = document.getElementById("google-signin-button");
-      if (googleButtonContainer) {
-        google.accounts.id.renderButton(
-          googleButtonContainer,
-          { theme: "outline", size: "large", text: "sign_in_with", shape: "pill" } // 按鈕樣式
-        );
-      } else {
-        console.error("找不到 ID 為 'google-signin-button' 的元素來渲染 Google 登入按鈕。");
-      }
-    } else {
-      console.error("Google GSI 腳本或 OAUTH_CLIENT_ID 未載入，無法初始化登入功能。");
-    }
+  // 2. 移除 renderButton 的呼叫，因為 HTML 會自動處理
+  // google.accounts.id.renderButton(...)  <-- 刪除這一段
 
-    // 2. 綁定 UI 事件
-    UI.bindTabs();
-    UI.loadCalendar(); // 載入靜態行事曆 iframe
+  // 3. 綁定 UI 事件 (保持不變)
+  UI.bindTabs();
+  UI.loadCalendar();
 
-    // 3. 綁定其他全域事件
-    document.getElementById("signout").addEventListener("click", signOut);
-    document.getElementById("class").addEventListener("change", () => UI.loadAll());
-  };
+  // 4. 綁定其他全域事件 (保持不變)
+  document.getElementById("signout").addEventListener("click", signOut);
+  document.getElementById("class").addEventListener("change", () => UI.loadAll());
+};
 
   // Google Sign-In callback（由 Google 的腳本在登入成功後呼叫）
   global.onGoogleSignIn = async (response) => {
@@ -96,3 +88,4 @@
   }
 
 })(window);
+
