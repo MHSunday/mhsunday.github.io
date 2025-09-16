@@ -10,7 +10,9 @@ window.onload = () => {
   if (window.google?.accounts?.id && APP_CONFIG?.OAUTH_CLIENT_ID) {
     google.accounts.id.initialize({
       client_id: APP_CONFIG.OAUTH_CLIENT_ID,
-      callback: global.onGoogleSignIn
+      callback: global.onGoogleSignIn,
+      ux_mode: 'redirect' // <--- 新增這一行
+});
     });
   } else {
     console.error("Google GSI 腳本或 OAUTH_CLIENT_ID 未載入，無法初始化登入功能。");
@@ -88,4 +90,5 @@ window.onload = () => {
   }
 
 })(window);
+
 
