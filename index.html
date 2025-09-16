@@ -29,7 +29,21 @@
       <div class="auth-section">
         <!-- index.html -->
 <div id="signin-container">
-  <!-- 移除舊的 div，換成下面這個標準的 g_id_signin div -->
+  <!-- 
+    DIV 1: 用於初始化。
+    這個 div 是隱形的，專門用來告訴 GSI 腳本 Client ID 和回呼函式。
+    Google 的腳本會先讀取這裡的設定。
+  -->
+  <div id="g_id_onload"
+       data-client_id="339277687965-7gkbr7hi74iv2viu92flrfh65vm7ibt2.apps.googleusercontent.com"
+       data-callback="onGoogleSignIn"
+       data-auto_prompt="false">
+  </div>
+
+  <!-- 
+    DIV 2: 用於渲染按鈕。
+    GSI 腳本在完成初始化後，會找到這個 div 並把按鈕畫在這裡。
+  -->
   <div class="g_id_signin"
        data-type="standard"
        data-size="large"
@@ -307,5 +321,6 @@
 </body>
 
 </html>
+
 
 
