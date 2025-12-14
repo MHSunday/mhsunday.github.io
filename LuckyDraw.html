@@ -1,0 +1,1443 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>互動抽獎程式</title>
+  <style>
+    :root{
+      --bg1:#071427;
+      --bg2:#0b2a4a;
+      --text:#f7fbff;
+      --muted: rgba(247,251,255,.75);
+      --accent:#ffd166;
+      --accent2:#7dd3fc;
+      --good:#34d399;
+      --danger:#fb7185;
+      --shadow: 0 18px 50px rgba(0,0,0,.35);
+      --radius: 18px;
+    }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      color:var(--text);
+      min-height:100vh;
+      background: radial-gradient(1200px 700px at 25% 10%, rgba(125,211,252,.18), transparent 60%),
+                  radial-gradient(1000px 650px at 70% 25%, rgba(255,209,102,.16), transparent 55%),
+                  linear-gradient(180deg, var(--bg1), var(--bg2));
+      overflow-x:hidden;
+    }
+
+    .bg{
+      position:fixed;
+      inset:0;
+      z-index:-3;
+      pointer-events:none;
+    }
+    .bg svg{ width:100%; height:100%; display:block; }
+
+    .grain{
+      position:fixed;
+      inset:0;
+      z-index:-2;
+      pointer-events:none;
+      background-image:
+        radial-gradient(circle at 10% 20%, rgba(255,255,255,.05) 0 1px, transparent 2px),
+        radial-gradient(circle at 80% 10%, rgba(255,255,255,.04) 0 1px, transparent 2px),
+        radial-gradient(circle at 30% 70%, rgba(255,255,255,.03) 0 1px, transparent 2px),
+        radial-gradient(circle at 70% 80%, rgba(255,255,255,.03) 0 1px, transparent 2px);
+      background-size: 220px 220px, 260px 260px, 300px 300px, 340px 340px;
+      opacity:.75;
+      mix-blend-mode: screen;
+    }
+
+    .wrap{
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 20px 16px 34px;
+    }
+
+    header{
+      display:flex;
+      gap:14px;
+      align-items:flex-start;
+      justify-content:space-between;
+      flex-wrap:wrap;
+      margin-top: 8px;
+    }
+    .title{ flex: 1 1 360px; min-width: 280px; }
+    h1{
+      margin:0;
+      font-size: clamp(22px, 4vw, 34px);
+      letter-spacing:.5px;
+      text-shadow: 0 8px 20px rgba(0,0,0,.25);
+    }
+    .subtitle{
+      margin: 8px 0 0;
+      color: var(--muted);
+      line-height:1.5;
+      font-size: 14px;
+    }
+
+    .pill{
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.10);
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow: var(--shadow);
+      font-size: 13px;
+      color: rgba(255,255,255,.85);
+      user-select:none;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .dot{
+      width:10px; height:10px; border-radius:50%;
+      background: var(--danger);
+      box-shadow: 0 0 0 4px rgba(251,113,133,.18);
+    }
+    .dot.ok{ background: var(--good); box-shadow: 0 0 0 4px rgba(52,211,153,.18); }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 14px;
+      margin-top: 14px;
+    }
+    @media (max-width: 860px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+	
+	/* 1) overlay 背景與內容顯示層都不要攔截滑鼠 */
+#overlay .scene,
+#overlay .scene *,
+#overlay .stage,
+#overlay .stage *{
+  pointer-events: none;
+}
+
+/* 2) 只有 topbar 的按鈕區可以互動 */
+#overlay .topbar,
+#overlay .topbar *{
+  pointer-events: auto;
+}
+
+/* 3) 確保 topbar 疊在最上層 */
+#overlay .topbar{
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+}
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06));
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .card h2{
+      margin: 2px 0 10px;
+      font-size: 16px;
+      color: rgba(255,255,255,.92);
+      letter-spacing:.3px;
+    }
+    .help{
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height:1.5;
+    }
+
+    .row{
+      display:flex;
+      gap: 10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+
+    input[type="file"]{
+      width:100%;
+      max-width: 520px;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px dashed rgba(255,255,255,.26);
+      background: rgba(0,0,0,.15);
+      color: rgba(255,255,255,.85);
+    }
+
+    .btn{
+      appearance:none;
+      border:none;
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-weight: 800;
+      letter-spacing:.6px;
+      cursor:pointer;
+      transition: transform .08s ease, filter .12s ease, opacity .2s ease;
+      box-shadow: 0 12px 24px rgba(0,0,0,.25);
+      user-select:none;
+      touch-action: manipulation;
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      min-height: 44px;
+    }
+    .btn:active{ transform: translateY(1px) scale(.99); }
+    .btn[disabled]{ opacity:.55; cursor:not-allowed; filter:saturate(.7); }
+
+    .btn-primary{
+      color:#1b1b1b;
+      background: linear-gradient(180deg, #ffe08a, #ffbf3f);
+    }
+    .btn-secondary{
+      color: rgba(255,255,255,.92);
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.16);
+      box-shadow:none;
+    }
+
+    .controls{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .toggle{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(0,0,0,.18);
+      border: 1px solid rgba(255,255,255,.14);
+    }
+    .toggle input{ width: 18px; height:18px; }
+    .toggle label{ color: rgba(255,255,255,.88); font-size: 14px; }
+
+    .result{
+      position:relative;
+      overflow:hidden;
+      padding: 16px;
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.08));
+      border: 1px solid rgba(255,255,255,.16);
+      box-shadow: var(--shadow);
+      min-height: 210px;
+    }
+
+	#overlay.overlay {
+	  position: fixed;
+	  inset: 0;
+	  z-index: 9999;
+	  opacity: 0;
+	  visibility: hidden;
+	  pointer-events: none; /* ✅ 關閉時不擋點擊 */
+	  transition: opacity .2s ease, visibility .2s ease;
+	}
+
+	#overlay.overlay.show {
+	  opacity: 1;
+	  visibility: visible;
+	  pointer-events: auto; /* ✅ 開啟時才擋 */
+	}
+
+
+    .overlay .panel{
+      position: relative;
+      height: 100vh;
+      width: 100%;
+      margin: 0;
+      border-radius: 0;
+      overflow: hidden;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .overlay .scene{
+      position:absolute;
+      inset:0;
+      z-index:0;
+      pointer-events:none;
+    }
+    .overlay .scene svg{ width:100%; height:100%; display:block; }
+
+    .overlay .veil{
+      position:absolute;
+      inset:0;
+      z-index:1;
+      background: radial-gradient(1000px 600px at 55% 35%, rgba(255,209,102,.10), transparent 60%),
+                  linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.40));
+    }
+
+    .overlay .topbar{
+      position:absolute;
+      left: 12px; right: 12px; top: 12px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      z-index: 3;
+      flex-wrap:wrap;
+    }
+
+    .badge{
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(0,0,0,.35);
+      color: rgba(255,255,255,.90);
+      font-size: 13px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      user-select:none;
+    }
+
+    .overlay .stage{
+      position: relative;
+      height: 100%;
+      display:grid;
+      place-items:center;
+      text-align:center;
+      padding: 84px 18px 24px;
+      z-index: 3;
+    }
+
+    .big{
+      font-size: clamp(44px, 7.2vw, 92px);
+      line-height:1.02;
+      margin: 8px 0 6px;
+      letter-spacing: .6px;
+      text-shadow: 0 22px 60px rgba(0,0,0,.55);
+      font-weight: 950;
+    }
+    .classline{
+      margin: 0;
+      color: rgba(255,255,255,.92);
+      font-weight: 900;
+      font-size: clamp(18px, 3.3vw, 30px);
+      letter-spacing:.4px;
+      text-shadow: 0 14px 40px rgba(0,0,0,.45);
+    }
+    .hint{
+      margin: 14px auto 0;
+      color: rgba(255,255,255,.86);
+      font-size: 14px;
+      line-height:1.6;
+      max-width: 46ch;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.30);
+      width: fit-content;
+    }
+
+    .ticker{
+      font-variant-numeric: tabular-nums;
+      display:flex;
+      gap:8px;
+      align-items:center;
+      justify-content:center;
+      flex-wrap:wrap;
+      color: rgba(255,255,255,.88);
+      font-size: 13px;
+      margin-top: 16px;
+    }
+    .chip{
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.32);
+      border: 1px solid rgba(255,255,255,.14);
+    }
+
+    .toast{
+      margin-top:10px;
+      color: rgba(255,255,255,.85);
+      font-size: 13px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.18);
+    }
+
+    .table{
+      width:100%;
+      border-collapse: collapse;
+      overflow:hidden;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.10);
+    }
+    .table th, .table td{
+      padding: 10px 10px;
+      border-bottom: 1px solid rgba(255,255,255,.10);
+      text-align:left;
+      font-size: 13px;
+      color: rgba(255,255,255,.88);
+      vertical-align: top;
+      word-break: break-word;
+    }
+    .table th{
+      color: rgba(255,255,255,.92);
+      background: rgba(255,255,255,.06);
+      position:sticky;
+      top:0;
+      backdrop-filter: blur(10px);
+    }
+    .table tr:last-child td{ border-bottom:none; }
+    .scroll{ max-height: 320px; overflow:auto; border-radius: 14px; }
+
+    .confetti{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      overflow:hidden;
+      z-index: 4;
+    }
+    .piece{
+      position:absolute;
+      width:10px; height:14px;
+      opacity:0;
+      border-radius: 3px;
+      transform: translateY(-20px) rotate(0deg);
+      animation: fall 900ms ease-out forwards;
+    }
+    @keyframes fall{
+      0%{ opacity:0; transform: translateY(-20px) rotate(0deg); }
+      15%{ opacity:1; }
+      100%{ opacity:0; transform: translateY(110vh) rotate(260deg); }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="bg" aria-hidden="true">
+    <svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" stop-color="#06101f"/>
+          <stop offset="1" stop-color="#0b2a4a"/>
+        </linearGradient>
+        <radialGradient id="starGlow" cx="50%" cy="35%" r="35%">
+          <stop offset="0" stop-color="#ffe9a8" stop-opacity="1"/>
+          <stop offset="0.4" stop-color="#ffd166" stop-opacity="0.35"/>
+          <stop offset="1" stop-color="#ffd166" stop-opacity="0"/>
+        </radialGradient>
+        <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="6"/>
+        </filter>
+        <filter id="twinkle" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="1.2" result="b"/>
+          <feMerge>
+            <feMergeNode in="b"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+
+      <rect width="1200" height="800" fill="url(#sky)"/>
+      <circle cx="650" cy="210" r="240" fill="url(#starGlow)" filter="url(#soft)"/>
+
+      <g transform="translate(650 210)" filter="url(#twinkle)">
+        <polygon points="0,-62 14,-16 62,0 14,16 0,62 -14,16 -62,0 -14,-16"
+                 fill="#ffe9a8" opacity="0.95"/>
+        <polygon points="0,-95 10,-30 95,0 10,30 0,95 -10,30 -95,0 -10,-30"
+                 fill="#ffd166" opacity="0.55"/>
+      </g>
+
+      <g opacity="0.85">
+        <circle cx="140" cy="120" r="2" fill="#e9f2ff"/>
+        <circle cx="220" cy="80" r="1.5" fill="#e9f2ff"/>
+        <circle cx="360" cy="160" r="1.8" fill="#e9f2ff"/>
+        <circle cx="980" cy="120" r="2.2" fill="#e9f2ff"/>
+        <circle cx="1060" cy="190" r="1.6" fill="#e9f2ff"/>
+        <circle cx="820" cy="70" r="1.4" fill="#e9f2ff"/>
+        <circle cx="520" cy="90" r="1.7" fill="#e9f2ff"/>
+        <circle cx="740" cy="140" r="1.5" fill="#e9f2ff"/>
+        <circle cx="620" cy="70" r="1.3" fill="#e9f2ff"/>
+        <circle cx="160" cy="220" r="1.3" fill="#e9f2ff"/>
+        <circle cx="1080" cy="70" r="1.2" fill="#e9f2ff"/>
+      </g>
+
+      <path d="M650 210 C 620 310, 520 380, 430 420"
+            stroke="rgba(255,209,102,.38)" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <path d="M650 210 C 630 305, 540 380, 460 430"
+            stroke="rgba(125,211,252,.26)" stroke-width="4" fill="none" stroke-linecap="round"/>
+
+      <path d="M0 560 C 200 520, 380 620, 560 580 C 760 535, 980 610, 1200 570 L 1200 800 L 0 800 Z"
+            fill="rgba(0,0,0,.35)"/>
+      <path d="M0 610 C 220 585, 420 675, 610 640 C 820 600, 980 700, 1200 660 L 1200 800 L 0 800 Z"
+            fill="rgba(0,0,0,.46)"/>
+    </svg>
+  </div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <div class="wrap">
+    <header>
+      <div class="title">
+        <h1>望廈聖方濟各堂主日學 主顯節</h1>
+        <p class="subtitle">
+          上傳 <strong>CSV</strong>（欄位：<strong>班別, 姓名</strong>）後按「抽獎」。
+          抽出時會自動<strong>全屏顯示（不透明背景：三皇來朝）</strong>，按右上角或按 <kbd>Esc</kbd> 可關閉。
+        </p>
+      </div>
+
+      <div class="pill" id="statusPill" title="資料狀態">
+        <span class="dot" id="statusDot"></span>
+        <span id="statusText">尚未載入名單</span>
+      </div>
+    </header>
+
+    <section class="grid">
+      <div class="card">
+        <h2>1) 上傳名單（CSV）</h2>
+        <p class="help">
+          CSV 第一行可有標題：<code>班別,姓名</code>。支援多餘欄位（只取前兩欄）。
+          也會自動嘗試分隔符：逗號 / 分號 / tab。
+        </p>
+
+        <div class="row">
+          <input id="fileInput" type="file" accept=".csv,text/csv" />
+          <button class="btn btn-secondary" id="demoBtn" type="button">載入範例名單</button>
+        </div>
+
+        <div class="controls">
+          <div class="toggle">
+            <input id="noRepeat" type="checkbox" checked />
+            <label for="noRepeat">不重複抽出（抽過就不再出現）</label>
+          </div>
+
+          <div class="toggle">
+            <input id="soundOn" type="checkbox" checked />
+            <label for="soundOn">抽獎音效（需使用者操作才能播放）</label>
+          </div>
+		 
+		 <div class="toggle">
+			  <input id="speechOn" type="checkbox" checked />
+		 	  <label for="speechOn">抽出後朗讀姓名（粵語/英語）</label>
+		 </div>
+
+          <div class="row">
+            <button class="btn btn-primary" id="drawBtn" type="button" disabled>
+              <span aria-hidden="true">🎁</span>抽獎！
+            </button>
+            <button class="btn btn-secondary" id="resetBtn" type="button" disabled>重置抽獎</button>
+            <button class="btn btn-secondary" id="clearBtn" type="button">清除名單</button>
+          </div>
+
+          <div class="toast" id="toast" role="status" aria-live="polite" style="display:none;"></div>
+        </div>
+      </div>
+
+      <div class="result" aria-live="polite">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+          <div class="badge">⭐ 小提示：抽獎會跳出全屏結果 ⭐</div>
+          <button class="btn btn-secondary" id="openOverlayBtn" type="button" title="手動開啟全屏顯示">
+            全屏顯示
+          </button>
+        </div>
+
+        <div style="margin-top:12px; text-align:center;">
+          <div style="font-size: 14px; color: var(--muted); line-height:1.6;">
+            按下「抽獎！」後會全屏顯示得獎者。
+          </div>
+
+          <div class="ticker" style="margin-top: 12px;">
+            <span class="chip">總筆數：<strong id="totalCount">0</strong></span>
+            <span class="chip">可抽：<strong id="availableCount">0</strong></span>
+            <span class="chip">已抽：<strong id="drawnCount">0</strong></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:14px;">
+      <h2>2) 名單預覽</h2>
+      <p class="help">顯示前 200 筆，方便確認匯入是否正確。</p>
+      <div class="scroll">
+        <table class="table" aria-label="名單預覽表格">
+          <thead>
+            <tr>
+              <th style="width: 90px;">序號</th>
+              <th style="width: 180px;">班別</th>
+              <th>姓名</th>
+            </tr>
+          </thead>
+          <tbody id="previewBody">
+            <tr><td colspan="3" style="color: rgba(255,255,255,.7);">尚未載入</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="overlay" id="overlay" aria-hidden="true">
+    <div class="panel" role="dialog" aria-modal="true" aria-label="抽獎結果（全屏顯示）">
+      <div class="scene" aria-hidden="true">
+       <div class="scene" aria-hidden="true">
+  <svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0" stop-color="#06101f"/>
+        <stop offset="1" stop-color="#0b2a4a"/>
+      </linearGradient>
+      <radialGradient id="starGlow" cx="50%" cy="35%" r="35%">
+        <stop offset="0" stop-color="#ffe9a8" stop-opacity="1"/>
+        <stop offset="0.4" stop-color="#ffd166" stop-opacity="0.35"/>
+        <stop offset="1" stop-color="#ffd166" stop-opacity="0"/>
+      </radialGradient>
+      <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="6"/>
+      </filter>
+      <filter id="twinkle" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="1.2" result="b"/>
+        <feMerge>
+          <feMergeNode in="b"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+    </defs>
+    <rect width="1200" height="800" fill="url(#sky)"/>
+    <circle cx="650" cy="210" r="240" fill="url(#starGlow)" filter="url(#soft)"/>
+    <g transform="translate(650 210)" filter="url(#twinkle)">
+      <polygon points="0,-62 14,-16 62,0 14,16 0,62 -14,16 -62,0 -14,-16"
+               fill="#ffe9a8" opacity="0.95"/>
+      <polygon points="0,-95 10,-30 95,0 10,30 0,95 -10,30 -95,0 -10,-30"
+               fill="#ffd166" opacity="0.55"/>
+    </g>
+    <g opacity="0.85">
+      <circle cx="140" cy="120" r="2" fill="#e9f2ff"/>
+      <circle cx="220" cy="80" r="1.5" fill="#e9f2ff"/>
+      <circle cx="360" cy="160" r="1.8" fill="#e9f2ff"/>
+      <circle cx="980" cy="120" r="2.2" fill="#e9f2ff"/>
+      <circle cx="1060" cy="190" r="1.6" fill="#e9f2ff"/>
+      <circle cx="820" cy="70" r="1.4" fill="#e9f2ff"/>
+      <circle cx="520" cy="90" r="1.7" fill="#e9f2ff"/>
+      <circle cx="740" cy="140" r="1.5" fill="#e9f2ff"/>
+      <circle cx="620" cy="70" r="1.3" fill="#e9f2ff"/>
+      <circle cx="160" cy="220" r="1.3" fill="#e9f2ff"/>
+      <circle cx="1080" cy="70" r="1.2" fill="#e9f2ff"/>
+    </g>
+    <path d="M650 210 C 620 310, 520 380, 430 420"
+          stroke="rgba(255,209,102,.38)" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M650 210 C 630 305, 540 380, 460 430"
+          stroke="rgba(125,211,252,.26)" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M0 560 C 200 520, 380 620, 560 580 C 760 535, 980 610, 1200 570 L 1200 800 L 0 800 Z"
+          fill="rgba(0,0,0,.35)"/>
+    <path d="M0 610 C 220 585, 420 675, 610 640 C 820 600, 980 700, 1200 660 L 1200 800 L 0 800 Z"
+          fill="rgba(0,0,0,.46)"/>
+  </svg>
+</div>
+          <defs>
+            <linearGradient id="oSky" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0" stop-color="#050f1d"/>
+              <stop offset="1" stop-color="#0a2744"/>
+            </linearGradient>
+            <radialGradient id="oStarGlow" cx="50%" cy="35%" r="36%">
+              <stop offset="0" stop-color="#fff2c5" stop-opacity="1"/>
+              <stop offset="0.45" stop-color="#ffd166" stop-opacity="0.30"/>
+              <stop offset="1" stop-color="#ffd166" stop-opacity="0"/>
+            </radialGradient>
+            <filter id="oSoft" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="7"/>
+            </filter>
+            <filter id="oTwinkle" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="1.4" result="b"/>
+              <feMerge>
+                <feMergeNode in="b"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
+
+          <rect width="1200" height="800" fill="url(#oSky)"/>
+          <circle cx="660" cy="190" r="280" fill="url(#oStarGlow)" filter="url(#oSoft)"/>
+
+          <g transform="translate(660 190)" filter="url(#oTwinkle)">
+            <polygon points="0,-64 14,-16 64,0 14,16 0,64 -14,16 -64,0 -14,-16"
+                     fill="#fff2c5" opacity="0.95"/>
+            <polygon points="0,-98 11,-30 98,0 11,30 0,98 -11,30 -98,0 -11,-30"
+                     fill="#ffd166" opacity="0.52"/>
+          </g>
+
+          <g opacity="0.90">
+            <circle cx="120" cy="110" r="2" fill="#e9f2ff"/>
+            <circle cx="240" cy="80" r="1.4" fill="#e9f2ff"/>
+            <circle cx="370" cy="150" r="1.6" fill="#e9f2ff"/>
+            <circle cx="980" cy="120" r="2.2" fill="#e9f2ff"/>
+            <circle cx="1090" cy="175" r="1.6" fill="#e9f2ff"/>
+            <circle cx="850" cy="70" r="1.4" fill="#e9f2ff"/>
+            <circle cx="520" cy="90" r="1.6" fill="#e9f2ff"/>
+            <circle cx="720" cy="120" r="1.4" fill="#e9f2ff"/>
+            <circle cx="620" cy="70" r="1.2" fill="#e9f2ff"/>
+            <circle cx="180" cy="210" r="1.2" fill="#e9f2ff"/>
+          </g>
+
+          <path d="M660 190 C 610 310, 520 390, 440 435"
+                stroke="rgba(255,209,102,.42)" stroke-width="7" fill="none" stroke-linecap="round"/>
+          <path d="M660 190 C 620 305, 545 392, 475 448"
+                stroke="rgba(125,211,252,.22)" stroke-width="5" fill="none" stroke-linecap="round"/>
+
+          <path d="M0 560 C 240 520, 420 640, 610 585 C 820 528, 980 620, 1200 575 L 1200 800 L 0 800 Z"
+                fill="rgba(0,0,0,.38)"/>
+          <path d="M0 620 C 220 590, 440 700, 650 650 C 840 605, 980 720, 1200 670 L 1200 800 L 0 800 Z"
+                fill="rgba(0,0,0,.52)"/>
+
+          <g transform="translate(610 560)" opacity="0.86">
+            <g transform="translate(-260 110) scale(1.05)">
+              <path d="M35 2 L45 18 L60 7 L58 28 L80 28 L66 41 L74 60 L55 48 L35 60 L43 41 L28 28 L52 28 Z"
+                    fill="rgba(0,0,0,.78)"/>
+              <circle cx="50" cy="78" r="16" fill="rgba(0,0,0,.78)"/>
+              <path d="M36 94 C28 128, 26 150, 22 178 C38 190, 62 190, 80 178 C78 150, 76 128, 66 94 Z"
+                    fill="rgba(0,0,0,.78)"/>
+              <path d="M30 170 C 10 182, 10 198, 26 204 C 46 212, 62 206, 72 196 C 56 190, 46 182, 30 170 Z"
+                    fill="rgba(0,0,0,.78)"/>
+              <rect x="50" y="128" width="30" height="22" rx="4" fill="rgba(0,0,0,.78)"/>
+              <rect x="62" y="122" width="6" height="34" rx="2" fill="rgba(0,0,0,.78)"/>
+            </g>
+
+            <g transform="translate(-40 76) scale(1.22)">
+              <path d="M40 6 L54 20 L70 10 L68 30 L90 30 L74 44 L82 64 L60 50 L40 64 L48 44 L32 30 L56 30 Z"
+                    fill="rgba(0,0,0,.82)"/>
+              <circle cx="56" cy="80" r="17" fill="rgba(0,0,0,.82)"/>
+              <path d="M38 98 C28 135, 30 172, 30 210 C48 230, 88 230, 106 210 C106 172, 108 135, 92 98 Z"
+                    fill="rgba(0,0,0,.82)"/>
+              <ellipse cx="70" cy="148" rx="18" ry="10" fill="rgba(0,0,0,.82)"/>
+              <rect x="54" y="144" width="32" height="18" rx="4" fill="rgba(0,0,0,.82)"/>
+            </g>
+
+            <g transform="translate(210 105) scale(1.06)">
+              <path d="M35 2 L45 18 L60 7 L58 28 L80 28 L66 41 L74 60 L55 48 L35 60 L43 41 L28 28 L52 28 Z"
+                    fill="rgba(0,0,0,.78)"/>
+              <circle cx="50" cy="78" r="16" fill="rgba(0,0,0,.78)"/>
+              <path d="M34 94 C24 130, 24 166, 22 204 C44 224, 74 224, 96 204 C94 166, 92 130, 80 94 Z"
+                    fill="rgba(0,0,0,.78)"/>
+              <rect x="40" y="136" width="34" height="28" rx="4" fill="rgba(0,0,0,.78)"/>
+              <rect x="55" y="130" width="6" height="40" rx="2" fill="rgba(0,0,0,.78)"/>
+              <rect x="92" y="92" width="6" height="138" rx="3" fill="rgba(0,0,0,.78)"/>
+              <circle cx="95" cy="86" r="10" fill="rgba(0,0,0,.78)"/>
+            </g>
+          </g>
+        </svg>
+      </div>
+
+      <div class="veil" aria-hidden="true"></div>
+
+      <div class="confetti" id="confetti"></div>
+
+      <div class="topbar">
+        <div class="badge" id="badge">⭐ 三皇來朝・星光指引 ⭐</div>
+        <div class="row" style="justify-content:flex-end;">
+          <button class="btn btn-secondary" id="drawAgainBtn" type="button">再抽一次</button>
+          <button class="btn btn-secondary" id="closeOverlayBtn" type="button" title="關閉（Esc）">關閉</button>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div>
+          <div class="big" id="nameText">請先上傳名單</div>
+          <p class="classline" id="classText">—</p>
+          <p class="hint" id="hintText">提示：CSV 需包含「班別」與「姓名」兩欄。</p>
+
+          <div class="ticker">
+            <span class="chip">總筆數：<strong id="totalCount2">0</strong></span>
+            <span class="chip">可抽：<strong id="availableCount2">0</strong></span>
+            <span class="chip">已抽：<strong id="drawnCount2">0</strong></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let records = [];
+    let available = [];
+    let drawn = [];
+
+    const el = (id) => document.getElementById(id);
+
+    const fileInput = el('fileInput');
+    const drawBtn = el('drawBtn');
+    const resetBtn = el('resetBtn');
+    const clearBtn = el('clearBtn');
+    const demoBtn = el('demoBtn');
+
+    const noRepeat = el('noRepeat');
+    const soundOn = el('soundOn');
+
+    const previewBody = el('previewBody');
+    const statusDot = el('statusDot');
+    const statusText = el('statusText');
+
+    const toast = el('toast');
+
+    const overlay = el('overlay');
+    const openOverlayBtn = el('openOverlayBtn');
+    const closeOverlayBtn = el('closeOverlayBtn');
+    const drawAgainBtn = el('drawAgainBtn');
+
+    const nameText = el('nameText');
+    const classText = el('classText');
+    const hintText = el('hintText');
+
+    const totalCount = el('totalCount');
+    const availableCount = el('availableCount');
+    const drawnCount = el('drawnCount');
+
+    const totalCount2 = el('totalCount2');
+    const availableCount2 = el('availableCount2');
+    const drawnCount2 = el('drawnCount2');
+
+    const confetti = el('confetti');
+
+    // NEW: lock to prevent clicking "再抽一次" during/after animation edge cases
+    let isDrawing = false;
+    let rollingTimerId = null;
+
+    function showToast(msg){
+      toast.textContent = msg;
+      toast.style.display = 'block';
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => toast.style.display = 'none', 3200);
+    }
+	
+
+    function pickYueVoice() {
+      const voices = speechSynthesis.getVoices();
+      yueVoice = voices.find(v =>
+        v.lang.toLowerCase().startsWith("yue") ||
+        v.lang.toLowerCase() === "zh-hk" ||
+        /cantonese|粵語|廣東話/i.test(v.name)
+      );
+      console.log("選到的粵語 voice =", yueVoice);
+    }
+
+
+	
+	function speakText(text) {
+		  const speechOn = document.getElementById('speechOn');
+		  if (!speechOn?.checked) return;
+
+		  if (!('speechSynthesis' in window)) {
+			console.warn('瀏覽器不支援語音朗讀');
+			return;
+		}
+			
+		   // 取消正在播放的語音（避免重複）
+		  speechSynthesis.cancel();
+
+		  const utterance = new SpeechSynthesisUtterance(text);
+
+		  // 優先使用粵語（yue-HK），若不可用則用英語
+		  const voices = speechSynthesis.getVoices();
+		  const yueVoice = voices.find(v => v.lang?.startsWith('yue')) ||
+						   voices.find(v => v.lang === 'zh-HK') ||
+						   voices.find(v => v.lang?.includes('HK'));
+		  const enVoice = voices.find(v => v.lang?.startsWith('en'));
+
+		  if (yueVoice) {
+				utterance.voice = yueVoice;
+				utterance.lang = 'yue-HK';
+			  } else if (enVoice) {
+				utterance.voice = enVoice;
+				utterance.lang = 'en-US';
+			  } else {
+				utterance.lang = 'zh-TW'; // 最後 fallback
+			  }
+
+			  utterance.rate = 1.0;
+			  utterance.pitch = 1.0;
+			  utterance.volume = 1.0;
+
+			  speechSynthesis.speak(utterance);
+			
+	}
+
+
+    function setStatus(loaded){
+      if(loaded){
+        statusDot.classList.add('ok');
+        statusText.textContent = `已載入：${records.length} 筆`;
+      }else{
+        statusDot.classList.remove('ok');
+        statusText.textContent = '尚未載入名單';
+      }
+    }
+
+    function updateCounters(){
+      totalCount.textContent = String(records.length);
+      availableCount.textContent = String(available.length);
+      drawnCount.textContent = String(drawn.length);
+
+      totalCount2.textContent = String(records.length);
+      availableCount2.textContent = String(available.length);
+      drawnCount2.textContent = String(drawn.length);
+
+      // IMPORTANT FIX:
+      // "再抽一次" should be enabled as long as a draw is possible and we're not mid-draw.
+      const canDraw = records.length > 0 && !(noRepeat.checked && available.length === 0);
+      drawBtn.disabled = !canDraw || isDrawing;
+      resetBtn.disabled = records.length === 0 || isDrawing;
+      openOverlayBtn.disabled = records.length === 0;
+      drawAgainBtn.disabled = !canDraw || isDrawing;
+    }
+
+    function resetDrawingPool(){
+      available = records.map((_, i) => i);
+      drawn = [];
+      isDrawing = false;
+      updateCounters();
+    }
+
+    function clearAll(){
+      records = [];
+      available = [];
+      drawn = [];
+      isDrawing = false;
+      if(rollingTimerId) { clearTimeout(rollingTimerId); rollingTimerId = null; }
+
+      fileInput.value = '';
+      previewBody.innerHTML = `<tr><td colspan="3" style="color: rgba(255,255,255,.7);">尚未載入</td></tr>`;
+      nameText.textContent = '請先上傳名單';
+      classText.textContent = '—';
+      hintText.textContent = '提示：CSV 需包含「班別」與「姓名」兩欄。';
+      setStatus(false);
+	  isDrawing = false;
+      updateCounters();
+      closeOverlay();
+      showToast('已清除名單。');
+    }
+
+    function sanitizeCell(s){
+      return String(s ?? '').replace(/\uFEFF/g,'').trim();
+    }
+
+    function detectDelimiter(text){
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const candidates = [',',';','\t','|'];
+      let best = ',', bestScore = -1;
+      for(const d of candidates){
+        const first = (lines[0] ?? '').split(d).length;
+        const second = (lines[1] ?? '').split(d).length;
+        const score = Math.max(first, second);
+        if(score > bestScore){ bestScore = score; best = d; }
+      }
+      return best;
+    }
+
+    function parseCSV(text){
+      const delim = detectDelimiter(text);
+      const rows = [];
+      let i = 0, field = '', row = [];
+      let inQuotes = false;
+
+      const pushField = () => { row.push(field); field = ''; };
+      const pushRow = () => { rows.push(row); row = []; };
+
+      while(i < text.length){
+        const c = text[i];
+        if(inQuotes){
+          if(c === '"'){
+            const next = text[i+1];
+            if(next === '"'){ field += '"'; i += 2; continue; }
+            inQuotes = false; i++; continue;
+          }
+          field += c; i++; continue;
+        }else{
+          if(c === '"'){ inQuotes = true; i++; continue; }
+          if(c === delim){ pushField(); i++; continue; }
+          if(c === '\n'){ pushField(); pushRow(); i++; continue; }
+          if(c === '\r'){
+            if(text[i+1] === '\n') i++;
+            pushField(); pushRow(); i++; continue;
+          }
+          field += c; i++; continue;
+        }
+      }
+      pushField();
+      const isRowEmpty = row.every(v => String(v ?? '').trim() === '');
+      if(!isRowEmpty) pushRow();
+      return rows.map(r => r.map(sanitizeCell));
+    }
+
+    function looksLikeHeader(r0){
+      const a = (r0?.[0] ?? '').toLowerCase();
+      const b = (r0?.[1] ?? '').toLowerCase();
+      return (
+        a.includes('班') || a.includes('class') || a.includes('group') ||
+        b.includes('名') || b.includes('name') || b.includes('student')
+      );
+    }
+
+    function loadFromCSVText(text){
+      const rows = parseCSV(text).filter(r => r.some(v => v && v.trim() !== ''));
+      if(rows.length === 0) throw new Error('CSV 內容是空的。');
+
+      let start = 0;
+      if(rows[0].length >= 2 && looksLikeHeader(rows[0])) start = 1;
+
+      const list = [];
+      for(let i = start; i < rows.length; i++){
+        const r = rows[i];
+        const klass = sanitizeCell(r[0] ?? '');
+        const name = sanitizeCell(r[1] ?? '');
+        if(!klass && !name) continue;
+
+        if(!name){
+          if(klass) list.push({ klass: '—', name: klass });
+          continue;
+        }
+        list.push({ klass: klass || '—', name });
+      }
+      if(list.length === 0) throw new Error('找不到有效資料列（需要至少「班別、姓名」）。');
+
+      records = list;
+      setStatus(true);
+      resetDrawingPool();
+      renderPreview();
+      hintText.textContent = '按下「抽獎！」看看星光帶來哪位幸運兒。';
+      showToast(`成功載入 ${records.length} 筆名單。`);
+    }
+
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, (m) => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[m]));
+    }
+
+    function renderPreview(){
+      const max = Math.min(records.length, 200);
+      const rows = [];
+      for(let i = 0; i < max; i++){
+        const r = records[i];
+        rows.push(`<tr><td>${i+1}</td><td>${escapeHtml(r.klass)}</td><td>${escapeHtml(r.name)}</td></tr>`);
+      }
+      if(records.length > max){
+        rows.push(`<tr><td colspan="3" style="color: rgba(255,255,255,.75);">…尚有 ${records.length - max} 筆未顯示</td></tr>`);
+      }
+      previewBody.innerHTML = rows.join('');
+    }
+
+    function openOverlay(){
+      overlay.classList.add('show');
+      overlay.setAttribute('aria-hidden', 'false');
+      requestAppFullscreen();
+    }
+
+	function closeOverlay(){
+	  overlay.classList.remove('show');
+	  overlay.setAttribute('aria-hidden', 'true');
+	  exitAppFullscreen();
+
+	  // ✅ 保險：如果使用者中途關閉，避免 isDrawing 永遠卡住
+	  if (isDrawing){
+		isDrawing = false;
+		updateCounters();
+	  }
+	}
+
+    async function requestAppFullscreen(){
+      <!-- try{ -->
+        <!-- if(!document.fullscreenElement && document.documentElement.requestFullscreen){ -->
+          <!-- await document.documentElement.requestFullscreen(); -->
+        <!-- } -->
+      <!-- }catch(_e){} -->
+    }
+
+    async function exitAppFullscreen(){
+      <!-- try{ -->
+        <!-- if(document.fullscreenElement && document.exitFullscreen){ -->
+          <!-- await document.exitFullscreen(); -->
+        <!-- } -->
+      <!-- }catch(_e){} -->
+    }
+
+    function randInt(n){ return Math.floor(Math.random() * n); }
+
+    function launchConfetti(){
+      confetti.innerHTML = '';
+      const colors = ['#ffd166', '#7dd3fc', '#34d399', '#fb7185', '#e9f2ff'];
+      const count = 42;
+      for(let i=0;i<count;i++){
+        const p = document.createElement('div');
+        p.className = 'piece';
+        const x = Math.random()*100;
+        const delay = Math.random()*140;
+        const dur = 850 + Math.random()*700;
+        const rot = (Math.random()*260 - 130);
+        const w = 7 + Math.random()*10;
+        const h = 9 + Math.random()*14;
+        p.style.left = x + '%';
+        p.style.top = (-10 - Math.random()*40) + 'px';
+        p.style.background = colors[randInt(colors.length)];
+        p.style.width = w + 'px';
+        p.style.height = h + 'px';
+        p.style.animationDuration = dur + 'ms';
+        p.style.animationDelay = delay + 'ms';
+        p.style.transform = `translateY(-20px) rotate(${rot}deg)`;
+        confetti.appendChild(p);
+      }
+      setTimeout(()=> confetti.innerHTML = '', 2000);
+    }
+
+    // ----- Sound -----
+    let audioCtx = null;
+    function getAudioCtx(){
+      if(!audioCtx){
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if(!AC) return null;
+        audioCtx = new AC();
+      }
+      return audioCtx;
+    }
+    async function ensureAudioRunning(){
+      const ctx = getAudioCtx();
+      if(!ctx) return false;
+      if(ctx.state === 'suspended'){
+        try{ await ctx.resume(); }catch(_e){}
+      }
+      return ctx.state === 'running';
+    }
+    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+    function playRaffleMusic(durationMs){
+      if(!soundOn.checked) return;
+      const ctx = getAudioCtx();
+      if(!ctx) return;
+
+      const duration = clamp(durationMs/1000, 3.0, 5.0);
+      const t0 = ctx.currentTime;
+
+      const master = ctx.createGain();
+      master.gain.value = 0.18;
+      master.connect(ctx.destination);
+
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -18;
+      comp.knee.value = 22;
+      comp.ratio.value = 6;
+      comp.attack.value = 0.008;
+      comp.release.value = 0.16;
+      comp.connect(master);
+
+      const bus = ctx.createGain();
+      bus.gain.value = 1.0;
+      bus.connect(comp);
+
+      function whiteNoiseBuffer(seconds){
+        const len = Math.max(1, Math.floor(ctx.sampleRate * seconds));
+        const b = ctx.createBuffer(1, len, ctx.sampleRate);
+        const d = b.getChannelData(0);
+        for(let i=0;i<len;i++) d[i] = (Math.random()*2-1);
+        return b;
+      }
+
+      function kick(at){
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(150, at);
+        o.frequency.exponentialRampToValueAtTime(55, at + 0.12);
+
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.exponentialRampToValueAtTime(0.9, at + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + 0.18);
+
+        o.connect(g); g.connect(bus);
+        o.start(at); o.stop(at + 0.22);
+      }
+
+      function snare(at){
+        const src = ctx.createBufferSource();
+        src.buffer = whiteNoiseBuffer(0.2);
+
+        const hp = ctx.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.setValueAtTime(900, at);
+
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.exponentialRampToValueAtTime(0.55, at + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+
+        src.connect(hp); hp.connect(g); g.connect(bus);
+        src.start(at); src.stop(at + 0.2);
+      }
+
+      function hat(at){
+        const src = ctx.createBufferSource();
+        src.buffer = whiteNoiseBuffer(0.06);
+
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.setValueAtTime(8000, at);
+        bp.Q.setValueAtTime(8, at);
+
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.exponentialRampToValueAtTime(0.22, at + 0.006);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + 0.05);
+
+        src.connect(bp); bp.connect(g); g.connect(bus);
+        src.start(at); src.stop(at + 0.07);
+      }
+
+      const synthGain = ctx.createGain();
+      synthGain.gain.value = 0.26;
+      synthGain.connect(bus);
+
+      function noteFreq(midi){
+        return 440 * Math.pow(2, (midi - 69) / 12);
+      }
+
+      function blip(at, midi, len){
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(noteFreq(midi), at);
+
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.exponentialRampToValueAtTime(1.0, at + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.setValueAtTime(4200, at);
+
+        o.connect(lp); lp.connect(g); g.connect(synthGain);
+        o.start(at); o.stop(at + len + 0.02);
+      }
+
+      const bpm0 = 135;
+      const bpm1 = 165;
+      const steps = Math.floor(duration * 8);
+      for(let i=0;i<steps;i++){
+        const k = i / Math.max(1, steps-1);
+        const bpm = bpm0 + (bpm1 - bpm0) * k;
+        const secPer8 = (60 / bpm) / 2;
+        const at = t0 + i * secPer8;
+
+        hat(at);
+        if(i % 4 === 0) kick(at);
+        if(i % 4 === 2) snare(at);
+
+        const base = 60 + Math.floor(k * 12);
+        const pattern = [0, 3, 7, 10];
+        const midi = base + pattern[i % pattern.length];
+        blip(at, midi, 0.10);
+      }
+
+      const tEnd = t0 + duration;
+      (function finalHit(){
+        const mids = [72, 79, 84];
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, tEnd);
+        g.gain.exponentialRampToValueAtTime(0.9, tEnd + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, tEnd + 0.30);
+        g.connect(bus);
+
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.setValueAtTime(5200, tEnd);
+        lp.connect(g);
+
+        for(const m of mids){
+          const o = ctx.createOscillator();
+          o.type = 'triangle';
+          o.frequency.setValueAtTime(noteFreq(m), tEnd);
+          o.connect(lp);
+          o.start(tEnd);
+          o.stop(tEnd + 0.34);
+        }
+
+        const src = ctx.createBufferSource();
+        src.buffer = whiteNoiseBuffer(0.16);
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.setValueAtTime(6000, tEnd);
+        bp.Q.setValueAtTime(10, tEnd);
+
+        const ng = ctx.createGain();
+        ng.gain.setValueAtTime(0.0001, tEnd);
+        ng.gain.exponentialRampToValueAtTime(0.35, tEnd + 0.01);
+        ng.gain.exponentialRampToValueAtTime(0.0001, tEnd + 0.18);
+
+        src.connect(bp); bp.connect(ng); ng.connect(bus);
+        src.start(tEnd);
+        src.stop(tEnd + 0.2);
+      })();
+    }
+
+    // FIX: ensure rollingEffect always re-enables buttons after finish
+    function rollingEffect(finalRecord, durationMs){
+      const start = performance.now();
+      const total = durationMs;
+      const minInterval = 40;
+      const maxInterval = 140;
+
+      function step(now){
+        const elapsed = now - start;
+        const p = Math.min(1, elapsed / total);
+        const ease = 1 - Math.pow(1 - p, 3);
+
+        const r = records[randInt(records.length)];
+        nameText.textContent = r?.name || '…';
+        classText.textContent = `班別：${r?.klass || '—'}`;
+
+        const interval = minInterval + (maxInterval - minInterval) * ease;
+
+        if(p >= 1){
+          nameText.textContent = finalRecord.name;
+          classText.textContent = `班別：${finalRecord.klass}`;
+          hintText.textContent = '輪到您了！';
+		  
+		  // 語音朗讀
+		const speechText = `${finalRecord.klass}班，${finalRecord.name}`;
+		speakText(speechText);
+		
+          launchConfetti();
+		  		 
+          // IMPORTANT: unlock after successful draw result is shown
+          isDrawing = false;
+          updateCounters();
+		  
+          return;
+		  
+		  
+        }
+        rollingTimerId = setTimeout(() => requestAnimationFrame(step), interval);
+      }
+      requestAnimationFrame(step);
+    }
+
+	 function drawOne(){
+	  const canDraw = records.length > 0 && !(noRepeat.checked && available.length === 0);
+	  if(!canDraw){
+		showToast(records.length === 0 ? '請先上傳 CSV 名單。' : '都抽完了！可按「重置抽獎」再抽一次。');
+		return;
+	  }
+	  if(isDrawing) return;
+
+	  isDrawing = true;
+	  updateCounters();
+
+	  try{
+		openOverlay();
+
+		const durationMs = 3000 + Math.floor(Math.random() * 2001);
+		ensureAudioRunning().then(() => playRaffleMusic(durationMs));
+
+		let idx;
+		if(noRepeat.checked){
+		  const pickPos = randInt(available.length);
+		  idx = available[pickPos];
+		  available.splice(pickPos, 1);
+		  drawn.push(idx);
+		}else{
+		  idx = randInt(records.length);
+		  drawn.push(idx);
+		}
+
+		updateCounters();
+		hintText.textContent = '抽獎中…';
+		rollingEffect(records[idx], durationMs);
+
+	  }catch(err){
+		// ✅ 發生錯誤時，避免永遠鎖住
+		console.error(err);
+		isDrawing = false;
+		updateCounters();
+		showToast('抽獎過程發生錯誤：' + (err?.message || '未知錯誤'));
+	  }
+	}
+
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if(!file) return;
+      try{
+        const text = await file.text();
+        loadFromCSVText(text);
+      }catch(err){
+        console.error(err);
+        showToast('讀取失敗：' + (err?.message || '未知錯誤'));
+      }
+    });
+
+    drawBtn.addEventListener('click', drawOne);
+    drawAgainBtn.addEventListener('click', drawOne);
+
+    openOverlayBtn.addEventListener('click', () => {
+      if(records.length === 0) return;
+      openOverlay();
+    });
+
+    closeOverlayBtn.addEventListener('click', closeOverlay);
+
+    resetBtn.addEventListener('click', () => {
+      if(records.length === 0) return;
+      resetDrawingPool();
+      showToast('已重置：全部恢復可抽。');
+    });
+
+    clearBtn.addEventListener('click', clearAll);
+
+    demoBtn.addEventListener('click', () => {
+      const demo =
+`班別,姓名
+仁愛班,陳小晴
+仁愛班,李小樂
+和平班,王子豪
+和平班,周語彤
+信德班,林恩宇
+信德班,張雅晴
+望德班,何子謙
+望德班,郭欣妍`;
+      loadFromCSVText(demo);
+    });
+
+    noRepeat.addEventListener('change', () => {
+      updateCounters();
+      if(noRepeat.checked && records.length > 0 && available.length === 0){
+        showToast('目前「可抽」是 0；可按「重置抽獎」恢復可抽。');
+      }
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if(e.key === 'Escape'){
+        if(overlay.classList.contains('show')) closeOverlay();
+        return;
+      }
+      if((e.key === 'Enter' || e.key === ' ') && !drawBtn.disabled){
+        if(e.key === ' ') e.preventDefault();
+        drawOne();
+      }
+    });
+	// 初始化語音（觸發 getVoices 載入）
+	if ('speechSynthesis' in window) {
+		let yueVoice = null;
+		speechSynthesis.onvoiceschanged = pickYueVoice;
+		pickYueVoice();
+   
+	 
+	  // 強制觸發一次
+	  setTimeout(() => { speechSynthesis.getVoices(); }, 500);
+	}
+    setStatus(false);
+    updateCounters();
+  </script>
+</body>
+</html>
