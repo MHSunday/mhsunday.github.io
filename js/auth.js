@@ -1,11 +1,11 @@
 // auth.js
-import { firebaseConfig } from './config.js';
+import { APP_CONFIG } from './config.js';
 
 let currentUser = null;
 let userRole = null;
 
 // 初始化 Firebase
-firebase.initializeApp(firebaseConfig);
+firebase.initializeApp(APP_CONFIG.firebase);
 const auth = firebase.auth();
 
 export function getCurrentUser() {

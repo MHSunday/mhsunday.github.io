@@ -1,107 +1,50 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Google Login on GitHub Pages</title>
+  <title>參與彌撒獎勵計劃 - 登入</title>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
       text-align: center;
-      padding: 50px;
-      background-color: #f9f9f9;
+      padding: 60px 20px;
+      background-color: #f5f5f5;
     }
-    .user-info {
-      margin: 20px 0;
+    h1 {
+      color: #2c3e50;
     }
-    img.avatar {
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      margin-bottom: 10px;
-      object-fit: cover;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      margin: 5px;
-      cursor: pointer;
-      border: none;
-      border-radius: 4px;
+    #loginBtn {
+      padding: 12px 24px;
+      font-size: 18px;
       background-color: #4285F4;
       color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
     }
-    button#logout-btn {
-      background-color: #ea4335;
-    }
-    button:hover {
-      opacity: 0.9;
+    #loginBtn:hover {
+      background-color: #3367D6;
     }
   </style>
 </head>
 <body>
-  <h1>👋 Welcome to My App!</h1>
-  <div id="user-info" class="user-info"></div>
-  <button id="login-btn">Login with Google</button>
-  <button id="logout-btn" style="display:none;">Logout</button>
+  <h1>參與彌撒獎勵計劃</h1>
+  <p>請使用您的教會或主日學 Google 帳號登入</p>
+  <button id="loginBtn">使用 Google 帳號登入</button>
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <!-- 使用 ES 模組載入 auth.js -->
+  <script type="module">
+    // 先引入 config（若需要）
+    import { login } from './js/auth.js';
 
-  <script>
-    // =============================
-    // 🔑 請替換為你的 Firebase config
-    // =============================
-    const firebaseConfig = {
-    apiKey: "AIzaSyD2A4wLUBVUBKvfc_b0t1QPxye-_M1bIXY",
-    authDomain: "githublogin-49a54.firebaseapp.com",
-    projectId: "githublogin-49a54",
-    storageBucket: "githublogin-49a54.firebasestorage.app",
-    messagingSenderId: "775608320556",
-    appId: "1:775608320556:web:1ff2f18fd19e108dcb8789"
-    };
-
-    // 初始化 Firebase
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-
-    // 登入按鈕事件
-    document.getElementById('login-btn').onclick = () => {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      auth.signInWithPopup(provider)
-        .catch(error => {
-          console.error("Login error:", error);
-          alert("Login failed: " + error.message);
-        });
-    };
-
-    // 登出按鈕事件
-    document.getElementById('logout-btn').onclick = () => {
-      auth.signOut();
-    };
-
-    // 監聽使用者狀態變化
-    auth.onAuthStateChanged(user => {
-      const userInfoDiv = document.getElementById('user-info');
-      const loginBtn = document.getElementById('login-btn');
-      const logoutBtn = document.getElementById('logout-btn');
-
-      if (user) {
-        // 顯示使用者資訊
-        userInfoDiv.innerHTML = `
-          <img src="${user.photoURL || 'https://via.placeholder.com/80'}" class="avatar" alt="Avatar">
-          <div><strong>${user.displayName || 'Anonymous'}</strong></div>
-          <div>${user.email}</div>
-        `;
-        loginBtn.style.display = 'none';
-        logoutBtn.style.display = 'inline-block';
-      } else {
-        // 未登入狀態
-        userInfoDiv.innerHTML = '';
-        loginBtn.style.display = 'inline-block';
-        logoutBtn.style.display = 'none';
-      }
+    // 綁定登入按鈕
+    document.getElementById('loginBtn').addEventListener('click', (e) => {
+      e.preventDefault();
+      login();
     });
   </script>
 </body>
