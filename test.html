@@ -1,28 +1,78 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Google Sign-In Demo</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend for Google Apps Script</title>
+    <style>
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background-color: #f0f2f5; }
+        .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; width: 90%; max-width: 450px; }
+        h1 { color: #1a73e8; margin-top: 0; }
+        button { background-color: #1a73e8; color: white; border: none; padding: 12px 24px; border-radius: 4px; font-size: 16px; cursor: pointer; transition: background-color 0.3s; margin-top: 1rem; }
+        button:hover { background-color: #1765cf; }
+        button:disabled { background-color: #9e9e9e; cursor: not-allowed; }
+        #response { margin-top: 1.5rem; padding: 1rem; border-radius: 4px; background-color: #e9ecef; word-wrap: break-word; text-align: left; font-family: "Courier New", Courier, monospace; }
+    </style>
 </head>
 <body>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <div id="g_id_onload"
-         data-client_id="339277687965-7gkbr7hi74iv2viu92flrfh65vm7ibt2.apps.googleusercontent.com"
-         data-callback="handleCredentialResponse">
+
+    <div class="container">
+        <h1>Send Data to Google Script</h1>
+        <p>Click the button to send a POST request with a JSON payload. This will trigger a preflight OPTIONS request handled automatically by Google.</p>
+        <button id="sendDataBtn">Send Data to `doPost`</button>
+        <pre id="response">Response will appear here...</pre>
     </div>
-    <div class="g_id_signin"
-         data-type="standard"
-         data-size="large"
-         data-theme="outline"
-         data-text="sign_in_with"
-         data-shape="rectangular"
-         data-logo_alignment="left">
-    </div>
+
     <script>
-        function handleCredentialResponse(response) {
-            // Handle the credential response here.
-            // The response.credential is a JWT ID token.
-            console.log("Encoded JWT ID token: " + response.credential);
+        const sendDataBtn = document.getElementById('sendDataBtn');
+        const responseDiv = document.getElementById('response');
+
+        // IMPORTANT: PASTE YOUR NEWLY DEPLOYED WEB APP URL HERE
+        const webAppUrl = 'YOUR_WEB_APP_URL';
+
+        async function sendData() {
+            sendDataBtn.disabled = true;
+            sendDataBtn.textContent = 'Sending...';
+            responseDiv.textContent = 'Waiting for server response...';
+
+            const dataToSend = {
+                name: "Alex Ray",
+                email: "alex.ray@example.com",
+                userId: `user_${Math.floor(Math.random() * 1000)}`,
+                timestamp: new Date().toISOString()
+            };
+
+            // This fetch call triggers the preflight OPTIONS request because
+            // we are sending a POST request with a Content-Type of 'application/json'.
+            try {
+                const response = await fetch(webAppUrl, {
+                    method: 'POST',
+                    // The 'mode: "cors"' is the default, but explicitly stating it can be clearer.
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(dataToSend),
+                });
+
+                // The browser will only proceed to this point if the preflight
+                // OPTIONS check was successful AND the POST response was not an
+                // opaque redirect.
+                const result = await response.json();
+
+                responseDiv.textContent = JSON.stringify(result, null, 2);
+
+            } catch (error) {
+                console.error('Fetch Error:', error);
+                responseDiv.textContent = `Error: ${error.message}.\n\nCheck the browser console (F12) and ensure your Apps Script is deployed with "Who has access" set to "Anyone".`;
+            } finally {
+                sendDataBtn.disabled = false;
+                sendDataBtn.textContent = 'Send Data to `doPost`';
+            }
         }
+
+        sendDataBtn.addEventListener('click', sendData);
     </script>
+
 </body>
 </html>

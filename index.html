@@ -1,327 +1,108 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>主日學 教師平台</title>
-  <meta name="color-scheme" content="light only" />
-  <link rel="stylesheet" href="assets/css/styles.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Google Login on GitHub Pages</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 50px;
+      background-color: #f9f9f9;
+    }
+    .user-info {
+      margin: 20px 0;
+    }
+    img.avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      margin-bottom: 10px;
+      object-fit: cover;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 5px;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background-color: #4285F4;
+      color: white;
+    }
+    button#logout-btn {
+      background-color: #ea4335;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+  </style>
 </head>
 <body>
-<header>
-  <div class="header-container">
-    <div class="header-content">
-      <div class="brand">
-        <div class="logo">
-          <!-- <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"> -->
-            <!-- <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path> -->
-            <!-- <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path> -->
-            <!-- <path d="M12 6v6"></path> -->
-            <!-- <path d="M9 9h6"></path> -->
-          <!-- </svg> -->
-        </div>
-        <div class="brand-text">
-          <h1>主日學導師平台</h1>
-          <p class="subtitle">Sunday School Teachers Portal</p>
-        </div>
-      </div>
-      
-      <div class="auth-section">
-        <!-- index.html -->
-<div id="signin-container">
-  <!-- 
-    DIV 1: 用於初始化。
-    這個 div 是隱形的，專門用來告訴 GSI 腳本 Client ID 和回呼函式。
-    Google 的腳本會先讀取這裡的設定。
-  -->
-  <div id="g_id_onload"
-       data-client_id="339277687965-7gkbr7hi74iv2viu92flrfh65vm7ibt2.apps.googleusercontent.com"
-       data-callback="onGoogleSignIn"
-       data-auto_prompt="false">
-  </div>
+  <h1>👋 Welcome to My App!</h1>
+  <div id="user-info" class="user-info"></div>
+  <button id="login-btn">Login with Google</button>
+  <button id="logout-btn" style="display:none;">Logout</button>
 
-  <!-- 
-    DIV 2: 用於渲染按鈕。
-    GSI 腳本在完成初始化後，會找到這個 div 並把按鈕畫在這裡。
-  -->
-  <div class="g_id_signin"
-       data-type="standard"
-       data-size="large"
-       data-theme="outline"
-       data-text="sign_in_with"
-       data-shape="pill"
-       data-logo_alignment="left">
-  </div>
-</div>
-        
-        <div id="user-box" class="user-info hidden">
-          <div class="user-details">
-            <div class="user-avatar">
-              <span id="user-initial">Example User</span>
-            </div>
-            <div class="user-meta">
-              <span id="user-email" class="user-email">email@example.com</span>
-              <span id="user-role" class="user-role">角色</span>
-            </div>
-          </div>
-          <select id="class" class="class-selector hidden" aria-label="選擇班級">
-            <option value="">選擇班級</option>
-          </select>
-          <button id="signout" class="btn-signout">登出</button>
-        </div>
-      </div>
-    </div>
-  </div>
-  
-  <nav class="nav-container">
-    <div class="nav-content">
-      <div class="tabs" role="tablist" aria-label="功能分頁">
-        <button class="tab active" data-tab="ann" data-icon="📢">
-          <span class="tab-icon">📢</span>
-          <span class="tab-text">公告</span>
-        </button>
-        <button class="tab" data-tab="week" data-icon="📅">
-          <span class="tab-icon">📅</span>
-          <span class="tab-text">本週行事曆</span>
-        </button>
-        <button class="tab" data-tab="classinfo" data-icon="📊">
-          <span class="tab-icon">📊</span>
-          <span class="tab-text">班級資料</span>
-        </button>
-        <button class="tab" data-tab="att" data-icon="✓">
-          <span class="tab-icon">✓</span>
-          <span class="tab-text">出席表</span>
-        </button>
-        <button class="tab" data-tab="docs" data-icon="📁">
-          <span class="tab-icon">📁</span>
-          <span class="tab-text">文件下載</span>
-        </button>
-        <button class="tab" data-tab="global" data-icon="🔔">
-          <span class="tab-icon">🔔</span>
-          <span class="tab-text">全校提醒</span>
-        </button>
-        <button class="tab hidden" data-tab="admin" data-icon="⚙">
-          <span class="tab-icon">⚙</span>
-          <span class="tab-text">管理</span>
-        </button>
-      </div>
-    </div>
-  </nav>
-</header>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 
-<main class="main-container">
-  <div class="content-wrapper">
-    
-    <!-- 公告 -->
-    <section id="ann" class="content-card">
-      <div class="card-header">
-        <h2 class="card-title">
-          <span class="title-icon">📢</span>
-          公告事項
-        </h2>
-        <span id="ann-count" class="badge">0</span>
-      </div>
-      <div id="ann-body" class="card-content announcement-list"></div>
-      <div id="ann-empty" class="empty-state">
-        <span class="empty-icon">📭</span>
-        <p>目前沒有公告</p>
-      </div>
-    </section>
+  <script>
+    // =============================
+    // 🔑 請替換為你的 Firebase config
+    // =============================
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
 
-    <!-- 本週行事曆 -->
-  
-	  <!-- 📅 本週行事曆 -->
-  <section id="week" class="hidden">
-    <h2>📅 本週行事曆</h2>
-    <div class="card">
-      <div class="card-header">Upcoming Events</div>
-      <div class="card-content">
-        <!-- 在這裡加入 iframe -->
-        <iframe id="calendar-iframe" style="border:0" width="100%" height="600" frameborder="0" scrolling="no"></iframe>
-      </div>
-    </div>
-  </section>
+    // 初始化 Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
 
-    <!-- 班級資料 -->
-    <section id="classinfo" class="content-card hidden">
-      <div class="card-header">
-        <h2 class="card-title">
-          <span class="title-icon">📊</span>
-          班級資料
-        </h2>
-        <span id="ci-class" class="badge">--</span>
-      </div>
-      <div class="card-content">
-        <div class="info-tip">
-          <span class="tip-icon">💡</span>
-          手機操作提示：用兩指在表格內滑動，橫置手機可獲得更寬視圖
-        </div>
-        <div class="iframe-container">
-          <iframe id="classinfo-iframe" title="班級資料" loading="lazy"></iframe>
-        </div>
-      </div>
-    </section>
+    // 登入按鈕事件
+    document.getElementById('login-btn').onclick = () => {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider)
+        .catch(error => {
+          console.error("Login error:", error);
+          alert("Login failed: " + error.message);
+        });
+    };
 
-    <!-- 出席表 -->
-    <section id="att" class="content-card hidden">
-      <div class="card-header">
-        <h2 class="card-title">
-          <span class="title-icon">✓</span>
-          出席表
-        </h2>
-        <span id="att-class" class="badge">--</span>
-      </div>
-      <div class="card-content">
-        <div class="iframe-container">
-          <iframe id="att-iframe" title="出席表" loading="lazy"></iframe>
-        </div>
-      </div>
-    </section>
+    // 登出按鈕事件
+    document.getElementById('logout-btn').onclick = () => {
+      auth.signOut();
+    };
 
-    <!-- 文件下載 -->
-    <section id="docs" class="content-card hidden">
-      <div class="card-header">
-        <h2 class="card-title">
-          <span class="title-icon">📁</span>
-          文件下載
-        </h2>
-        <span id="docs-count" class="badge">0</span>
-      </div>
-      <div id="docs-list" class="card-content document-grid"></div>
-      <div id="docs-empty" class="empty-state">
-        <span class="empty-icon">📂</span>
-        <p>目前沒有可下載的文件</p>
-      </div>
-    </section>
+    // 監聽使用者狀態變化
+    auth.onAuthStateChanged(user => {
+      const userInfoDiv = document.getElementById('user-info');
+      const loginBtn = document.getElementById('login-btn');
+      const logoutBtn = document.getElementById('logout-btn');
 
-    <!-- 全校提醒 -->
-    <section id="global" class="content-card hidden">
-      <div class="card-header">
-        <h2 class="card-title">
-          <span class="title-icon">🔔</span>
-          全校提醒
-        </h2>
-      </div>
-      <div id="reminders" class="card-content reminder-list"></div>
-      <div id="rem-empty" class="empty-state">
-        <span class="empty-icon">🔕</span>
-        <p>目前沒有提醒</p>
-      </div>
-    </section>
-
-    <!-- 管理介面 -->
-    <section id="admin" class="content-card hidden">
-      <div class="card-header">
-        <h2 class="card-title">
-          <span class="title-icon">⚙</span>
-          公告管理
-        </h2>
-        <button id="reload-admin" class="btn-secondary btn-small">
-          <span>↻</span> 重新載入
-        </button>
-      </div>
-      
-      <div class="card-content">
-        <div class="admin-form">
-          <div class="form-grid">
-            <div class="form-field">
-              <label for="a-title">標題 <span class="required">*</span></label>
-              <input id="a-title" type="text" placeholder="輸入公告標題" />
-            </div>
-            
-            <div class="form-field span-2">
-              <label for="a-body">內容</label>
-              <textarea id="a-body" rows="4" placeholder="輸入公告內容"></textarea>
-            </div>
-            
-            <div class="form-field">
-              <label for="a-class">目標班級</label>
-              <select id="a-class">
-                <option value="">選擇班級</option>
-              </select>
-            </div>
-            
-            <div class="form-field">
-              <label for="a-audience">目標對象</label>
-              <select id="a-audience">
-                <option value="All">全部</option>
-                <option value="Teachers">所有老師</option>
-                <option value="Coordinators">協調同工</option>
-              </select>
-            </div>
-            
-            <div class="form-field">
-              <label for="a-priority">優先級</label>
-              <select id="a-priority">
-                <option value="normal">一般</option>
-                <option value="warn">提醒</option>
-                <option value="danger">緊急</option>
-              </select>
-            </div>
-            
-            <div class="form-field">
-              <label for="a-start">開始日期</label>
-              <input id="a-start" type="date" />
-            </div>
-            
-            <div class="form-field">
-              <label for="a-end">結束日期</label>
-              <input id="a-end" type="date" />
-            </div>
-          </div>
-          
-          <div class="form-actions">
-            <button id="a-save" class="btn-primary">
-              <span>💾</span> 儲存
-            </button>
-            <button id="a-clear" class="btn-secondary">
-              <span>🗑</span> 清除
-            </button>
-          </div>
-        </div>
-        
-        <div class="admin-list">
-          <h3 class="section-title">現有公告</h3>
-          <div class="table-container">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>標題</th>
-                  <th>對象</th>
-                  <th>開始</th>
-                  <th>結束</th>
-                  <th>優先</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody id="admin-ann-list"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </section>
-    
-  </div>
-</main>
-
-<footer class="footer">
-  <div class="footer-content">
-    <p>© 2025 主日學教師平台</p>
-    <p>需要協助？請聯絡協調同工</p>
-  </div>
-</footer>
-
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="assets/js/config.js"></script>
-<script src="assets/js/api.js"></script>
-<script src="assets/js/state.js"></script>
-<script src="assets/js/ui.js"></script>
-<script src="assets/js/admin.js"></script>
-<script src="assets/js/main.js"></script>
+      if (user) {
+        // 顯示使用者資訊
+        userInfoDiv.innerHTML = `
+          <img src="${user.photoURL || 'https://via.placeholder.com/80'}" class="avatar" alt="Avatar">
+          <div><strong>${user.displayName || 'Anonymous'}</strong></div>
+          <div>${user.email}</div>
+        `;
+        loginBtn.style.display = 'none';
+        logoutBtn.style.display = 'inline-block';
+      } else {
+        // 未登入狀態
+        userInfoDiv.innerHTML = '';
+        loginBtn.style.display = 'inline-block';
+        logoutBtn.style.display = 'none';
+      }
+    });
+  </script>
 </body>
-
 </html>
-
-
-
-
