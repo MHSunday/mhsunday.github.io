@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>統計</title>
+</head>
+<body>
+  <h1>獎勵計劃統計</h1>
+  <button id="logoutBtn">登出</button>
+  <div id="statsContainer">
+    <label>班級:
+      <select id="classSelect"></select>
+    </label>
+    <button id="loadBtn">載入</button>
+    <div id="statsResult"></div>
+  </div>
+
+  <script type="module">
+    import { getUserRole, logout } from './js/auth.js';
+    import { getAllClasses, getStats } from './js/api.js';
+
+    document.getElementById('logoutBtn').onclick = logout;
+
+    async function init() {
+      const role = getUserRole();
+      const classes = await getAllClasses();
+      const sel = document.getElementById('classSelect');
+      if (role.role === 'admin') {
+        sel.innerHTML = '<option value="*">全校</option>';
+        classes.forEach(cls => {
+          const opt = document.createElement('option');
+          opt.value = cls;
+          opt.textContent = cls;
+          sel.appendChild(opt);
+        });
+      } else {
+        sel.innerHTML = `<option value="${role.classes[0]}">${role.classes[0]}</option>`;
+        sel.disabled = true;
+      }
+      loadStats(sel.value);
+    }
+
+    async function loadStats(className) {
+      try {
+        const stats = await getStats(className);
+        document.getElementById('statsResult').innerHTML = `
+          <h2>${stats.class === '*' ? '全校' : stats.class} 統計</h2>
+          <p>總參與次數: ${stats.totalRecords}</p>
+          <p>達成獎勵人數: ${stats.achievedStudents}</p>
+          <p>已換領獎品人數: ${stats.redeemedCount}</p>
+        `;
+      } catch (err) {
+        document.getElementById('statsResult').innerHTML = `<p style="color:red">錯誤: ${err.message}</p>`;
+      }
+    }
+
+    document.getElementById('loadBtn').onclick = () => {
+      loadStats(document.getElementById('classSelect').value);
+    };
+
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>登記獎勵</title>
+</head>
+<body>
+  <h1>登記彌撒參與</h1>
+  <button id="logoutBtn">登出</button>
+  <div id="formContainer">
+    <label>班級:
+      <select id="classSelect"></select>
+    </label><br><br>
+    <label>學生:
+      <select id="studentSelect"></select>
+    </label><br><br>
+    <label>登記日期 (星期日):
+      <input type="date" id="dateInput">
+    </label><br><br>
+    <label>
+      <input type="checkbox" id="redeemedCheck"> 已換領獎品
+    </label>
+    <label id="redeemDateLabel" style="display:none;">
+      換領日期: <input type="date" id="redeemDateInput">
+    </label><br><br>
+    <button id="submitBtn">登記</button>
+    <div id="message"></div>
+  </div>
+
+  <script type="module">
+    import { getCurrentUser, getUserRole, logout } from './js/auth.js';
+    import { getAllClasses, getStudentsByClass, recordAttendance } from './js/api.js';
+
+    document.getElementById('logoutBtn').onclick = logout;
+    document.getElementById('redeemedCheck').onchange = function() {
+      document.getElementById('redeemDateLabel').style.display = this.checked ? 'block' : 'none';
+    };
+
+    // 初始化
+    async function init() {
+      const user = getCurrentUser();
+      if (!user) return;
+
+      const role = getUserRole();
+      const classes = await getAllClasses();
+
+      const classSelect = document.getElementById('classSelect');
+      if (role.role === 'admin') {
+        classes.forEach(cls => {
+          const opt = document.createElement('option');
+          opt.value = cls;
+          opt.textContent = cls;
+          classSelect.appendChild(opt);
+        });
+      } else if (role.role === 'teacher') {
+        const cls = role.classes[0];
+        classSelect.innerHTML = `<option value="${cls}">${cls}</option>`;
+        classSelect.disabled = true;
+        loadStudents(cls);
+      }
+
+      classSelect.onchange = () => loadStudents(classSelect.value);
+      if (role.role === 'teacher') {
+        loadStudents(role.classes[0]);
+      }
+    }
+
+    async function loadStudents(className) {
+      const students = await getStudentsByClass(className);
+      const sel = document.getElementById('studentSelect');
+      sel.innerHTML = students.map(name => `<option>${name}</option>`).join('');
+    }
+
+    document.getElementById('submitBtn').onclick = async () => {
+      const classSelect = document.getElementById('classSelect');
+      const studentSelect = document.getElementById('studentSelect');
+      const dateInput = document.getElementById('dateInput');
+      const redeemedCheck = document.getElementById('redeemedCheck');
+      const redeemDateInput = document.getElementById('redeemDateInput');
+
+      try {
+        const data = {
+          className: classSelect.value,
+          studentName: studentSelect.value,
+          attendanceDate: dateInput.value,
+          redeemed: redeemedCheck.checked,
+          redeemDate: redeemDateInput.value,
+          email: getCurrentUser().email
+        };
+        await recordAttendance(data);
+        document.getElementById('message').innerHTML = '<span style="color:green">登記成功！</span>';
+        // 清空表單（可選）
+      } catch (err) {
+        document.getElementById('message').innerHTML = `<span style="color:red">${err.message}</span>`;
+      }
+    };
+
+    init();
+  </script>
+</body>
+</html>

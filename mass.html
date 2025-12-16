@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>彌撒獎勵計劃 - 登入</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+  <h1>參與彌撒獎勵計劃</h1>
+  <button id="loginBtn">使用 Google 帳號登入</button>
+
+  <script type="module">
+    import { login } from './js/auth.js';
+    document.getElementById('loginBtn').onclick = login;
+  </script>
+</body>
+</html>
