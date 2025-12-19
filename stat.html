@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>統計報表</title>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+      max-width: 600px;
+      margin: 20px auto;
+      padding: 0 16px;
+      background-color: #f9f9f9;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #eee;
+    }
+    h1 {
+      margin: 0;
+      color: #2c3e50;
+      font-size: 24px;
+    }
+    .nav-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    .nav-btn {
+      padding: 6px 12px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .nav-btn:hover {
+      background: #2980b9;
+    }
+    #logoutBtn {
+      background: #e74c3c;
+    }
+    #logoutBtn:hover {
+      background: #c0392b;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: bold;
+      color: #34495e;
+    }
+    select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 16px;
+      background-color: white;
+    }
+    select:disabled {
+      background-color: #f5f5f5;
+      color: #999;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .stat-card {
+      background: white;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 28px;
+      font-weight: bold;
+      color: #2980b9;
+      margin: 8px 0;
+    }
+    .stat-label {
+      color: #7f8c8d;
+      font-size: 14px;
+    }
+
+    #message {
+      min-height: 24px;
+      margin-top: 12px;
+      text-align: center;
+      font-weight: bold;
+    }
+    .loading {
+      text-align: center;
+      color: #7f8c8d;
+      font-style: italic;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>統計報表</h1>
+    <div class="nav-buttons">
+      <button class="nav-btn" onclick="window.location.href='form.html'">登記</button>
+      <button id="logoutBtn">登出</button>
+    </div>
+  </header>
+
+  <div class="form-group">
+    <label for="classSelect">選擇班級</label>
+    <select id="classSelect" disabled>
+      <option>載入中…</option>
+    </select>
+  </div>
+
+  <div id="statsContainer" style="display: none;">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">總參與人次</div>
+        <div id="totalRecords" class="stat-value">0</div>
+      </div>
+    <div class="stat-card" id="achievedCard">
+    <div class="stat-label">達成學生人數</div>
+    <div id="achievedStudents" class="stat-value">0</div>
+    </div>
+      <div class="stat-card">
+        <div class="stat-label">已換領獎品</div>
+        <div id="redeemedCount" class="stat-value">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">班級</div>
+        <div id="displayClass" class="stat-value">-</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="message"></div>
+
+  <script type="module" src="./js/main-stats.js"></script>
+</body>
+</html>

@@ -1,20 +1,20 @@
-// auth.js
+// js/auth.js
 import { APP_CONFIG } from './config.js';
 
 let currentUser = null;
 let userRole = null;
+let roleLoaded = false;
+const roleLoadedCallbacks = [];
 
-// 初始化 Firebase
-firebase.initializeApp(APP_CONFIG.firebase);
+// 🔥 初始化 Firebase（使用 HTML 引入的全域 firebase）
+if (!firebase.apps.length) {
+  firebase.initializeApp(APP_CONFIG.firebase);
+}
 const auth = firebase.auth();
 
-export function getCurrentUser() {
-  return currentUser;
-}
-
-export function getUserRole() {
-  return userRole;
-}
+// --- 匯出的函式 ---
+export function getCurrentUser() { return currentUser; }
+export function getUserRole() { return userRole; }
 
 export async function login() {
   const provider = new firebase.auth.GoogleAuthProvider();
@@ -31,17 +31,33 @@ export async function logout() {
   window.location.href = 'index.html';
 }
 
-// 初始化監聽
+export function onRoleLoaded(callback) {
+  if (roleLoaded && userRole) {
+    callback(userRole);
+  } else {
+    roleLoadedCallbacks.push(callback);
+  }
+}
+
+// --- 登入狀態監聽 ---
 auth.onAuthStateChanged(async (user) => {
   if (user) {
     currentUser = user;
     try {
-      const response = await fetch(`${APP_CONFIG.appsScriptUrl}?action=getUserRoles&email=${encodeURIComponent(user.email)}`);
+      const response = await fetch(
+        `${APP_CONFIG.appsScriptUrl}?action=getUserRoles&email=${encodeURIComponent(user.email)}`
+      );
       const roleData = await response.json();
       if (roleData && (roleData.role === 'admin' || roleData.role === 'teacher')) {
         userRole = roleData;
-        // 如果已在 form 或 stats 頁，不跳轉
-        if (window.location.pathname.endsWith('index.html')) {
+        roleLoaded = true;
+        // 通知所有等待者
+        roleLoadedCallbacks.forEach(cb => cb(roleData));
+        roleLoadedCallbacks.length = 0;
+
+        // 跳轉到表單頁（如果在首頁）
+        const path = window.location.pathname;
+        if (path === '/' || path.endsWith('/index.html')) {
           window.location.href = 'form.html';
         }
       } else {
@@ -56,7 +72,8 @@ auth.onAuthStateChanged(async (user) => {
   } else {
     currentUser = null;
     userRole = null;
-    if (!window.location.pathname.endsWith('index.html')) {
+    roleLoaded = false;
+    if (!window.location.pathname.endsWith('/index.html')) {
       window.location.href = 'index.html';
     }
   }

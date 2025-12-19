@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>學生參與明細</title>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 0 16px;
+      background-color: #f9f9f9;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #eee;
+    }
+    h1 {
+      margin: 0;
+      color: #2c3e50;
+      font-size: 24px;
+    }
+    .nav-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    .nav-btn {
+      padding: 6px 12px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .nav-btn:hover {
+      background: #2980b9;
+    }
+    #logoutBtn {
+      background: #e74c3c;
+    }
+    #logoutBtn:hover {
+      background: #c0392b;
+    }
+
+    .info-bar {
+      background: #eaf7ff;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-weight: bold;
+      color: #2980b9;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .bulk-actions {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+    .bulk-actions label {
+      margin: 0;
+      font-weight: normal;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    th, td {
+      padding: 12px 10px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+    th {
+      background-color: #f1f8ff;
+      color: #2c3e50;
+      font-weight: bold;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    tr.selectable-row:hover {
+      background-color: #f8f9fa;
+    }
+    tr.selected {
+      background-color: #eaf7ff !important;
+    }
+    .redeemed-yes { color: #27ae60; }
+    .redeemed-no { color: #e74c3c; }
+
+    .redeem-btn {
+      padding: 4px 8px;
+      background: #27ae60;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .redeem-btn:hover {
+      background: #219653;
+    }
+
+    #message {
+      min-height: 24px;
+      margin-top: 12px;
+      text-align: center;
+      font-weight: bold;
+    }
+    .loading {
+      text-align: center;
+      color: #7f8c8d;
+      font-style: italic;
+      margin: 20px 0;
+    }
+    #progressBar {
+      height: 6px;
+      background: #ecf0f1;
+      border-radius: 3px;
+      margin-top: 8px;
+      overflow: hidden;
+      display: none;
+    }
+    #progressBarFill {
+      height: 100%;
+      background: #3498db;
+      width: 0%;
+      transition: width 0.3s;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>學生參與明細</h1>
+    <div class="nav-buttons">
+      <button class="nav-btn" onclick="window.location.href='stat.html'">返回統計</button>
+      <button id="logoutBtn">登出</button>
+    </div>
+  </header>
+
+  <div class="info-bar">
+    <span>班級：<span id="displayClass">-</span></span>
+  </div>
+
+  <div class="bulk-actions">
+    <label>
+      <input type="checkbox" id="selectAll"> 全選未換領記錄
+    </label>
+    <button id="bulkRedeemBtn" class="nav-btn" style="background:#27ae60;">批量標記為已換領</button>
+    <div id="progressBar"><div id="progressBarFill"></div></div>
+  </div>
+
+  <table id="recordsTable">
+    <thead>
+      <tr>
+        <th>學生姓名</th>
+        <th>參與日期</th>
+        <th>已換領</th>
+        <th>換領日期</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody id="recordsBody">
+      <!-- 動態載入 -->
+    </tbody>
+  </table>
+
+  <div id="message"></div>
+
+  <script type="module" src="./js/main-details.js"></script>
+</body>
+</html>
