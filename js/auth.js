@@ -54,30 +54,26 @@ auth.getRedirectResult().catch(error => {
 });
 
 // --- 登入狀態監聽 ---
+// 在 onAuthStateChanged 中，替換跳轉部分
 auth.onAuthStateChanged(async (user) => {
   if (user) {
     currentUser = user;
     try {
-      // 🔑 從 Apps Script 取得使用者角色
       const response = await fetch(
         `${APP_CONFIG.appsScriptUrl}?action=getUserRoles&email=${encodeURIComponent(user.email)}`
       );
       const roleData = await response.json();
 
-      // 驗證權限
       if (roleData && (roleData.role === 'admin' || roleData.role === 'teacher')) {
         userRole = roleData;
         roleLoaded = true;
-
-        // 通知所有等待者
         roleLoadedCallbacks.forEach(cb => cb(roleData));
         roleLoadedCallbacks.length = 0;
 
-        // 跳轉到表單頁（避免重複跳轉）
-        const path = window.location.pathname;
-        const isOnIndex = path === '/' || path.endsWith('/index.html');
-        if (isOnIndex) {
-          window.location.href = 'form.html';
+        // 🔑 修正跳轉邏輯
+        const currentPage = window.location.pathname.split('/').pop();
+        if (!['form.html', 'stat.html', 'details.html'].includes(currentPage)) {
+          window.location.href = './form.html'; // ✅ 相對路徑
         }
       } else {
         alert("您沒有使用此系統的權限");
@@ -89,15 +85,14 @@ auth.onAuthStateChanged(async (user) => {
       await auth.signOut();
     }
   } else {
-    // 未登入
     currentUser = null;
     userRole = null;
     roleLoaded = false;
 
-    // 自動跳回首頁（如果不是已在首頁）
-    const path = window.location.pathname;
-    if (!path.endsWith('/index.html') && path !== '/') {
-      window.location.href = 'index.html';
+    // 未登入時跳回首頁
+    const currentPage = window.location.pathname.split('/').pop();
+    if (currentPage !== 'index.html' && currentPage !== '') {
+      window.location.href = './index.html';
     }
   }
 });
