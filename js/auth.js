@@ -13,21 +13,28 @@ if (!firebase.apps.length) {
 const auth = firebase.auth();
 
 // --- 匯出的函式 ---
-export function getCurrentUser() { return currentUser; }
-export function getUserRole() { return userRole; }
+export function getCurrentUser() {
+  return currentUser;
+}
 
+export function getUserRole() {
+  return userRole;
+}
+
+// ✅ 一律使用 signInWithRedirect（行動裝置相容）
 export async function login() {
   const provider = new firebase.auth.GoogleAuthProvider();
   try {
-    await auth.signInWithPopup(provider);
+    await auth.signInWithRedirect(provider);
   } catch (error) {
     console.error("Login error:", error);
-    alert("登入失敗：" + error.message);
+    alert("登入失敗：" + (error.message || error.code));
   }
 }
 
 export async function logout() {
   await auth.signOut();
+  // 跳轉到首頁（使用相對路徑，相容 GitHub Pages）
   window.location.href = 'index.html';
 }
 
@@ -39,25 +46,37 @@ export function onRoleLoaded(callback) {
   }
 }
 
+// --- 處理 Redirect 登入結果（非必需，但可除錯）---
+auth.getRedirectResult().catch(error => {
+  if (error.code !== 'auth/redirect-cancelled-by-user') {
+    console.error("Redirect login error:", error);
+  }
+});
+
 // --- 登入狀態監聽 ---
 auth.onAuthStateChanged(async (user) => {
   if (user) {
     currentUser = user;
     try {
+      // 🔑 從 Apps Script 取得使用者角色
       const response = await fetch(
         `${APP_CONFIG.appsScriptUrl}?action=getUserRoles&email=${encodeURIComponent(user.email)}`
       );
       const roleData = await response.json();
+
+      // 驗證權限
       if (roleData && (roleData.role === 'admin' || roleData.role === 'teacher')) {
         userRole = roleData;
         roleLoaded = true;
+
         // 通知所有等待者
         roleLoadedCallbacks.forEach(cb => cb(roleData));
         roleLoadedCallbacks.length = 0;
 
-        // 跳轉到表單頁（如果在首頁）
+        // 跳轉到表單頁（避免重複跳轉）
         const path = window.location.pathname;
-        if (path === '/' || path.endsWith('/index.html')) {
+        const isOnIndex = path === '/' || path.endsWith('/index.html');
+        if (isOnIndex) {
           window.location.href = 'form.html';
         }
       } else {
@@ -70,10 +89,14 @@ auth.onAuthStateChanged(async (user) => {
       await auth.signOut();
     }
   } else {
+    // 未登入
     currentUser = null;
     userRole = null;
     roleLoaded = false;
-    if (!window.location.pathname.endsWith('/index.html')) {
+
+    // 自動跳回首頁（如果不是已在首頁）
+    const path = window.location.pathname;
+    if (!path.endsWith('/index.html') && path !== '/') {
       window.location.href = 'index.html';
     }
   }
