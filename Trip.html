@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>深圳兩日行程</title>
+  <style>
+    @media print {
+      @page {
+        size: A4;
+        margin: 15mm;
+      }
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+
+    body {
+      font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans CJK TC", sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #fff;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 24px;
+      margin-bottom: 10px;
+      color: #2c3e50;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #7f8c8d;
+      margin-bottom: 30px;
+      font-size: 16px;
+    }
+
+    .day {
+      margin-bottom: 30px;
+      break-inside: avoid;
+    }
+
+    .day-title {
+      font-size: 20px;
+      font-weight: bold;
+      color: #2980b9;
+      border-bottom: 2px solid #3498db;
+      padding-bottom: 6px;
+      margin-bottom: 15px;
+    }
+
+    .event {
+      display: flex;
+      margin-bottom: 12px;
+      break-inside: avoid;
+    }
+
+    .time {
+      width: 110px;
+      font-weight: bold;
+      flex-shrink: 0;
+      color: #2c3e50;
+    }
+
+    .content {
+      flex: 1;
+    }
+
+    .activity {
+      font-weight: bold;
+      color: #2c3e50;
+    }
+
+    .note {
+      margin-top: 4px;
+      font-size: 14px;
+      color: #555;
+    }
+
+    .divider {
+      height: 1px;
+      background-color: #ddd;
+      margin: 25px 0;
+    }
+
+    .notes-section {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 1px dashed #ccc;
+    }
+
+    .notes-title {
+      font-weight: bold;
+      margin-bottom: 8px;
+      color: #c0392b;
+    }
+
+    .emoji {
+      margin-right: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>深圳兩日行程表</h1>
+  <div class="subtitle">珠海出發</div>
+
+  <div class="day">
+    <div class="day-title">📅 第一天（12月27日，星期六）｜珠海 → 深圳</div>
+
+    <div class="event">
+      <div class="time">09:00 – 11:00</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">🚗</span>從拱北出發，包車前往深圳</div>
+        <div class="note">• 車程約100分鐘，中途休息10分鐘</div>
+      </div>
+    </div>
+
+    <div class="event">
+      <div class="time">11:15 – 12:15</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">🖼️</span>南山萬象天地 · HAUS NOWHERE 展</div>      
+      </div>
+    </div>
+
+    <div class="event">
+      <div class="time">12:30 – 14:00</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">🍽️</span>午餐：閩和南（L3）</div>        
+      </div>
+    </div>
+
+    <div class="event">
+      <div class="time">14:00 – 14:45</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">🛍</span>商場閒逛</div>        
+      </div>
+    </div>
+	
+    <div class="event">
+      <div class="time">14:45 – 15:15</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">🚗</span>前往前海華僑城JW萬豪酒店（寶安區寶興路8號）</div>
+        <div class="note">• 車程約30分鐘</div>
+      </div>
+    </div>
+
+    <div class="event">
+      <div class="time">15:15 – 16:15</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">🏨</span>酒店入住 & 休息</div>
+        <div class="note">• 可寄放行李、稍作調整</div>
+      </div>
+    </div>
+
+    <div class="event">
+      <div class="time">16:30 – 17:30</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">📚</span>歡樂港灣 · 鍾書閣</div>
+        <div class="note">• 網紅書店，海景閱讀空間</div>
+      </div>
+    </div>
+
+    <div class="event">
+      <div class="time">17:40 – 18:00</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">🚗</span>前往萬象前海（南山桂灣四路169號）</div>
+        <div class="note">• 車程約20分鐘</div>
+      </div>
+    </div>
+
+    <div class="event">
+      <div class="time">18:00 – 19:30</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">🍲</span>晚餐：炳勝私廚（萬象前海 L3）</div>
+        <div class="note">• 華為專用電梯直達 </div>
+      </div>
+    </div>
+
+    <div class="event">
+      <div class="time">19:50之後</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">🌊</span>選擇其一：<br>
+          • 回酒店休息<br>
+          • 欣賞歡樂港灣水秀（20:00 或 21:00 場）
+        </div>        
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="day">
+    <div class="day-title">📅 第二天（12月28日，星期日）｜ 主日彌撒 · 返程</div>
+
+    <div class="event">
+      <div class="time">早餐</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">🥐</span>酒店內悠閒早餐</div>        
+      </div>
+    </div>
+
+    <div class="event">
+      <div class="time">10:00</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">🧳</span>酒店退房</div>        
+      </div>
+    </div>
+
+    <div class="event">
+      <div class="time">10:10 – 10:30</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">🚗</span>前往南頭古城</div>
+        <div class="note">• 車程約20分鐘</div>
+      </div>
+    </div>
+
+    <div class="event">
+      <div class="time">10:30 – 12:00</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">🏯</span>漫遊南頭古城</div>
+        <div class="note">• 歷史街區、文創小店、老城新貌</div>
+      </div>
+    </div>
+
+    <div class="event">
+      <div class="time">12:00 – 12:30</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">🚗</span>前往芙蓉樓・尚熹（西鄉大道中央大道B座）</div>
+        <div class="note">• 車程約30分鐘</div>
+      </div>
+    </div>
+
+    <div class="event">
+      <div class="time">12:30 – 14:00</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">🍜</span>午餐：芙蓉樓（海灣旗艦店）</div>        
+      </div>
+    </div>
+
+    <div class="event">
+      <div class="time">14:00 – 14:30</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">🚗</span>前往寶安耶穌君王堂</div>
+        <div class="note">• 車程約30分鐘</div>
+      </div>
+    </div>
+
+    <div class="event">
+      <div class="time">14:30 – 16:20</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">✝️</span>參與主日彌撒（15:00 開始）</div>        
+      </div>
+    </div>
+
+    <div class="event">
+      <div class="time">16:20 – 18:10</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">🚗</span>自駕返回珠海拱北</div>
+        <div class="note">• 車程約100分鐘 + 10分鐘中途休息</div>
+      </div>
+    </div>
+
+    <div class="event">
+      <div class="time">18:15</div>
+      <div class="content">
+        <div class="activity"><span class="emoji">🥢</span>晚餐：萊禧薈（拱北來魅力假日酒店23樓）</div>        
+      </div>
+    </div>
+  </div> 
+  
+  <div class="event">
+    <div class="time">20:00</div>
+	<div class="content">
+        <div class="activity"><span class="emoji">👋🏻</span>旅程結束</div>        
+    </div>
+  </div>
+
+</body>
+</html>
