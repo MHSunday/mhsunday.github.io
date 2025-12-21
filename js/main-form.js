@@ -284,6 +284,11 @@ function initFormPage() {
   function hideSuggestions() {
     studentSuggestions.classList.remove('show');
     currentFocus = -1;
+    // 移除旋轉類別以恢復箭頭方向
+    const dropdownArrow = document.querySelector('.dropdown-arrow');
+    if (dropdownArrow) {
+      dropdownArrow.classList.remove('rotate');
+    }
   }
   
   // 顯示建議列表
@@ -314,28 +319,43 @@ function initFormPage() {
     }
     
     studentSuggestions.classList.add('show');
+    // 添加旋轉類別以旋轉箭頭向下
+    const dropdownArrow = document.querySelector('.dropdown-arrow');
+    if (dropdownArrow) {
+      dropdownArrow.classList.add('rotate');
+    }
   }
   
   // 自動完成搜索邏輯
   function autocompleteSearch() {
     const inputValue = studentInput.value.toLowerCase();
-    if (!inputValue) {
-      hideSuggestions();
-      return;
-    }
     
     // 根據當前班級選擇過濾學生
     let filteredStudents = [];
     if (classSelect.value === '*') {
       // "所有班級"選項：顯示所有學生
-      filteredStudents = allStudents.filter(student =>
-        student && student.name && student.name.toLowerCase().includes(inputValue)
-      );
+      if (!inputValue) {
+        // 如果輸入為空，顯示所有學生
+        filteredStudents = allStudents;
+      } else {
+        // 如果有輸入，進行過濾
+        filteredStudents = allStudents.filter(student =>
+          student && student.name && student.name.toLowerCase().includes(inputValue)
+        );
+      }
     } else {
       // 特定班級：只顯示該班級的學生
-      filteredStudents = allStudents.filter(student =>
-        student && student.name && student.class === classSelect.value && student.name.toLowerCase().includes(inputValue)
-      );
+      if (!inputValue) {
+        // 如果輸入為空，顯示該班級的所有學生
+        filteredStudents = allStudents.filter(student =>
+          student && student.name && student.class === classSelect.value
+        );
+      } else {
+        // 如果有輸入，進行過濾
+        filteredStudents = allStudents.filter(student =>
+          student && student.name && student.class === classSelect.value && student.name.toLowerCase().includes(inputValue)
+        );
+      }
     }
     
     showSuggestions(filteredStudents);
@@ -346,17 +366,65 @@ function initFormPage() {
      autocompleteSearch();
    });
    
+   // 顯示所有學生選項當點擊或聚焦且輸入框為空時
+   studentInput.addEventListener('focus', () => {
+     if (!studentInput.value) {
+       autocompleteSearch(); // 這會觸發顯示所有學生（根據當前班級選擇）
+     }
+   });
+   
+   // 添加點擊事件以顯示所有選項
+   studentInput.addEventListener('click', () => {
+     if (!studentInput.value) {
+       autocompleteSearch(); // 這會觸發顯示所有學生（根據當前班級選擇）
+     }
+   });
+   
+   // 添加點擊下拉箭頭事件以顯示所有選項 - 使用事件委託
+   document.addEventListener('click', (e) => {
+     if (e.target.closest('.dropdown-arrow')) {
+       if (studentSuggestions.classList.contains('show')) {
+         // 如果建議列表已顯示，則隱藏它
+         hideSuggestions();
+       } else {
+         // 如果建議列表未顯示，則顯示所有學生
+         studentInput.focus();
+         if (!studentInput.value) {
+           autocompleteSearch(); // 顯示所有學生
+         } else {
+           autocompleteSearch(); // 顯示匹配的學生
+         }
+       }
+     }
+   });
+   
    studentInput.addEventListener('keydown', (e) => {
      const items = studentSuggestions.querySelectorAll('.autocomplete-item');
      
+     if (!items.length) return; // 如果沒有項目，直接返回
+     
      if (e.key === 'ArrowDown') {
        e.preventDefault();
-       currentFocus = (currentFocus + 1) % items.length;
+       currentFocus = currentFocus < items.length - 1 ? currentFocus + 1 : 0;
        updateActiveItem(items);
+       scrollToActiveItem(items);
      } else if (e.key === 'ArrowUp') {
        e.preventDefault();
-       currentFocus = currentFocus <= 0 ? items.length - 1 : currentFocus - 1;
+       currentFocus = currentFocus > 0 ? currentFocus - 1 : items.length - 1;
        updateActiveItem(items);
+       scrollToActiveItem(items);
+     } else if (e.key === 'PageDown') {
+       e.preventDefault();
+       // 移動到下一個可視區域的項目（假設每頁顯示約5個項目）
+       currentFocus = Math.min(currentFocus + 5, items.length - 1);
+       updateActiveItem(items);
+       scrollToActiveItem(items);
+     } else if (e.key === 'PageUp') {
+       e.preventDefault();
+       // 移動到上一個可視區域的項目（假設每頁顯示約5個項目）
+       currentFocus = Math.max(currentFocus - 5, 0);
+       updateActiveItem(items);
+       scrollToActiveItem(items);
      } else if (e.key === 'Enter') {
        e.preventDefault();
        if (currentFocus > -1 && items[currentFocus]) {
@@ -366,6 +434,13 @@ function initFormPage() {
        hideSuggestions();
      }
    });
+   
+   // 滾動到當前選中的項目
+   function scrollToActiveItem(items) {
+     if (currentFocus >= 0 && items[currentFocus]) {
+       items[currentFocus].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+     }
+   }
    
    // 更新當前選中的項目樣式
   function updateActiveItem(items) {

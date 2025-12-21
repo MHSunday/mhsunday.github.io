@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+ <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>補領禮物管理</title>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+      max-width: 1000px;
+      margin: 20px auto;
+      padding: 0 16px;
+      background-color: #f9f9f9;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #eee;
+    }
+    h1 {
+      margin: 0;
+      color: #2c3e50;
+      font-size: 24px;
+    }
+    .nav-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    .nav-btn {
+      padding: 6px 12px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .nav-btn:hover {
+      background: #2980b9;
+    }
+    #logoutBtn {
+      background: #e74c3c;
+    }
+    #logoutBtn:hover {
+      background: #c0392b;
+    }
+
+    .controls {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+      align-items: end;
+    }
+    
+    .form-group {
+      flex: 1;
+      margin-bottom: 0;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: bold;
+      color: #34495e;
+    }
+    
+    select, input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 16px;
+      background-color: white;
+    }
+    
+    select:disabled, input:disabled {
+      background-color: #f5f5f5;
+      color: #999;
+    }
+    
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    
+    .btn-primary {
+      background: #27ae60;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    
+    .btn-primary:hover {
+      background: #219653;
+    }
+    
+    .btn-primary:disabled {
+      background: #bdc3c7;
+      cursor: not-allowed;
+    }
+    
+    .btn-secondary {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    
+    .btn-secondary:hover {
+      background: #2980b9;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+    
+    th {
+      background-color: #3498db;
+      color: white;
+      font-weight: bold;
+    }
+    
+    tr:nth-child(even) {
+      background-color: #f8f9fa;
+    }
+    
+    .checkbox-cell {
+      text-align: center;
+      width: 50px;
+    }
+    
+    .checkbox-cell input[type="checkbox"] {
+      transform: scale(1.2);
+    }
+    
+    #message {
+      min-height: 24px;
+      margin-top: 12px;
+      text-align: center;
+      font-weight: bold;
+    }
+    
+    .loading {
+      text-align: center;
+      color: #7f8c8d;
+      font-style: italic;
+      margin: 20px 0;
+    }
+    
+    .date-input {
+      width: 150px;
+    }
+    
+    .status-cell {
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>補領禮物管理</h1>
+    <div class="nav-buttons">
+      <button class="nav-btn" onclick="window.location.href='form.html'">登記</button>
+      <button class="nav-btn" onclick="window.location.href='stat.html'">統計</button>
+      <button id="logoutBtn">登出</button>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div class="form-group">
+      <label for="classFilter">篩選班級</label>
+      <select id="classFilter">
+        <option value="*">所有班級</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="redeemDate">補領日期</label>
+      <input type="date" id="redeemDate">
+    </div>
+  </div>
+
+  <div class="action-buttons">
+    <button id="selectAllBtn" class="btn-secondary">全選</button>
+    <button id="updateAllBtn" class="btn-primary" disabled>批量更新選取項目</button>
+    <button id="updateAllUnselectedBtn" class="btn-primary" disabled>批量更新全部項目</button>
+  </div>
+
+  <div id="recordsTableContainer">
+    <table id="recordsTable">
+      <thead>
+        <tr>
+          <th class="checkbox-cell"><input type="checkbox" id="selectAllCheckbox"></th>
+          <th>班級</th>
+          <th>學生姓名</th>
+          <th>登記日期</th>
+          <th>補領日期</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="recordsTableBody">
+        <!-- 動態內容 -->
+      </tbody>
+    </table>
+  </div>
+
+  <div id="message"></div>
+
+  <script type="module" src="./js/main-redeem.js"></script>
+</body>
+</html>

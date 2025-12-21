@@ -136,3 +136,60 @@ export async function updateRedeemStatus(data) {
   if (result.error) throw new Error(result.error);
   return result;
 }
+
+/**
+ * 獲取所有未換領獎品的記錄 (僅限管理員)
+ * @param {string} email - 用戶郵箱
+ * @returns {Array} 未換領記錄列表
+ */
+export async function getUnredeemedRecords(email) {
+  if (!email) throw new Error('必須提供使用者 email');
+  
+  const url = `${API_URL}?action=getUnredeemedRecords&email=${encodeURIComponent(email)}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+/**
+ * 批量更新換領狀態 (補領模式)
+ * @param {Array} records - 要更新的記錄數組，每項包含 {className, studentName, attendanceDate, redeemDate}
+ * @param {string} email - 用戶郵箱
+ */
+export async function batchUpdateRedeemStatus(records, email) {
+  if (!email) throw new Error('必須提供使用者 email');
+  if (!Array.isArray(records)) throw new Error('records 必須是數組');
+  
+  const formData = toFormData({
+    action: 'batchUpdateRedeemStatus',
+    email: email,
+    records: JSON.stringify(records)
+  });
+
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: formData
+ });
+
+  const result = await response.json();
+  if (result.error) throw new Error(result.error);
+  return result;
+}
+
+/**
+ * 獲取達成換領條件的學生名單
+ * @param {string} email - 用戶郵箱
+ * @param {string} className - 班級名稱，'*' 表示所有班級
+ * @returns {Array} 達成換領條件的學生列表
+ */
+export async function getAchievedStudents(email, className = '*') {
+  if (!email) throw new Error('必須提供使用者 email');
+  
+  const url = `${API_URL}?action=getAchievedStudents&email=${encodeURIComponent(email)}&class=${encodeURIComponent(className)}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}

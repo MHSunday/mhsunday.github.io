@@ -109,6 +109,46 @@
       font-style: italic;
       margin: 20px 0;
     }
+    
+    .tabs {
+      display: flex;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #ddd;
+    }
+    
+    .tab-btn {
+      padding: 10px 20px;
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      border-bottom: none;
+      border-radius: 4px 4px 0 0;
+      cursor: pointer;
+      margin-right: 5px;
+    }
+    
+    .tab-btn.active {
+      background: #3498db;
+      color: white;
+    }
+    
+    .achieved-student-item {
+      padding: 12px;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      background: white;
+    }
+    
+    .achieved-student-header {
+      font-weight: bold;
+      color: #2c3e50;
+      margin-bottom: 4px;
+    }
+    
+    .achieved-student-details {
+      color: #7f8c8d;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -116,6 +156,7 @@
     <h1>統計報表</h1>
     <div class="nav-buttons">
       <button class="nav-btn" onclick="window.location.href='form.html'">登記</button>
+      <button class="nav-btn" onclick="window.location.href='redeem.html'">補領禮物</button>
       <button id="logoutBtn">登出</button>
     </div>
   </header>
@@ -127,7 +168,13 @@
     </select>
   </div>
 
-  <div id="statsContainer" style="display: none;">
+  <!-- 頁籤切換 -->
+  <div class="tabs">
+    <button id="statsTab" class="tab-btn active">統計摘要</button>
+    <button id="achievedTab" class="tab-btn">達成換領條件名單</button>
+  </div>
+
+  <div id="statsContainer" style="display: block;">
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-label">總參與人次</div>
@@ -146,6 +193,10 @@
         <div id="displayClass" class="stat-value">-</div>
       </div>
     </div>
+  </div>
+
+  <div id="achievedStudentsContainer" style="display: none; margin-top: 20px;">
+    <div id="achievedStudentsList"></div>
   </div>
 
   <div id="message"></div>
