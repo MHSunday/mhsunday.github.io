@@ -42,9 +42,13 @@
     import { login } from './js/auth.js';
 
     // 綁定登入按鈕
-    document.getElementById('loginBtn').addEventListener('click', (e) => {
-      e.preventDefault();
-      login();
+    // document.getElementById('loginBtn').addEventListener('click', (e) => {
+    //   e.preventDefault();
+    //   login();
+    // });
+     // 等 DOM 載入完成
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('loginBtn').onclick = login;
     });
   </script>
 </body>
