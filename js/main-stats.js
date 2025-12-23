@@ -22,8 +22,9 @@ function initStatsPage() {
   // 登出
   document.getElementById('logoutBtn').onclick = logout;
 
-  // 預設隱藏統計區
-  statsContainer.style.display = 'none';
+  // 預設顯示統計區，因為初始頁籤是統計摘要
+  statsContainer.style.display = 'block';
+  achievedStudentsContainer.style.display = 'none';
   messageEl.innerHTML = '';
 
   // 初始化卡片狀態（不可點）
@@ -109,15 +110,28 @@ function initStatsPage() {
     if (user && classSelect.value) {
       await loadStats(user.email, classSelect.value);
       
-      // 如果當前在達成換領條件學生名單頁籤，也重新載入該頁面的數據
-      if (achievedTab.classList.contains('active')) {
-        try {
+      // 無論當前在哪個標籤頁，都應當預先載入達成學生列表的最新數據
+      // 這樣當用戶切換到達成標籤頁時，會看到正確的數據
+      try {
+        const achievedStudents = await getAchievedStudents(user.email, classSelect.value);
+        // 更新達成學生列表的內容，無論當前在哪個標籤頁
+        // 但只有在達成標籤頁激活時才顯示加載信息
+        if (achievedTab.classList.contains('active')) {
+          // 如果當前就在達成標籤頁，顯示加載信息並更新顯示
           messageEl.innerHTML = '<div class="loading">載入達成換領條件的學生名單中…</div>';
-          const achievedStudents = await getAchievedStudents(user.email, classSelect.value);
           displayAchievedStudents(achievedStudents);
           messageEl.innerHTML = '';
-        } catch (err) {
+        } else {
+          // 如果不在達成標籤頁，也預先載入數據並更新列表內容
+          // 這樣當用戶切換過去時，會立即看到正確的結果
+          displayAchievedStudents(achievedStudents);
+        }
+      } catch (err) {
+        // 即使載入失敗，也要確保列表內容被清空或顯示錯誤信息
+        if (achievedTab.classList.contains('active')) {
           messageEl.innerHTML = `<span style="color:red">載入達成換領條件的學生名單失敗：${err.message}</span>`;
+        } else {
+          achievedStudentsList.innerHTML = '<p style="text-align: center; color: #7f8c8d; font-style: italic;">載入失敗</p>';
         }
       }
     }
@@ -126,7 +140,14 @@ function initStatsPage() {
   // 載入統計數據
   async function loadStats(email, className) {
     messageEl.innerHTML = '<div class="loading">載入統計中…</div>';
-    statsContainer.style.display = 'none';
+    
+    // 確保在載入時顯示正確的容器
+    if (statsTab.classList.contains('active')) {
+      statsContainer.style.display = 'block';
+    } else {
+      statsContainer.style.display = 'none';
+    }
+    achievedStudentsContainer.style.display = 'none';
 
     // 暫時禁用卡片點擊
     achievedCard.onclick = null;
@@ -140,24 +161,23 @@ function initStatsPage() {
       document.getElementById('redeemedCount').textContent = stats.redeemedCount;
       document.getElementById('displayClass').textContent = stats.class === '*' ? '全部' : stats.class;
 
-      // ✅ 關鍵修正：從 classSelect 讀取當前班級，而非 stats
-      achievedCard.onclick = () => {
-        const currentClass = classSelect.value;
-        if (currentClass === '*') {
-          alert('請先選擇單一班級以查看明細');
-          return;
-        }
-        window.location.href = `details.html?class=${encodeURIComponent(currentClass)}`;
-      };
-      achievedCard.style.cursor = 'pointer';
-      achievedCard.title = '點擊查看明細';
+      // 移除達成卡片的連結，因為功能重複
+      achievedCard.onclick = null;
+      achievedCard.style.cursor = 'default';
+      achievedCard.title = '';
 
       messageEl.innerHTML = '';
-      statsContainer.style.display = 'block';
+      
+      // 只有當統計標籤是活動狀態時才顯示統計容器
+      if (statsTab.classList.contains('active')) {
+        statsContainer.style.display = 'block';
+      } else {
+        statsContainer.style.display = 'none';
+      }
+      achievedStudentsContainer.style.display = 'none';
     } catch (err) {
       messageEl.innerHTML = `<span style="color:red">載入失敗：${err.message}</span>`;
-      statsContainer.style.display = 'none';
-
+      
       // 錯誤時確保卡片不可點
       achievedCard.onclick = null;
       achievedCard.style.cursor = 'default';
@@ -168,7 +188,7 @@ function initStatsPage() {
   // 顯示達成換領條件的學生名單
   function displayAchievedStudents(students) {
     if (!students || students.length === 0) {
-      achievedStudentsList.innerHTML = '<p style="text-align: center; color: #7f8c8d; font-style: italic;">沒有達成換領條件的學生</p>';
+      achievedStudentsList.innerHTML = '<p style="text-align: center; color: #7f8c8d; font-style: italic;">沒有學生符合條件</p>';
       return;
     }
 
@@ -183,8 +203,8 @@ function initStatsPage() {
     const html = students.map(student => `
       <div class="achieved-student-item">
         <div class="achieved-student-header">${student.class} - ${student.studentName}</div>
-        <div class="achieved-student-details">達成日期: ${formatDate(student.achievedDate)} | 出席次數: ${student.attendanceCount}</div>
-        ${student.attendanceDates ? `<div class="achieved-student-details">出席日期: ${student.attendanceDates.map(date => formatDate(date)).join(', ')}</div>` : ''}
+        <div class="achieved-student-details">總達成次數: ${student.attendanceCount}</div>
+        ${student.attendanceDates ? `<div class="achieved-student-details">達成日期: ${student.attendanceDates.map(date => formatDate(date)).join(', ')}</div>` : ''}
       </div>
     `).join('');
 

@@ -9,6 +9,9 @@ if (!document.getElementById('recordsTable')) {
  initRedeemPage();
 }
 
+// 用於跟蹤加載請求的計數器，避免並發問題
+let loadCounter = 0;
+
 function initRedeemPage() {
   const classFilter = document.getElementById('classFilter');
   const redeemDate = document.getElementById('redeemDate');
@@ -72,14 +75,16 @@ function initRedeemPage() {
     updateButtonsState();
   });
 
-  // 全選/取消全選主複選框事件
-  selectAllCheckbox.addEventListener('change', () => {
-    const checkboxes = recordsTableBody.querySelectorAll('input[type="checkbox"]');
-    checkboxes.forEach(checkbox => {
-      checkbox.checked = selectAllCheckbox.checked;
+  // 全選/取消全選主複選框事件 (雖然視覺上隱藏，但仍保留功能)
+  if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', () => {
+      const checkboxes = recordsTableBody.querySelectorAll('input[type="checkbox"]');
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+      });
+      updateButtonsState();
     });
-    updateButtonsState();
-  });
+  }
 
  // 批量更新選取項目按鈕事件
   updateAllBtn.addEventListener('click', async () => {
@@ -93,15 +98,29 @@ function initRedeemPage() {
     }
 
     const selectedRecords = [];
+    let hasDifferentDate = false;
     checkboxes.forEach(checkbox => {
       const row = checkbox.closest('tr');
+      const tableRedeemDate = row.querySelector('.redeem-date-input').value;
+      const globalRedeemDate = redeemDate.value;
+      
+      // 如果表格中的日期與全局日期不同，顯示警告
+      if (tableRedeemDate !== globalRedeemDate) {
+        hasDifferentDate = true;
+      }
+      
       selectedRecords.push({
         className: row.dataset.class,
         studentName: row.dataset.student,
         attendanceDate: row.dataset.attendanceDate,
-        redeemDate: redeemDate.value
+        redeemDate: tableRedeemDate  // 使用表格中的日期
       });
     });
+
+    // 如果存在不同的日期，顯示警告
+    if (hasDifferentDate) {
+      messageEl.innerHTML = '<span style="color:orange">注意：部分記錄使用表格中的換領日期，而非上方設定的日期</span>';
+    }
 
     await updateRedeemStatus(user.email, selectedRecords, '部分');
   });
@@ -118,27 +137,49 @@ function initRedeemPage() {
     }
 
     const allRecords = [];
+    let hasDifferentDate = false;
     allRows.forEach(row => {
+      const tableRedeemDate = row.querySelector('.redeem-date-input').value;
+      const globalRedeemDate = redeemDate.value;
+      
+      // 如果表格中的日期與全局日期不同，顯示警告
+      if (tableRedeemDate !== globalRedeemDate) {
+        hasDifferentDate = true;
+      }
+      
       allRecords.push({
         className: row.dataset.class,
         studentName: row.dataset.student,
         attendanceDate: row.dataset.attendanceDate,
-        redeemDate: redeemDate.value
+        redeemDate: tableRedeemDate  // 使用表格中的日期
       });
     });
+
+    // 如果存在不同的日期，顯示警告
+    if (hasDifferentDate) {
+      messageEl.innerHTML = '<span style="color:orange">注意：部分記錄使用表格中的換領日期，而非上方設定的日期</span>';
+    }
 
     await updateRedeemStatus(user.email, allRecords, '全部');
   });
 
   // 載入未換領記錄
+  let loadCounter = 0; // 用於跟蹤加載請求的計數器
   async function loadUnredeemedRecords(email, className) {
+    const currentLoadId = ++loadCounter; // 為當前加載請求分配唯一ID
     messageEl.innerHTML = '<div class="loading">載入未換領記錄中…</div>';
     recordsTableBody.innerHTML = '';
 
     try {
       const records = await getUnredeemedRecords(email);
-      const filteredRecords = className === '*' 
-        ? records 
+      
+      // 確保只處理最新請求的結果
+      if (currentLoadId !== loadCounter) {
+        return; // 如果不是最新的請求，則退出
+      }
+      
+      const filteredRecords = className === '*'
+        ? records
         : records.filter(record => record.class === className);
 
       if (filteredRecords.length === 0) {
@@ -150,7 +191,9 @@ function initRedeemPage() {
           const row = document.createElement('tr');
           row.dataset.class = record.class;
           row.dataset.student = record.studentName;
-          row.dataset.attendanceDate = record.attendanceDate;
+          // 確保日期格式為 yyyy-MM-dd 格式
+          const attendanceDateStr = formatDateForData(record.attendanceDate);
+          row.dataset.attendanceDate = attendanceDateStr;
           
           row.innerHTML = `
             <td class="checkbox-cell"><input type="checkbox"></td>
@@ -165,19 +208,36 @@ function initRedeemPage() {
           recordsTableBody.appendChild(row);
         });
 
-        // 為每個更新按鈕添加事件
-        document.querySelectorAll('.update-single-btn').forEach(btn => {
-          btn.addEventListener('click', async () => {
+        // 為每個換領日期輸入框添加事件監聽器
+        const redeemDateInputs = document.querySelectorAll('.redeem-date-input');
+        redeemDateInputs.forEach(input => {
+          input.addEventListener('change', function() {
+            const tableDate = this.value;
+            const globalDate = redeemDate.value;
+            if (tableDate !== globalDate) {
+              messageEl.innerHTML = `<span style="color:orange">注意：表格中的換領日期與上方設定的日期不同，將使用表格中的日期：${tableDate}</span>`;
+            }
+          });
+        });
+
+        // 為每個更新按鈕添加事件（僅在第一次載入時添加，或先移除現有事件）
+        const updateButtons = document.querySelectorAll('.update-single-btn');
+        updateButtons.forEach(btn => {
+          // 移除現有的事件監聽器（如果有的話）以避免重複綁定
+          const newBtn = btn.cloneNode(true);
+          btn.parentNode.replaceChild(newBtn, btn);
+          
+          newBtn.addEventListener('click', async () => {
             const user = getCurrentUser();
             if (!user) return;
 
-            const index = parseInt(btn.dataset.index);
-            const row = btn.closest('tr');
+            const index = parseInt(newBtn.dataset.index);
+            const row = newBtn.closest('tr');
             const redeemDateInput = row.querySelector('.redeem-date-input');
             const record = {
               className: row.dataset.class,
               studentName: row.dataset.student,
-              attendanceDate: row.dataset.attendanceDate,
+              attendanceDate: row.dataset.attendanceDate, // 已格式化的日期
               redeemDate: redeemDateInput.value
             };
 
@@ -185,15 +245,26 @@ function initRedeemPage() {
           });
         });
 
-        // 為每個複選框添加事件
-        document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-          checkbox.addEventListener('change', updateButtonsState);
+        // 為每個複選框添加事件（僅在第一次載入時添加，或先移除現有事件）
+        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+          // 移除現有的事件監聽器（如果有的話）以避免重複綁定
+          const newCheckbox = checkbox.cloneNode(true);
+          checkbox.parentNode.replaceChild(newCheckbox, checkbox);
+          
+          newCheckbox.addEventListener('change', updateButtonsState);
         });
       }
 
-      messageEl.innerHTML = '';
+      // 只有當前是最新的請求時才清除消息
+      if (currentLoadId === loadCounter) {
+        messageEl.innerHTML = '';
+      }
     } catch (err) {
-      messageEl.innerHTML = `<span style="color:red">載入失敗：${err.message}</span>`;
+      // 只有當前是最新的請求時才顯示錯誤
+      if (currentLoadId === loadCounter) {
+        messageEl.innerHTML = `<span style="color:red">載入失敗：${err.message}</span>`;
+      }
     }
   }
 
@@ -237,7 +308,23 @@ function initRedeemPage() {
     }
   }
 
-  // 格式化日期
+  // 格式化日期為數據格式 (yyyy-MM-dd)
+  function formatDateForData(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    // 檢查是否是有效的日期
+    if (isNaN(date.getTime())) {
+      // 如果不是有效日期，直接返回原字符串
+      return dateString;
+    }
+    // 格式化為 yyyy-MM-dd
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  // 格式化日期為顯示格式
   function formatDate(dateString) {
     if (!dateString) return '';
     const date = new Date(dateString);

@@ -121,9 +121,15 @@ export async function updateRedeemStatus(data) {
     }
   }
 
+  // 處理日期格式，確保attendanceDate是yyyy-MM-dd格式
+  const processedData = {
+    ...data,
+    attendanceDate: formatDateForApi(data.attendanceDate)
+  };
+  
   const formData = toFormData({
     action: 'updateRedeemStatus',
-    ...data
+    ...processedData
   });
 
   const response = await fetch(API_URL, {
@@ -161,10 +167,17 @@ export async function batchUpdateRedeemStatus(records, email) {
   if (!email) throw new Error('必須提供使用者 email');
   if (!Array.isArray(records)) throw new Error('records 必須是數組');
   
+  // 確保記錄中的日期格式正確
+  const processedRecords = records.map(record => ({
+    ...record,
+    // 確保attendanceDate是yyyy-MM-dd格式
+    attendanceDate: formatDateForApi(record.attendanceDate)
+  }));
+  
   const formData = toFormData({
     action: 'batchUpdateRedeemStatus',
     email: email,
-    records: JSON.stringify(records)
+    records: JSON.stringify(processedRecords)
   });
 
   const response = await fetch(API_URL, {
@@ -179,17 +192,35 @@ export async function batchUpdateRedeemStatus(records, email) {
 }
 
 /**
+ * 將日期格式化為API所需的格式 (yyyy-MM-dd)
+ */
+function formatDateForApi(dateString) {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  // 檢查是否是有效的日期
+  if (isNaN(date.getTime())) {
+    // 如果不是有效日期，直接返回原字符串
+    return dateString;
+  }
+  // 格式化為 yyyy-MM-dd
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * 獲取達成換領條件的學生名單
  * @param {string} email - 用戶郵箱
  * @param {string} className - 班級名稱，'*' 表示所有班級
  * @returns {Array} 達成換領條件的學生列表
  */
 export async function getAchievedStudents(email, className = '*') {
-  if (!email) throw new Error('必須提供使用者 email');
-  
-  const url = `${API_URL}?action=getAchievedStudents&email=${encodeURIComponent(email)}&class=${encodeURIComponent(className)}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (data.error) throw new Error(data.error);
-  return data;
-}
+   if (!email) throw new Error('必須提供使用者 email');
+   
+   const url = `${API_URL}?action=getAchievedStudents&email=${encodeURIComponent(email)}&class=${encodeURIComponent(className)}`;
+   const res = await fetch(url);
+   const data = await res.json();
+   if (data.error) throw new Error(data.error);
+   return data;
+ }
