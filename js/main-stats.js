@@ -31,6 +31,35 @@ function initStatsPage() {
   achievedCard.style.cursor = 'default';
   achievedCard.title = '';
 
+  // 載入達成學生列表的函數（可重複使用）
+  async function loadAchievedStudentsList(showLoading = true) {
+    const user = getCurrentUser();
+    if (!user) return;
+
+    try {
+      if (showLoading) {
+        messageEl.innerHTML = '<div class="loading">載入達成換領條件的學生名單中…</div>';
+      }
+      const className = classSelect.value;
+      const achievedStudents = await getAchievedStudents(user.email, className);
+      
+      // 確保在非同步操作完成後正確更新界面
+      displayAchievedStudents(achievedStudents);
+    } catch (err) {
+      if (showLoading) {
+        messageEl.innerHTML = `<span style="color:red">載入達成換領條件的學生名單失敗：${err.message}</span>`;
+      } else {
+        achievedStudentsList.innerHTML = '<p style="text-align: center; color: #7f8c8d; font-style: italic;">載入失敗</p>';
+      }
+      return; // 發生錯誤時提前返回
+    } finally {
+      // 無論成功或失敗，都要清除加載信息（如果之前顯示了）
+      if (showLoading) {
+        messageEl.innerHTML = '';
+      }
+    }
+  }
+
   // 頁籤切換功能
   statsTab.addEventListener('click', () => {
     statsTab.classList.add('active');
@@ -50,16 +79,7 @@ function initStatsPage() {
     achievedStudentsContainer.style.display = 'block';
 
     // 載入達成換領條件的學生名單
-    try {
-      messageEl.innerHTML = '<div class="loading">載入達成換領條件的學生名單中…</div>';
-      const className = classSelect.value;
-      const achievedStudents = await getAchievedStudents(user.email, className);
-      
-      displayAchievedStudents(achievedStudents);
-      messageEl.innerHTML = '';
-    } catch (err) {
-      messageEl.innerHTML = `<span style="color:red">載入達成換領條件的學生名單失敗：${err.message}</span>`;
-    }
+    await loadAchievedStudentsList();
   });
 
   // 監聽權限載入
@@ -112,27 +132,14 @@ function initStatsPage() {
       
       // 無論當前在哪個標籤頁，都應當預先載入達成學生列表的最新數據
       // 這樣當用戶切換到達成標籤頁時，會看到正確的數據
-      try {
-        const achievedStudents = await getAchievedStudents(user.email, classSelect.value);
-        // 更新達成學生列表的內容，無論當前在哪個標籤頁
-        // 但只有在達成標籤頁激活時才顯示加載信息
-        if (achievedTab.classList.contains('active')) {
-          // 如果當前就在達成標籤頁，顯示加載信息並更新顯示
-          messageEl.innerHTML = '<div class="loading">載入達成換領條件的學生名單中…</div>';
-          displayAchievedStudents(achievedStudents);
-          messageEl.innerHTML = '';
-        } else {
-          // 如果不在達成標籤頁，也預先載入數據並更新列表內容
-          // 這樣當用戶切換過去時，會立即看到正確的結果
-          displayAchievedStudents(achievedStudents);
-        }
-      } catch (err) {
-        // 即使載入失敗，也要確保列表內容被清空或顯示錯誤信息
-        if (achievedTab.classList.contains('active')) {
-          messageEl.innerHTML = `<span style="color:red">載入達成換領條件的學生名單失敗：${err.message}</span>`;
-        } else {
-          achievedStudentsList.innerHTML = '<p style="text-align: center; color: #7f8c8d; font-style: italic;">載入失敗</p>';
-        }
+      if (achievedTab.classList.contains('active')) {
+        // 如果當前就在達成標籤頁，確保容器可見，並顯示加載信息
+        achievedStudentsContainer.style.display = 'block';
+        await loadAchievedStudentsList(true);
+      } else {
+        // 如果不在達成標籤頁，也預先載入數據並更新列表內容
+        // 但不顯示加載信息，這樣當用戶切換過去時會立即看到正確結果
+        await loadAchievedStudentsList(false);
       }
     }
   });
@@ -147,7 +154,11 @@ function initStatsPage() {
     } else {
       statsContainer.style.display = 'none';
     }
-    achievedStudentsContainer.style.display = 'none';
+    // 只有當統計標籤頁是活動狀態時才隱藏達成學生容器
+    // 如果當前在達成標籤頁，則不要改變達成學生容器的顯示狀態
+    if (statsTab.classList.contains('active')) {
+      achievedStudentsContainer.style.display = 'none';
+    }
 
     // 暫時禁用卡片點擊
     achievedCard.onclick = null;
@@ -174,7 +185,10 @@ function initStatsPage() {
       } else {
         statsContainer.style.display = 'none';
       }
-      achievedStudentsContainer.style.display = 'none';
+      // 只有當統計標籤頁是活動狀態時才隱藏達成學生容器
+      if (statsTab.classList.contains('active')) {
+        achievedStudentsContainer.style.display = 'none';
+      }
     } catch (err) {
       messageEl.innerHTML = `<span style="color:red">載入失敗：${err.message}</span>`;
       
@@ -187,6 +201,7 @@ function initStatsPage() {
 
   // 顯示達成換領條件的學生名單
   function displayAchievedStudents(students) {
+    
     if (!students || students.length === 0) {
       achievedStudentsList.innerHTML = '<p style="text-align: center; color: #7f8c8d; font-style: italic;">沒有學生符合條件</p>';
       return;
@@ -207,7 +222,7 @@ function initStatsPage() {
         ${student.attendanceDates ? `<div class="achieved-student-details">達成日期: ${student.attendanceDates.map(date => formatDate(date)).join(', ')}</div>` : ''}
       </div>
     `).join('');
-
+    
     achievedStudentsList.innerHTML = html;
   }
 
