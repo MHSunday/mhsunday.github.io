@@ -602,36 +602,155 @@
             }
             
             // 完成抽獎（此時播放音效）
-            function finalizeDraw() {
-                const index = Math.floor(Math.random() * numbers.length);
-                const drawnNumber = numbers.splice(index, 1)[0];
-                drawnNumbers.push(drawnNumber);
-                
-                // 顯示最終數字
-                currentNumberEl.textContent = drawnNumber;
-                currentNumberEl.style.transform = 'scale(1)';
-                
-                // 更新歷史記錄
-                addToHistory(drawnNumber);
-                updateDrawnCount();
-                
-                // 播放抽獎完成音效（僅在此處播放）
-                if (audioReady) {
-                    drawSound.currentTime = 0;
-                    drawSound.play().catch(e => console.log("Draw sound play failed:", e));
-                }
-                
-                // 恢復按鈕
-                isAnimating = false;
-                drawBtn.disabled = false;
-                resetBtn.disabled = false;
-                
-                // 如果抽完所有數字
-                if (numbers.length === 0) {
-                    drawBtn.textContent = '已完成';
-                    drawBtn.style.background = 'linear-gradient(to right, #c9ae5d, #a67c00)';
-                }
-            }
+           function finalizeDraw() {
+               const index = Math.floor(Math.random() * numbers.length);
+               const drawnNumber = numbers.splice(index, 1)[0];
+               drawnNumbers.push(drawnNumber);
+               
+               // 顯示最終數字
+               currentNumberEl.textContent = drawnNumber;
+               currentNumberEl.style.transform = 'scale(1)';
+               
+               // 更新歷史記錄
+               addToHistory(drawnNumber);
+               updateDrawnCount();
+               
+               // 播放抽獎完成音效（僅在此處播放）
+               if (audioReady) {
+                   drawSound.currentTime = 0;
+                   drawSound.play()
+                   .then(() => {
+                       // 音效播放完成後延遲一點時間再進行語音
+                       setTimeout(() => {
+                           speakNumberInCantonese(drawnNumber);
+                       }, 300); // 延遲300毫秒以確保音效不會與語音重疊
+                   })
+                   .catch(e => {
+                       console.log("Draw sound play failed:", e);
+                       // 如果音效播放失敗，仍然進行語音
+                       speakNumberInCantonese(drawnNumber);
+                   });
+               } else {
+                   // 如果音效未準備好，直接進行語音
+                   speakNumberInCantonese(drawnNumber);
+               }
+               
+               // 恢復按鈕
+               isAnimating = false;
+               drawBtn.disabled = false;
+               resetBtn.disabled = false;
+               
+               // 如果抽完所有數字
+               if (numbers.length === 0) {
+                   drawBtn.textContent = '已完成';
+                   drawBtn.style.background = 'linear-gradient(to right, #c9ae5d, #a67c00)';
+               }
+           }
+           
+           // 粵語語音功能
+           function speakNumberInCantonese(number) {
+               if ('speechSynthesis' in window) {
+                   // 創建語音內容
+                   const numberString = number.toString() + "號";
+                   const speech = new SpeechSynthesisUtterance(numberString);
+                   
+                   // 設定語音屬性
+                   speech.lang = 'zh-HK'; // 使用粵語
+                   speech.rate = 0.1; // 語速稍慢以便聽清楚
+                   speech.pitch = 2.0; // 音調正常
+                   speech.volume = 10.0; // 音量最大
+                   
+                   // 等待語音加載完成
+                   speechSynthesis.getVoices(); // 觸發語音加載
+                   window.speechSynthesis.onvoiceschanged = function() {
+                       const voices = speechSynthesis.getVoices();
+                       let cantoneseVoice = null;
+                       
+                       // 尋找粵語語音
+                       for (let i = 0; i < voices.length; i++) {
+                           if (voices[i].lang.includes('zh-HK') || voices[i].lang.includes('yue')) {
+                               cantoneseVoice = voices[i];
+                               break;
+                           }
+                       }
+                       
+                       // 如果沒有找到粵語語音，嘗試使用中文語音
+                       if (!cantoneseVoice) {
+                           for (let i = 0; i < voices.length; i++) {
+                               if (voices[i].lang.includes('zh')) {
+                                   cantoneseVoice = voices[i];
+                                   break;
+                               }
+                           }
+                       }
+                       
+                       // 如果找到合適的語音，則使用它
+                       if (cantoneseVoice) {
+                           speech.voice = cantoneseVoice;
+                       }
+                   };
+                   
+                   // 執行語音
+                   speechSynthesis.speak(speech);
+               } else {
+                   console.log('瀏覽器不支援語音合成功能');
+               }
+           }
+           
+           // 確保語音功能在頁面加載時初始化語音列表
+           let voicesLoaded = false;
+           window.speechSynthesis.onvoiceschanged = function() {
+               if (!voicesLoaded) {
+                   voicesLoaded = true; // 確保只設置一次
+               }
+           };
+           
+           // 粵語語音功能
+           function speakNumberInCantonese(number) {
+               if ('speechSynthesis' in window) {
+                   // 創建語音內容
+                   const numberString = number.toString();
+                   const speech = new SpeechSynthesisUtterance(numberString);
+                   
+                   // 設定語音屬性
+                   speech.lang = 'zh-HK'; // 使用粵語
+                   speech.rate = 0.5; // 語速更慢 (0.5倍速)
+                   speech.pitch = 1.0; // 音調正常
+                   speech.volume = 1.0; // 音量最大 (100%)
+                   
+                   // 獲取語音列表
+                   const voices = speechSynthesis.getVoices();
+                   let cantoneseVoice = null;
+                   
+                   // 尋找粵語語音
+                   for (let i = 0; i < voices.length; i++) {
+                       if (voices[i].lang.includes('zh-HK') || voices[i].lang.includes('yue')) {
+                           cantoneseVoice = voices[i];
+                           break;
+                       }
+                   }
+                   
+                   // 如果沒有找到粵語語音，嘗試使用中文語音
+                   if (!cantoneseVoice) {
+                       for (let i = 0; i < voices.length; i++) {
+                           if (voices[i].lang.includes('zh')) {
+                               cantoneseVoice = voices[i];
+                               break;
+                           }
+                       }
+                   }
+                   
+                   // 如果找到合適的語音，則使用它
+                   if (cantoneseVoice) {
+                       speech.voice = cantoneseVoice;
+                   }
+                   
+                   // 執行語音
+                   speechSynthesis.speak(speech);
+               } else {
+                   console.log('瀏覽器不支援語音合成功能');
+               }
+           }
             
             // 添加到歷史記錄
             function addToHistory(number) {
