@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>iOS Web Speech 測試</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            padding: 20px;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding-bottom: 350px; /* 預留空間給控制台 */
+        }
+
+        h1 { font-size: 20px; margin-bottom: 10px; }
+        h2 { font-size: 16px; margin-top: 20px; margin-bottom: 10px; color: #333; }
+        p { font-size: 14px; color: #666; margin-bottom: 15px; }
+
+        /* 測試按鈕樣式 */
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 12px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: opacity 0.2s;
+        }
+        button:active { opacity: 0.8; }
+        
+        .btn-log { background-color: #3b82f6; } /* 藍色 */
+        .btn-speech { background-color: #8b5cf6; } /* 紫色 */
+        .btn-stop { background-color: #ef4444; } /* 紅色 */
+
+        /* 輸入框樣式 */
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+
+        /* --- 自定義控制台樣式 --- */
+        #mobile-debug-console {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 300px;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            font-family: "Menlo", "Monaco", "Courier New", monospace;
+            font-size: 12px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .console-header {
+            background-color: #333;
+            padding: 8px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #444;
+        }
+        .console-title { font-weight: bold; color: #fff; }
+        .console-actions button {
+            background: #555;
+            font-size: 10px;
+            padding: 4px 8px;
+            margin-left: 5px;
+            border-radius: 4px;
+        }
+
+        #mobile-debug-console.minimized {
+            transform: translateY(260px);
+        }
+
+        #console-logs {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            word-wrap: break-word;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid #333;
+            line-height: 1.4;
+        }
+        .log-entry.log { color: #d4d4d4; }
+        .log-entry.warn { color: #fcd34d; background: rgba(251, 191, 36, 0.1); }
+        .log-entry.error { color: #f87171; background: rgba(239, 68, 68, 0.1); }
+        
+        .timestamp {
+            color: #666;
+            margin-right: 8px;
+            font-size: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>iOS Web Speech 測試</h1>
+    <p>請確保手機未處於靜音模式，並調大音量。</p>
+
+    <h2>1. 語音合成 (TTS)</h2>
+    <input type="text" id="speech-text" value="Hello, this is a test on iOS Chrome." placeholder="輸入要朗讀的文字">
+    
+    <div class="btn-group">
+        <button class="btn-speech" onclick="speakText()">🔊 播放語音 (Speak)</button>
+        <button class="btn-stop" onclick="stopSpeaking()">⏹ 停止播放 (Stop)</button>
+    </div>
+
+    <h2>2. 除錯工具</h2>
+    <div class="btn-group">
+        <button class="btn-log" onclick="checkSupport()">檢查瀏覽器支援度</button>
+        <button class="btn-log" onclick="listVoices()">列出可用語音包</button>
+    </div>
+
+    <!-- 自定義控制台 HTML 結構 -->
+    <div id="mobile-debug-console">
+        <div class="console-header">
+            <span class="console-title">Console</span>
+            <div class="console-actions">
+                <button onclick="clearConsole()">Clear</button>
+                <button onclick="toggleConsole()">Toggle</button>
+            </div>
+        </div>
+        <div id="console-logs"></div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. 自定義控制台邏輯 (與之前相同)
+        // ==========================================
+        (function() {
+            const logContainer = document.getElementById('console-logs');
+            const originalConsole = { log: console.log, warn: console.warn, error: console.error };
+
+            function formatArgs(args) {
+                return args.map(arg => {
+                    if (typeof arg === 'object') {
+                        try { return JSON.stringify(arg, null, 2); } catch (e) { return '[Circular Object]'; }
+                    }
+                    return String(arg);
+                }).join(' ');
+            }
+
+            function getTime() { return new Date().toTimeString().split(' ')[0]; }
+
+            function writeToScreen(type, args) {
+                const message = formatArgs(Array.from(args));
+                const entry = document.createElement('div');
+                entry.className = `log-entry ${type}`;
+                entry.innerHTML = `<span class="timestamp">[${getTime()}]</span>${message.replace(/\n/g, '<br>').replace(/ /g, '&nbsp;')}`;
+                logContainer.appendChild(entry);
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+
+            console.log = function() { writeToScreen('log', arguments); originalConsole.log.apply(console, arguments); };
+            console.warn = function() { writeToScreen('warn', arguments); originalConsole.warn.apply(console, arguments); };
+            console.error = function() { writeToScreen('error', arguments); originalConsole.error.apply(console, arguments); };
+            window.onerror = function(msg, src, line, col) { console.error(`${msg} at ${line}:${col}`); return false; };
+        })();
+
+        const consoleEl = document.getElementById('mobile-debug-console');
+        const logsContainer = document.getElementById('console-logs');
+        function toggleConsole() { consoleEl.classList.toggle('minimized'); }
+        function clearConsole() { logsContainer.innerHTML = ''; }
+
+
+        // ==========================================
+        // 2. Web Speech API 邏輯
+        // ==========================================
+        
+        const synth = window.speechSynthesis;
+        let voices = [];
+
+        // 載入語音包 (iOS Safari/Chrome 有時需要這個事件)
+        function loadVoices() {
+            voices = synth.getVoices();
+            console.log(`已載入 ${voices.length} 個語音包`);
+        }
+
+        // 監聽語音包變更 (Chrome/Safari 必備)
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = loadVoices;
+        }
+
+        // 檢查支援度
+        function checkSupport() {
+            if ('speechSynthesis' in window) {
+                console.log("✅ 此瀏覽器支援 Speech Synthesis API");
+            } else {
+                console.error("❌ 此瀏覽器不支援 Speech Synthesis API");
+            }
+        }
+
+        // 列出語音包
+        function listVoices() {
+            voices = synth.getVoices();
+            if (voices.length === 0) {
+                console.warn("尚未偵測到語音包，或正在載入中...");
+                return;
+            }
+            console.log("--- 可用語音列表 ---");
+            voices.forEach((voice, index) => {
+                // 只列出前 5 個或包含 'en'/'zh' 的，避免洗版
+                if(index < 5 || voice.lang.includes('en') || voice.lang.includes('zh')) {
+                    console.log(`${index}: ${voice.name} (${voice.lang})`);
+                }
+            });
+            console.log(`(共 ${voices.length} 個，僅顯示部分)`);
+        }
+
+        // 開始朗讀
+        function speakText() {
+            if (synth.speaking) {
+                console.warn("正在說話中，請先停止...");
+                synth.cancel(); // 強制中斷舊的
+            }
+
+            const textInput = document.getElementById('speech-text').value;
+            if (textInput === '') {
+                console.warn("請輸入文字");
+                return;
+            }
+
+            const utterThis = new SpeechSynthesisUtterance(textInput);
+
+            // 嘗試尋找適合的語音 (優先找 iOS 的英文或中文)
+            // 注意：iOS 上的語音名稱通常像 "Samantha", "Daniel", "Ting-Ting"
+            voices = synth.getVoices();
+            
+            // 簡單的語音選擇邏輯：如果是中文內容選中文語音，否則選英文
+            const isChinese = /[\u4e00-\u9fa5]/.test(textInput);
+            let selectedVoice = null;
+
+            if (isChinese) {
+                selectedVoice = voices.find(v => v.lang.includes('zh-TW') || v.lang.includes('zh-CN'));
+            } else {
+                selectedVoice = voices.find(v => v.lang.includes('en-US') || v.lang.includes('en-GB'));
+            }
+
+            if (selectedVoice) {
+                utterThis.voice = selectedVoice;
+                console.log(`使用語音: ${selectedVoice.name}`);
+            } else {
+                console.log("使用系統預設語音");
+            }
+
+            // iOS 特定調整
+            utterThis.rate = 1.0;  // 語速
+            utterThis.pitch = 1.0; // 音調
+            utterThis.volume = 1.0; // 音量
+
+            // 事件監聽
+            utterThis.onstart = function(event) {
+                console.log("▶️ 開始朗讀...");
+            }
+
+            utterThis.onend = function(event) {
+                console.log("✅ 朗讀結束");
+            }
+
+            utterThis.onerror = function(event) {
+                console.error("❌ 朗讀發生錯誤: " + event.error);
+            }
+
+            // 執行
+            synth.speak(utterThis);
+        }
+
+        // 停止朗讀
+        function stopSpeaking() {
+            if (synth.speaking || synth.pending) {
+                synth.cancel();
+                console.log("⏹ 已停止朗讀");
+            }
+        }
+
+        // 初始化嘗試載入一次
+        loadVoices();
+
+    </script>
+</body>
+</html>
