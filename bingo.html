@@ -655,7 +655,7 @@
                    const speech = new SpeechSynthesisUtterance(numberString);
                    
                    // 設定語音屬性
-                   speech.lang = 'zh-HK'; // 使用粵語
+                   speech.lang = 'zh-TW'; // 使用粵語
                    speech.rate = 0.5; // 語速調整到合適範圍 (0.1-2.0)
                    speech.pitch = 1.0; // 音調正常
                    speech.volume = 1.0; // 音量最大 (0-1)
@@ -666,7 +666,7 @@
                    
                    // 尋找粵語語音
                    for (let i = 0; i < voices.length; i++) {
-                       if (voices[i].lang.includes('zh-HK') || voices[i].lang.includes('yue')) {
+                       if (voices[i].lang.includes('zh-TW') || voices[i].lang.includes('yue')) {
                            cantoneseVoice = voices[i];
                            break;
                        }
