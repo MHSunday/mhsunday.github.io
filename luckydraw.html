@@ -565,24 +565,45 @@
       </div>
     </section>
 
-    <section class="card" style="margin-top:14px;">
-      <h2>2) 名單預覽</h2>
-      <p class="help">顯示前 200 筆，方便確認匯入是否正確。</p>
-      <div class="scroll">
-        <table class="table" aria-label="名單預覽表格">
-          <thead>
-            <tr>
-              <th style="width: 90px;">序號</th>
-              <th style="width: 180px;">班別</th>
-              <th>姓名</th>
-            </tr>
-          </thead>
-          <tbody id="previewBody">
-            <tr><td colspan="3" style="color: rgba(255,255,255,.7);">尚未載入</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+    <div style="display: grid; grid-template-columns: 1fr 320px; gap: 14px; margin-top: 14px;">
+      <section class="card">
+        <h2>2) 名單預覽</h2>
+        <p class="help">顯示前 200 筆，方便確認匯入是否正確。</p>
+        <div class="scroll">
+          <table class="table" aria-label="名單預覽表格">
+            <thead>
+              <tr>
+                <th style="width: 90px;">序號</th>
+                <th style="width: 180px;">班別</th>
+                <th>姓名</th>
+              </tr>
+            </thead>
+            <tbody id="previewBody">
+              <tr><td colspan="3" style="color: rgba(25,255,255,.7);">尚未載入</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      
+      <section class="card">
+        <h2>3) 已抽出名單</h2>
+        <p class="help">顯示已抽出的學生（班別/姓名）。</p>
+        <div class="scroll">
+          <table class="table" aria-label="已抽出名單表格">
+            <thead>
+              <tr>
+                <th style="width: 90px;">序號</th>
+                <th style="width: 100px;">班別</th>
+                <th>姓名</th>
+              </tr>
+            </thead>
+            <tbody id="drawnBody">
+              <tr><td colspan="3" style="color: rgba(255,255,.7);">尚未抽出</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
   </div>
 
   <div class="overlay" id="overlay" aria-hidden="true">
@@ -767,6 +788,7 @@
     let records = [];
     let available = [];
     let drawn = [];
+    let classDrawCounts = {}; // 追蹤每個班級被抽中的次數
 
     const el = (id) => document.getElementById(id);
 
@@ -780,6 +802,7 @@
     const soundOn = el('soundOn');
 
     const previewBody = el('previewBody');
+    const drawnBody = el('drawnBody');  // 新增：已抽出名單表格
     const statusDot = el('statusDot');
     const statusText = el('statusText');
 
@@ -807,6 +830,35 @@
     // NEW: lock to prevent clicking "再抽一次" during/after animation edge cases
     let isDrawing = false;
     let rollingTimerId = null;
+ 
+ // 新增函數：更新已抽出名單顯示
+  function updateDrawnList() {
+    if (!drawnBody) return;
+    
+    if (drawn.length === 0) {
+   drawnBody.innerHTML = '<tr><td colspan="3" style="color: rgba(25,255,255,.7);">尚未抽出</td></tr>';
+   return;
+    }
+    
+    const rows = [];
+    // 顯示所有已抽出的學生，按抽出順序
+    for (let i = 0; i < drawn.length; i++) {
+   const recordIndex = drawn[i];
+   const record = records[recordIndex];
+   rows.push(`<tr><td>${i+1}</td><td>${escapeHtml(record.klass)}</td><td>${escapeHtml(record.name)}</td></tr>`);
+    }
+    drawnBody.innerHTML = rows.join('');
+  }
+
+  // 新增函數：更新班級抽獎計數
+  function updateClassDrawCounts(idx) {
+    const klass = records[idx].klass;
+    if (!classDrawCounts[klass]) {
+      classDrawCounts[klass] = 1;
+    } else {
+      classDrawCounts[klass]++;
+    }
+  }
 
     function showToast(msg){
       toast.textContent = msg;
@@ -899,14 +951,17 @@
     function resetDrawingPool(){
       available = records.map((_, i) => i);
       drawn = [];
+      classDrawCounts = {}; // 重置班級抽獎計數
       isDrawing = false;
       updateCounters();
+      updateDrawnList();  // 更新已抽出名單顯示
     }
 
     function clearAll(){
       records = [];
       available = [];
       drawn = [];
+      classDrawCounts = {}; // 清除班級抽獎計數
       isDrawing = false;
       if(rollingTimerId) { clearTimeout(rollingTimerId); rollingTimerId = null; }
 
@@ -916,10 +971,32 @@
       classText.textContent = '—';
       hintText.textContent = '提示：CSV 需包含「班別」與「姓名」兩欄。';
       setStatus(false);
-	  isDrawing = false;
+   isDrawing = false;
       updateCounters();
       closeOverlay();
       showToast('已清除名單。');
+   updateDrawnList(); // 清除已抽出名單顯示
+    }
+
+    function clearAll(){
+      records = [];
+      available = [];
+      drawn = [];
+      classDrawCounts = {}; // 清除班級抽獎計數
+      isDrawing = false;
+      if(rollingTimerId) { clearTimeout(rollingTimerId); rollingTimerId = null; }
+
+      fileInput.value = '';
+      previewBody.innerHTML = `<tr><td colspan="3" style="color: rgba(255,255,255,.7);">尚未載入</td></tr>`;
+      nameText.textContent = '請先上傳名單';
+      classText.textContent = '—';
+      hintText.textContent = '提示：CSV 需包含「班別」與「姓名」兩欄。';
+      setStatus(false);
+   isDrawing = false;
+      updateCounters();
+      closeOverlay();
+      showToast('已清除名單。');
+   updateDrawnList(); // 清除已抽出名單顯示
     }
 
     function sanitizeCell(s){
@@ -1013,6 +1090,15 @@
       showToast(`成功載入 ${records.length} 筆名單。`);
     }
 
+    function resetDrawingPool(){
+      available = records.map((_, i) => i);
+      drawn = [];
+      classDrawCounts = {}; // 重置班級抽獎計數
+      isDrawing = false;
+      updateCounters();
+      updateDrawnList();  // 更新已抽出名單顯示
+    }
+
     function escapeHtml(s){
       return String(s).replace(/[&<>"']/g, (m) => ({
         '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
@@ -1051,19 +1137,19 @@
 	}
 
     async function requestAppFullscreen(){
-      <!-- try{ -->
-        <!-- if(!document.fullscreenElement && document.documentElement.requestFullscreen){ -->
-          <!-- await document.documentElement.requestFullscreen(); -->
-        <!-- } -->
-      <!-- }catch(_e){} -->
+      try{
+        if(!document.fullscreenElement && document.documentElement.requestFullscreen){
+          await document.documentElement.requestFullscreen();
+        }
+      }catch(_e){}
     }
 
     async function exitAppFullscreen(){
-      <!-- try{ -->
-        <!-- if(document.fullscreenElement && document.exitFullscreen){ -->
-          <!-- await document.exitFullscreen(); -->
-        <!-- } -->
-      <!-- }catch(_e){} -->
+      try{
+        if(document.fullscreenElement && document.exitFullscreen){
+          await document.exitFullscreen();
+        }
+      }catch(_e){}
     }
 
     function randInt(n){ return Math.floor(Math.random() * n); }
@@ -1314,7 +1400,8 @@
           // IMPORTANT: unlock after successful draw result is shown
           isDrawing = false;
           updateCounters();
-		  
+    updateDrawnList(); // 更新已抽出名單顯示
+   
           return;
 		  
 		  
@@ -1428,17 +1515,263 @@
     });
 	// 初始化語音（觸發 getVoices 載入）
 	if ('speechSynthesis' in window) {
-		let yueVoice = null;
+	let yueVoice = null;
 		speechSynthesis.onvoiceschanged = pickYueVoice;
 		pickYueVoice();
-   
-	 
+	   
+		 
 	  // 強制觸發一次
 	  setTimeout(() => { speechSynthesis.getVoices(); }, 500);
 	}
-    setStatus(false);
-    updateCounters();
-  </script>
+	
+	// 預載入 2026StudentList.csv 檔案
+	window.addEventListener('DOMContentLoaded', async () => {
+	  try {
+		const response = await fetch('2026StudentList.csv');
+		const csvText = await response.text();
+		loadFromCSVText(csvText);
+		console.log('CSV 檔案已預載入');
+	  } catch (error) {
+		console.error('預載入 CSV 檔案失敗:', error);
+		// 如果預載入失敗，仍允許手動上傳
+	showToast('預載入名單失敗，請手動上傳或刷新頁面');
+	  }
+	});
+	
+	// 按班級比例抽獎的函數
+	function groupByClass(records) {
+	  const groups = {};
+	  for (const record of records) {
+		const klass = record.klass;
+		if (!groups[klass]) {
+		  groups[klass] = [];
+		}
+	groups[klass].push(record);
+	  }
+	  return groups;
+	}
+
+	// 檢查是否已達到抽獎限制
+	function checkDrawConditions() {
+		// 獲取所有不同的班級
+	const allClasses = [...new Set(records.map(r => r.klass))];
+		
+		// 檢查是否達到15次抽獎且每個班級都至少有一人被抽中
+	const drawnClasses = [...new Set(drawn.map(i => records[i].klass))];
+		const allClassesHaveDrawn = allClasses.every(klass => drawnClasses.includes(klass));
+		const reached15Draws = drawn.length >= 15;
+		
+		// 如果達到15次抽獎且每個班級都至少有一人被抽中，則取消班級中獎次數限制
+		if (reached15Draws && allClassesHaveDrawn) {
+			return {maxPerClass: Infinity, requireAllClasses: false};
+		} else {
+			// 否則，確保每個班級至少有一人被抽中
+			return {maxPerClass: 1, requireAllClasses: true};
+		}
+	}
+
+	function drawFromClassRatioWithNoRepeat() {
+		// 檢查抽獎條件
+		const conditions = checkDrawConditions();
+		
+		// 獲取所有可用的記錄
+		const availableRecords = available.map(i => records[i]);
+		const classGroups = groupByClass(availableRecords);
+		
+		// 獲取所有班級的抽獎次數
+		const allClasses = [...new Set(records.map(r => r.klass))];
+	const currentClassCounts = {};
+		allClasses.forEach(klass => {
+			currentClassCounts[klass] = drawn.filter(i => records[i].klass === klass).length;
+		});
+		
+		// 過濾掉已達到限制的班級
+		const filteredClassGroups = {};
+		for (const klass in classGroups) {
+			if (currentClassCounts[klass] < conditions.maxPerClass) {
+				filteredClassGroups[klass] = classGroups[klass];
+			}
+		}
+		
+		// 如果需要確保所有班級至少有一人被抽中，則排除已經被抽中的班級
+		if (conditions.requireAllClasses) {
+			const drawnClasses = [...new Set(drawn.map(i => records[i].klass))];
+			for (const klass of drawnClasses) {
+				if (filteredClassGroups[klass]) {
+					delete filteredClassGroups[klass];
+				}
+			}
+		}
+		
+		// 如果沒有可用的班級，則放寬限制
+		if (Object.keys(filteredClassGroups).length === 0) {
+			// 如果所有班級都達到2次限制，則允許再次選擇
+			for (const klass in classGroups) {
+				if (!filteredClassGroups[klass]) {
+					filteredClassGroups[klass] = classGroups[klass];
+				}
+			}
+		}
+		
+		// 計算每個班級的權重（基於剩餘學生數量）
+		const classWeights = {};
+		let totalWeight = 0;
+		for (const klass in filteredClassGroups) {
+			classWeights[klass] = filteredClassGroups[klass].length;
+			totalWeight += classWeights[klass];
+		}
+		
+		// 如果沒有任何可用選項，返回第一個可用記錄
+		if (totalWeight === 0) {
+			return available[0]; // 返回第一個可用的記錄
+		}
+		
+		// 隨機選擇一個班級（按權重）
+		const random = Math.random() * totalWeight;
+		let cumulativeWeight = 0;
+		let selectedClass = null;
+		for (const klass in classWeights) {
+			cumulativeWeight += classWeights[klass];
+			if (random <= cumulativeWeight) {
+				selectedClass = klass;
+				break;
+			}
+		}
+		
+		// 從選定的班級中隨機選擇一個學生
+		const selectedStudentIndex = Math.floor(Math.random() * filteredClassGroups[selectedClass].length);
+		const selectedStudent = filteredClassGroups[selectedClass][selectedStudentIndex];
+		
+		// 返回原始 records 中的索引
+		return records.indexOf(selectedStudent);
+	}
+
+	function drawFromClassRatioWithRepeat() {
+		// 檢查抽獎條件
+		const conditions = checkDrawConditions();
+		
+		// 獲取所有班級及其學生
+		const classGroups = groupByClass(records);
+		
+		// 獲取所有班級的抽獎次數
+		const allClasses = [...new Set(records.map(r => r.klass))];
+		const currentClassCounts = {};
+		allClasses.forEach(klass => {
+			currentClassCounts[klass] = drawn.filter(i => records[i].klass === klass).length;
+		});
+		
+		// 過濾掉已達到限制的班級
+		const filteredClassGroups = {};
+		for (const klass in classGroups) {
+			if (currentClassCounts[klass] < conditions.maxPerClass) {
+				filteredClassGroups[klass] = classGroups[klass];
+			}
+		}
+		
+		// 如果需要確保所有班級至少有一人被抽中，則排除已經被抽中的班級
+		if (conditions.requireAllClasses) {
+			const drawnClasses = [...new Set(drawn.map(i => records[i].klass))];
+			for (const klass of drawnClasses) {
+				if (filteredClassGroups[klass]) {
+					delete filteredClassGroups[klass];
+				}
+			}
+		}
+		
+		// 如果沒有可用的班級，則放寬限制
+		if (Object.keys(filteredClassGroups).length === 0) {
+			// 如果所有班級都達到2次限制，則允許再次選擇
+			for (const klass in classGroups) {
+				if (!filteredClassGroups[klass]) {
+					filteredClassGroups[klass] = classGroups[klass];
+				}
+			}
+		}
+		
+		// 計算每個班級的權重（基於學生數量）
+		const classWeights = {};
+		let totalWeight = 0;
+		for (const klass in filteredClassGroups) {
+			classWeights[klass] = filteredClassGroups[klass].length;
+			totalWeight += classWeights[klass];
+		}
+		
+		// 如果沒有任何可用選項，返回第一個記錄
+		if (totalWeight === 0) {
+			return 0; // 返回第一個記錄
+		}
+		
+		// 隨機選擇一個班級（按權重）
+		const random = Math.random() * totalWeight;
+		let cumulativeWeight = 0;
+		let selectedClass = null;
+		for (const klass in classWeights) {
+			cumulativeWeight += classWeights[klass];
+			if (random <= cumulativeWeight) {
+				selectedClass = klass;
+				break;
+			}
+		}
+		
+		// 從選定的班級中隨機選擇一個學生
+	const selectedStudentIndex = Math.floor(Math.random() * filteredClassGroups[selectedClass].length);
+		const selectedStudent = filteredClassGroups[selectedClass][selectedStudentIndex];
+		
+		// 返回原始 records 中的索引
+		return records.indexOf(selectedStudent);
+	}
+	
+	function drawByClassRatio() {
+	  // 檢查是否可以抽獎
+	  const canDraw = records.length > 0 && !(noRepeat.checked && available.length === 0);
+	  if (!canDraw) {
+		showToast(records.length === 0 ? '請先上傳 CSV 名單。' : '都抽完了！可按「重置抽獎」再抽一次。');
+		return;
+	  }
+	  if (isDrawing) return;
+
+	  isDrawing = true;
+	  updateCounters();
+
+	  try {
+		openOverlay();
+
+		const durationMs = 3000 + Math.floor(Math.random() * 2001);
+		ensureAudioRunning().then(() => playRaffleMusic(durationMs));
+
+		let idx;
+		if (noRepeat.checked) {
+		  // 按班級比例分配抽獎（不重複）
+		  idx = drawFromClassRatioWithNoRepeat();
+		  available = available.filter(i => i !== idx);
+	} else {
+		  // 按班級比例分配抽獎（可重複）
+		  idx = drawFromClassRatioWithRepeat();
+	}
+	drawn.push(idx); // 添加到已抽列表
+
+		updateCounters();
+		hintText.textContent = '抽獎中…';
+		rollingEffect(records[idx], durationMs);
+
+	  } catch (err) {
+		// 發生錯誤時，避免永遠鎖住
+		console.error(err);
+		isDrawing = false;
+		updateCounters();
+		showToast('抽獎過程發生錯誤：' + (err?.message || '未知錯誤'));
+	  }
+	}
+
+	    setStatus(false);
+	    updateCounters();
+	 
+	 // 修改抽獎按鈕的事件監聽器
+	 drawBtn.removeEventListener('click', drawOne);
+	 drawBtn.addEventListener('click', drawByClassRatio);
+	 drawAgainBtn.removeEventListener('click', drawOne);
+	 drawAgainBtn.addEventListener('click', drawByClassRatio);
+	  </script>
 </body>
 
 </html>
