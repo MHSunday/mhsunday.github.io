@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>南頭古城時光偵探手冊</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+        }
+        
+        body {
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f4ee;
+            padding: 20px;
+        }
+        
+        .container {
+            width: 90%;
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #8b4513;
+            margin-bottom: 1rem;
+            font-size: 2rem;
+        }
+        
+        h2 {
+            color: #8b4513;
+            margin: 1.5rem 0 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #d4a76a;
+        }
+        
+        h3 {
+            color: #a0522d;
+            margin: 1.2rem 0 0.8rem;
+        }
+        
+        h4 {
+            color: #b5651d;
+            margin: 1rem 0 0.5rem;
+        }
+        
+        p {
+            margin-bottom: 1rem;
+            line-height: 1.8;
+        }
+        
+        .keyword {
+            color: #d4a76a;
+            font-weight: bold;
+        }
+        
+        .map-container {
+            background: #f0e6d2;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .simplified-map {
+            background: white;
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 1rem 0;
+            font-family: monospace;
+            text-align: center;
+        }
+        
+        .timeline-container {
+            background: #e8f4f8;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .timeline-item {
+            background: white;
+            padding: 1rem;
+            border-radius: 5px;
+            border-left: 4px solid #4a7b9d;
+        }
+        
+        .timeline-year {
+            font-weight: bold;
+            color: #8b4513;
+        }
+        
+        .route-container {
+            margin: 1.5rem 0;
+        }
+        
+        .route-step {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .step-number {
+            display: inline-block;
+            background: #8b4513;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .time-badge {
+            display: inline-block;
+            background: #d4a76a;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            margin-left: 10px;
+        }
+        
+        .history-fact {
+            background: #fff8e1;
+            border-left: 4px solid #ffc107;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .detective-tip {
+            background: #e8f4f8;
+            border-left: 4px solid #4a7b9d;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        ul {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+        }
+        
+        li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .quiz-container {
+            background: #f0e6d2;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+        }
+        
+        .quiz-question {
+            padding: 0.75rem;
+            margin: 0.75rem 0;
+            background: white;
+            border-radius: 5px;
+            border-left: 3px solid #8b4513;
+        }
+        
+        .important-note {
+            background: #e8f8e8;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 1.5rem 0;
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 2rem;
+            border-top: 1px solid #ddd;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                width: 95%;
+                padding: 1rem;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            h2 {
+                font-size: 1.3rem;
+            }
+            
+            .time-badge {
+                display: block;
+                margin-left: 0;
+                margin-top: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗺️ 南頭古城時光偵探手冊</h1>
+<div class="map-container">
+    <h2>🗺️ 1小時極速探索路線圖</h2>
+    <div class="simplified-map">
+        🚶‍♀️🚶‍♂️ 起點：南城門廣場<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;↓（進城，看古城大門！）<br>
+        🏛️ 南頭古城博物館<br>
+        （看331年東官郡、1573年新安縣故事）<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;↓（向北走50步）<br>
+        🏯 新安縣衙遺址<br>
+        （這裡是400年前深圳+香港的「市政府」！）<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;↓（沿石板路往北）<br>
+        🛍️ 中山南街（文創街）<br>
+        （老屋＋新店，找找「青磚牆」和「潮畫展」！）<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;↘（向西北轉一小段）<br>
+              </div>
+              <p><strong>任務總時長：60分鐘</strong> • 請跟隨領隊老師有序參觀！</p>
+          </div>
+        
+        <h2>📜 我們的偵探任務</h2>
+        <p>各位時光偵探，歡迎來到深圳的歷史起點——<span class="keyword">南頭古城</span>！你們今天的任務是：在1小時內，找到古城作為<strong>"深圳城市開端"</strong>和<strong>"古代粵東南行政中心"</strong>的關鍵證據！</p>
+        
+        <div class="timeline-container">
+             <h3>⏳ 南頭古城歷史大事記</h3>
+             <p>在開始探索前，先快速了解古城的幾個關鍵時間點：</p>
+             <div class="timeline">
+                 <div class="timeline-item">
+                     <div class="timeline-year">三國·東吳 (265年)</div>
+                     <div class="timeline-desc">因管理<span class="keyword">食鹽</span>，開始建城，名為"蕪城"</div>
+                 </div>
+                 <div class="timeline-item">
+                     <div class="timeline-year">東晉 (331年)</div>
+                     <div class="timeline-desc">設立<span class="keyword">東官郡</span>和<span class="keyword">寶安縣</span>政府，成為地區首府</div>
+                 </div>
+                 <div class="timeline-item">
+                     <div class="timeline-year">唐朝 (736-757年)</div>
+                     <div class="timeline-desc">轉變為<span class="keyword">屯門軍鎮</span>，成為海防要塞</div>
+                 </div>
+                 <div class="timeline-item">
+                     <div class="timeline-year">現代 (2017年至今)</div>
+                     <div class="timeline-desc"><span class="keyword">活化新生</span>，成為創意文化街區</div>
+                 </div>
+             </div>
+         </div>
+        
+        <h2>🔍 探索路線與任務詳情</h2>
+        <div class="route-container">
+             <div class="route-step">
+                 <div class="step-number">1</div>
+                 <div class="time-badge">約10分鐘</div>
+                 <h3>第一站：古城入口與主街 - 領取偵探地圖</h3>
+                 <p><strong>任務：</strong>在入口處的導覽圖前，了解古城基本佈局，準備開始探索。</p>
+                 <div class="history-fact">
+                     <strong>📚 歷史小知識：</strong> 南頭古城的歷史可以追溯到1700多年前！三國時期，這裡因為是重要的<span class="keyword">鹽業管理</span>中心而開始建城。食鹽在古代是非常珍貴的物資，管理食鹽的地方自然就變得重要起來。
+                 </div>
+                 <div class="detective-tip">
+                     <strong>偵探提示：</strong> 注意觀察古城的主街走向，想一想為什麼古代城市通常有一條主街道？
+                 </div>
+             </div>
+             
+             <div class="route-step">
+                 <div class="step-number">2</div>
+                 <div class="time-badge">約25分鐘</div>
+                 <h3>第二站：深入古城 - 尋找兩大歷史證據</h3>
+                 <p><strong>核心任務：</strong>找到兩個能證明古城歷史地位的關鍵地點。</p>
+                 
+                 <h4>證據一：古城牆遺跡或標示</h4>
+                 <p><strong>角色扮演：小小防禦官</strong></p>
+                 <p>根據歷史資料，唐朝時期這裡是<span class="keyword">"屯門軍鎮"</span>，一個重要的海防軍事要塞。想像你是駐守在這裡的士兵，負責保衛海岸線的安全。</p>
+                 <p><strong>觀察任務：</strong></p>
+                 <ul>
+                     <li>尋找古老牆體的痕跡、磚石</li>
+                     <li>尋找說明這裡曾是城牆的標誌牌</li>
+                     <li>思考：為什麼這裡需要軍事防禦？</li>
+                 </ul>
+                 
+                 <h4>證據二："新安縣衙"遺址或相關介紹</h4>
+                 <p><strong>角色扮演：小小縣令</strong></p>
+                 <p>這是今天最重要的發現！在<span class="keyword">東晉咸和六年（公元331年）</span>，這裡設立了<span class="keyword">東官郡</span>和<span class="keyword">寶安縣</span>的政府，是整個粵東南地區的政治、經濟、文化中心，管轄範圍包括今天的深圳、香港等地。</p>
+                 <p><strong>觀察任務：</strong></p>
+                 <ul>
+                     <li>尋找標有"新安縣衙"、"東官郡治"的石碑或展示牌</li>
+                     <li>注意地面遺址標示</li>
+                     <li>這是證明古城是<span class="keyword">"港澳源頭"</span>、<span class="keyword">"古代地區首府"</span>的關鍵證據！</li>
+                 </ul>
+                 
+                 <div class="detective-tip">
+                     <strong>偵探提示：</strong> 這兩個證據證明了南頭古城的雙重身份：既是軍事防禦的<span class="keyword">海防要塞</span>，又是管理地方的<span class="keyword">行政中心</span>。
+                 </div>
+             </div>
+             
+             <div class="route-step">
+                 <div class="step-number">3</div>
+                 <div class="time-badge">約25分鐘</div>
+                 <h3>第三站：創意街區 - 觀察古城的新生</h3>
+                 <p><strong>任務：</strong>前往創意街區（如"新生場"、"丕場"方向），觀察古城如何獲得新生命。</p>
+                 
+                 <div class="history-fact">
+                     <strong>📚 歷史小知識：</strong> 歷史上南頭古城的功能不斷變化：從三國鹽城→東晉郡府→唐代軍鎮→現代城中村→現在的文化創意街區。這種變化體現了歷史的層次感，就像一本活的歷史書！
+                 </div>
+                 
+                 <p><strong>討論任務：</strong></p>
+                 <ul>
+                     <li><strong>找不同：</strong>觀察周圍建築，哪些看起來很古老？哪些是新建或改造過的？</li>
+                     <li><strong>想一想：</strong>為什麼要把古老城區改造成有書店、咖啡館和展覽的創意街區？</li>
+                     <li><strong>聯想：</strong>資料中提到"啟動保護，活化新生"，你覺得眼前街區哪些地方體現了"活化"（賦予新生命）？</li>
+                 </ul>
+             </div>
+         </div>
+        
+        <div class="quiz-container">
+             <h2>🧠 時光偵探小測驗</h2>
+             <p>完成探索後，試著回答這些問題：</p>
+             <div class="quiz-question">1. 南頭古城最初是因為管理什麼重要物資而建城的？</div>
+             <div class="quiz-question">2. 東晉時期這裡設立了什麼政府機構，使它成為地區首府？</div>
+             <div class="quiz-question">3. 唐朝時期這裡的軍事功能是什麼？</div>
+             <div class="quiz-question">4. 今天的古城在保護歷史的同時，還增加了什麼新功能？</div>
+         </div>
+        
+        <div class="important-note">
+             <h3>⭐ 探索任務總結</h3>
+             <p>各位時光偵探，如果你們找到了以下證據，任務就成功完成了：</p>
+             <ol>
+                 <li><strong>城市開端：</strong>理解了這裡因<span class="keyword">鹽</span>設城（三國時期）</li>
+                 <li><strong>高光時刻：</strong>找到了這裡曾是<span class="keyword">東官郡</span>和<span class="keyword">寶安縣</span>首府的證據（東晉時期）</li>
+                 <li><strong>功能轉變：</strong>了解到這裡曾是<span class="keyword">海防軍鎮</span>（唐朝時期）</li>
+                 <li><strong>今日新生：</strong>觀察到古城如何在保護中獲得<span class="keyword">新生命</span></li>
+             </ol>
+         </div>
+        
+        <div class="footer">
+             <p>南頭古城時光偵探手冊 | 資料來源：<a href="https://www.nantoucity.com/" target="_blank">南頭古城官方網站</a> | 設計用於小學六年級學生參觀學習</p>
+             <p>記住：歷史不是枯燥的文字，而是我們腳下這片土地曾經發生的真實故事！</p>
+         </div>
+            </div>
+        </body>
+        </html>
+</body> </html>
