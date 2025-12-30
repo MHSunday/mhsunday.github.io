@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>禮堂座位安排圖 - 高清對比版</title>
+<style>
+    :root {
+        --seat-size: 45px; /* 大字體座位 */
+        --gap-size: 8px;
+        --aisle-width: 100px;
+    }
+
+    body {
+        font-family: "Microsoft JhengHei", "Heiti TC", sans-serif;
+        background-color: #f0f2f5;
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .container {
+        background: white;
+        padding: 40px;
+        border-radius: 15px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        max-width: 1000px;
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    /* 講台區 */
+    .stage-area {
+        width: 100%;
+        background: #2c3e50;
+        color: white;
+        text-align: center;
+        padding: 20px 0;
+        border-radius: 8px;
+        margin-bottom: 40px;
+        position: relative;
+    }
+    
+    .stage-screen {
+        border: 4px solid #ecf0f1;
+        display: inline-block;
+        padding: 10px 40px;
+        font-size: 24px;
+        font-weight: bold;
+        background: #34495e;
+        border-radius: 4px;
+    }
+
+    .game-zone {
+        margin-top: 10px;
+        font-size: 16px;
+        color: #f1c40f;
+        border-top: 1px dashed #7f8c8d;
+        padding-top: 5px;
+    }
+
+    /* 座位行結構 */
+    .row {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .row-number {
+        width: 30px;
+        text-align: right;
+        margin-right: 15px;
+        font-weight: bold;
+        color: #bdc3c7;
+        font-size: 14px;
+    }
+
+    .block {
+        display: flex;
+        gap: var(--gap-size);
+    }
+
+    .aisle {
+        width: var(--aisle-width);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-shrink: 0;
+    }
+
+    .aisle-arrow {
+        color: #e0e0e0;
+        font-size: 20px;
+        font-weight: bold;
+    }
+
+    /* 座位樣式 */
+    .seat {
+        width: var(--seat-size);
+        height: var(--seat-size);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        font-weight: 900;
+        font-size: 16px;
+        border-radius: 6px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        position: relative;
+        user-select: none;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+
+    .seat.small {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%; /* 圓形代表小椅子 */
+        font-size: 14px;
+    }
+
+    .seat.empty {
+        background: #ecf0f1;
+        box-shadow: none;
+        border: 2px dashed #bdc3c7;
+        color: transparent;
+    }
+
+    .seat.teacher {
+        border: 3px solid white; /* 導師加白框 */
+        box-sizing: border-box;
+    }
+    
+    .seat.teacher::after {
+        content: "T";
+    }
+    
+    .seat.teacher span {
+        display: none;
+    }
+
+    /* --- 顏色定義 (已修改) --- */
+    
+    /* 亞西西：改為鮮豔粉紅，區別於橙色 */
+    .c-assisi { background-color: #e84393; } 
+    
+    /* 小德蘭：改為深咖啡色，區別於橙色和粉色 */
+    .c-therese { background-color: #5d4037; } 
+
+    /* 鮑思高B：維持深橙色 */
+    .c-bosco-b { background-color: #D35400; } 
+
+    /* 其他班級維持原色 */
+    .c-anthony { background-color: #F39C12; } /* 橙黃 */
+    .c-loyola { background-color: #27AE60; } /* 綠色 */
+    .c-anne { background-color: #2980B9; } /* 藍色 */
+    .c-paul { background-color: #8E44AD; } /* 紫色 */
+    .c-bosco-a { background-color: #16A085; } /* 青色 */
+    .c-xavier { background-color: #2C3E50; } /* 深藍灰 */
+    .c-parent { background-color: #95A5A6; } /* 灰色 */
+    
+    .c-priest { 
+        background-color: #F1C40F; 
+        color: #2c3e50; 
+        border: 3px solid #F39C12;
+        width: 55px; height: 55px; border-radius: 50%;
+        z-index: 10;
+        font-size: 14px;
+    }
+
+    /* 圖例 */
+    .legend {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 15px;
+        margin-top: 40px;
+        padding-top: 20px;
+        border-top: 2px solid #eee;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        font-size: 14px;
+        font-weight: bold;
+        color: #333;
+        background: #f9f9f9;
+        padding: 5px 10px;
+        border-radius: 20px;
+    }
+
+    .legend-color {
+        width: 20px;
+        height: 20px;
+        border-radius: 4px;
+        margin-right: 8px;
+    }
+    
+    .section-title {
+        text-align: center;
+        color: #7f8c8d;
+        font-size: 14px;
+        margin: 10px 0 5px 0;
+        font-weight: bold;
+        letter-spacing: 1px;
+    }
+
+</style>
+</head>
+<body>
+
+<div class="container">
+    <div class="stage-area">
+        <div class="stage-screen">講台 / 投影幕</div>
+        <div class="game-zone">⬇️ 遊戲互動區 & 緩衝空間 ⬇️</div>
+    </div>
+
+    <div class="section-title">--- 第一區：小椅子 (幼兒班) ---</div>
+
+    <!-- Row 1 -->
+    <div class="row">
+        <div class="row-number">1</div>
+        <div class="block">
+            <!-- 亞西西 (5人) -->
+            <div class="seat small c-assisi">1</div>
+            <div class="seat small c-assisi">2</div>
+            <div class="seat small c-assisi">3</div>
+            <div class="seat small c-assisi teacher"><span>4</span></div>
+            <div class="seat small c-assisi teacher"><span>5</span></div>
+            <div class="seat small empty"></div>
+        </div>
+        <div class="aisle">
+            <div class="seat c-priest">神父</div>
+        </div>
+        <div class="block">
+            <!-- 安多尼 (6/10) -->
+            <div class="seat small c-anthony">1</div>
+            <div class="seat small c-anthony">2</div>
+            <div class="seat small c-anthony">3</div>
+            <div class="seat small c-anthony">4</div>
+            <div class="seat small c-anthony">5</div>
+            <div class="seat small c-anthony">6</div>
+        </div>
+    </div>
+
+    <!-- Row 2 -->
+    <div class="row">
+        <div class="row-number">2</div>
+        <div class="block">
+            <!-- 羅耀拉 (開始, 5/12) -->
+            <div class="seat c-loyola">1</div>
+            <div class="seat c-loyola">2</div>
+            <div class="seat c-loyola">3</div>
+            <div class="seat c-loyola">4</div>
+            <div class="seat c-loyola">5</div>
+        </div>
+        <div class="aisle"><span class="aisle-arrow">↑ 通道 ↑</span></div>
+        <div class="block">
+            <!-- 安多尼 (剩餘 4/10) -->
+            <div class="seat small c-anthony">7</div>
+            <div class="seat small c-anthony">8</div>
+            <div class="seat small c-anthony teacher"><span>9</span></div>
+            <div class="seat small c-anthony teacher"><span>10</span></div>
+            <div class="seat small empty"></div>
+            <div class="seat small empty"></div>
+        </div>
+    </div>
+
+    <div class="section-title">--- 第二區：標準座位 ---</div>
+
+    <!-- Row 3 -->
+    <div class="row">
+        <div class="row-number">3</div>
+        <div class="block">
+            <!-- 羅耀拉 (續 5/12) -->
+            <div class="seat c-loyola">6</div>
+            <div class="seat c-loyola">7</div>
+            <div class="seat c-loyola">8</div>
+            <div class="seat c-loyola">9</div>
+            <div class="seat c-loyola">10</div>
+        </div>
+        <div class="aisle"><span class="aisle-arrow">↑</span></div>
+        <div class="block">
+            <!-- 亞納 (5/13) -->
+            <div class="seat c-anne">1</div>
+            <div class="seat c-anne">2</div>
+            <div class="seat c-anne">3</div>
+            <div class="seat c-anne">4</div>
+            <div class="seat c-anne">5</div>
+        </div>
+    </div>
+
+    <!-- Row 4 -->
+    <div class="row">
+        <div class="row-number">4</div>
+        <div class="block">
+            <!-- 羅耀拉 (完 2) + 保祿 (3) -->
+            <div class="seat c-loyola teacher"><span>11</span></div>
+            <div class="seat c-loyola teacher"><span>12</span></div>
+            <div class="seat c-paul">1</div>
+            <div class="seat c-paul">2</div>
+            <div class="seat c-paul">3</div>
+        </div>
+        <div class="aisle"><span class="aisle-arrow">↑</span></div>
+        <div class="block">
+            <!-- 亞納 (續 5/13) -->
+            <div class="seat c-anne">6</div>
+            <div class="seat c-anne">7</div>
+            <div class="seat c-anne">8</div>
+            <div class="seat c-anne">9</div>
+            <div class="seat c-anne">10</div>
+        </div>
+    </div>
+
+    <!-- Row 5 -->
+    <div class="row">
+        <div class="row-number">5</div>
+        <div class="block">
+            <!-- 保祿 (續 5/15) -->
+            <div class="seat c-paul">4</div>
+            <div class="seat c-paul">5</div>
+            <div class="seat c-paul">6</div>
+            <div class="seat c-paul">7</div>
+            <div class="seat c-paul">8</div>
+        </div>
+        <div class="aisle"><span class="aisle-arrow">↑</span></div>
+        <div class="block">
+            <!-- 亞納 (完 3) + 鮑思高A (2) -->
+            <div class="seat c-anne">11</div>
+            <div class="seat c-anne teacher"><span>12</span></div>
+            <div class="seat c-anne teacher"><span>13</span></div>
+            <div class="seat c-bosco-a">1</div>
+            <div class="seat c-bosco-a">2</div>
+        </div>
+    </div>
+
+    <!-- Row 6 -->
+    <div class="row">
+        <div class="row-number">6</div>
+        <div class="block">
+            <!-- 保祿 (續 5/15) -->
+            <div class="seat c-paul">9</div>
+            <div class="seat c-paul">10</div>
+            <div class="seat c-paul">11</div>
+            <div class="seat c-paul">12</div>
+            <div class="seat c-paul">13</div>
+        </div>
+        <div class="aisle"><span class="aisle-arrow">↑</span></div>
+        <div class="block">
+            <!-- 鮑思高A (續 5/9) -->
+            <div class="seat c-bosco-a">3</div>
+            <div class="seat c-bosco-a">4</div>
+            <div class="seat c-bosco-a">5</div>
+            <div class="seat c-bosco-a">6</div>
+            <div class="seat c-bosco-a">7</div>
+        </div>
+    </div>
+
+    <!-- Row 7 -->
+    <div class="row">
+        <div class="row-number">7</div>
+        <div class="block">
+            <!-- 保祿 (完 2) + 小德蘭 (3) -->
+            <div class="seat c-paul teacher"><span>14</span></div>
+            <div class="seat c-paul teacher"><span>15</span></div>
+            <div class="seat c-therese">1</div>
+            <div class="seat c-therese">2</div>
+            <div class="seat c-therese">3</div>
+        </div>
+        <div class="aisle"><span class="aisle-arrow">↑</span></div>
+        <div class="block">
+            <!-- 鮑思高A (完 2) + 鮑思高B (3) -->
+            <div class="seat c-bosco-a teacher"><span>8</span></div>
+            <div class="seat c-bosco-a teacher"><span>9</span></div>
+            <div class="seat c-bosco-b">1</div>
+            <div class="seat c-bosco-b">2</div>
+            <div class="seat c-bosco-b">3</div>
+        </div>
+    </div>
+
+    <!-- Row 8 -->
+    <div class="row">
+        <div class="row-number">8</div>
+        <div class="block">
+            <!-- 小德蘭 (續 5/20) -->
+            <div class="seat c-therese">4</div>
+            <div class="seat c-therese">5</div>
+            <div class="seat c-therese">6</div>
+            <div class="seat c-therese">7</div>
+            <div class="seat c-therese">8</div>
+        </div>
+        <div class="aisle"><span class="aisle-arrow">↑</span></div>
+        <div class="block">
+            <!-- 鮑思高B (續 5/15) -->
+            <div class="seat c-bosco-b">4</div>
+            <div class="seat c-bosco-b">5</div>
+            <div class="seat c-bosco-b">6</div>
+            <div class="seat c-bosco-b">7</div>
+            <div class="seat c-bosco-b">8</div>
+        </div>
+    </div>
+
+    <!-- Row 9 -->
+    <div class="row">
+        <div class="row-number">9</div>
+        <div class="block">
+            <!-- 小德蘭 (續 5/20) -->
+            <div class="seat c-therese">9</div>
+            <div class="seat c-therese">10</div>
+            <div class="seat c-therese">11</div>
+            <div class="seat c-therese">12</div>
+            <div class="seat c-therese">13</div>
+        </div>
+        <div class="aisle"><span class="aisle-arrow">↑</span></div>
+        <div class="block">
+            <!-- 鮑思高B (續 5/15) -->
+            <div class="seat c-bosco-b">9</div>
+            <div class="seat c-bosco-b">10</div>
+            <div class="seat c-bosco-b">11</div>
+            <div class="seat c-bosco-b">12</div>
+            <div class="seat c-bosco-b">13</div>
+        </div>
+    </div>
+
+    <!-- Row 10 -->
+    <div class="row">
+        <div class="row-number">10</div>
+        <div class="block">
+            <!-- 小德蘭 (續 5/20) -->
+            <div class="seat c-therese">14</div>
+            <div class="seat c-therese">15</div>
+            <div class="seat c-therese">16</div>
+            <div class="seat c-therese">17</div>
+            <div class="seat c-therese">18</div>
+        </div>
+        <div class="aisle"><span class="aisle-arrow">↑</span></div>
+        <div class="block">
+            <!-- 鮑思高B (完 2) + 沙勿略 (3) -->
+            <div class="seat c-bosco-b teacher"><span>14</span></div>
+            <div class="seat c-bosco-b teacher"><span>15</span></div>
+            <div class="seat c-xavier">1</div>
+            <div class="seat c-xavier">2</div>
+            <div class="seat c-xavier">3</div>
+        </div>
+    </div>
+
+    <!-- Row 11 -->
+    <div class="row">
+        <div class="row-number">11</div>
+        <div class="block">
+            <!-- 小德蘭 (完 2) + 空位 -->
+            <div class="seat c-therese teacher"><span>19</span></div>
+            <div class="seat c-therese teacher"><span>20</span></div>
+            <div class="seat empty"></div>
+            <div class="seat empty"></div>
+            <div class="seat empty"></div>
+        </div>
+        <div class="aisle"><span class="aisle-arrow">↑</span></div>
+        <div class="block">
+            <!-- 沙勿略 (續 5/18) -->
+            <div class="seat c-xavier">4</div>
+            <div class="seat c-xavier">5</div>
+            <div class="seat c-xavier">6</div>
+            <div class="seat c-xavier">7</div>
+            <div class="seat c-xavier">8</div>
+        </div>
+    </div>
+
+    <div class="section-title">--- 家長區開始 (左側) ---</div>
+
+    <!-- Row 12 -->
+    <div class="row">
+        <div class="row-number">12</div>
+        <div class="block">
+            <!-- 家長 (5) -->
+            <div class="seat c-parent">家</div>
+            <div class="seat c-parent">家</div>
+            <div class="seat c-parent">家</div>
+            <div class="seat c-parent">家</div>
+            <div class="seat c-parent">家</div>
+        </div>
+        <div class="aisle"><span class="aisle-arrow">↑</span></div>
+        <div class="block">
+            <!-- 沙勿略 (續 5/18) -->
+            <div class="seat c-xavier">9</div>
+            <div class="seat c-xavier">10</div>
+            <div class="seat c-xavier">11</div>
+            <div class="seat c-xavier">12</div>
+            <div class="seat c-xavier">13</div>
+        </div>
+    </div>
+
+    <!-- Row 13 -->
+    <div class="row">
+        <div class="row-number">13</div>
+        <div class="block">
+            <!-- 家長 (5) -->
+            <div class="seat c-parent">家</div>
+            <div class="seat c-parent">家</div>
+            <div class="seat c-parent">家</div>
+            <div class="seat c-parent">家</div>
+            <div class="seat c-parent">家</div>
+        </div>
+        <div class="aisle"><span class="aisle-arrow">↑</span></div>
+        <div class="block">
+            <!-- 沙勿略 (完 5) -->
+            <div class="seat c-xavier">14</div>
+            <div class="seat c-xavier">15</div>
+            <div class="seat c-xavier">16</div>
+            <div class="seat c-xavier teacher"><span>17</span></div>
+            <div class="seat c-xavier teacher"><span>18</span></div>
+        </div>
+    </div>
+
+    <div class="section-title">--- 全家長區 ---</div>
+
+    <!-- Row 14 -->
+    <div class="row">
+        <div class="row-number">14</div>
+        <div class="block">
+            <div class="seat c-parent">家</div>
+            <div class="seat c-parent">家</div>
+            <div class="seat c-parent">家</div>
+            <div class="seat c-parent">家</div>
+            <div class="seat c-parent">家</div>
+        </div>
+        <div class="aisle"></div>
+        <div class="block">
+            <div class="seat c-parent">家</div>
+            <div class="seat c-parent">家</div>
+            <div class="seat c-parent">家</div>
+            <div class="seat c-parent">家</div>
+            <div class="seat c-parent">家</div>
+        </div>
+    </div>
+
+    <!-- Row 15+ Placeholder -->
+    <div class="row">
+        <div class="block" style="width: 100%; justify-content: center; background: #dfe6e9; padding: 10px; border-radius: 8px; color: #7f8c8d;">
+            後續約 6-7 行均為家長座位 (共81人)
+        </div>
+    </div>
+
+
+    <!-- Legend -->
+    <div class="legend">
+        <div class="legend-item"><div class="legend-color c-assisi"></div>亞西西 (5)</div>
+        <div class="legend-item"><div class="legend-color c-anthony"></div>安多尼 (10)</div>
+        <div class="legend-item"><div class="legend-color c-loyola"></div>羅耀拉 (12)</div>
+        <div class="legend-item"><div class="legend-color c-anne"></div>亞納 (13)</div>
+        <div class="legend-item"><div class="legend-color c-paul"></div>保祿 (15)</div>
+        <div class="legend-item"><div class="legend-color c-bosco-a"></div>鮑思高A (9)</div>
+        <div class="legend-item"><div class="legend-color c-bosco-b"></div>鮑思高B (15)</div>
+        <div class="legend-item"><div class="legend-color c-therese"></div>小德蘭 (20)</div>
+        <div class="legend-item"><div class="legend-color c-xavier"></div>沙勿略 (18)</div>
+        <div class="legend-item"><div class="legend-color c-parent"></div>家長 (81)</div>
+        <div class="legend-item" style="border: 2px solid #333;"><div class="seat small c-assisi" style="width:20px; height:20px; font-size:0; margin-right:5px;"></div>小椅子</div>
+        <div class="legend-item" style="border: 2px solid #333;"><div class="seat c-assisi teacher" style="width:20px; height:20px; font-size:0; margin-right:5px;"></div>導師位</div>
+    </div>
+
+</div>
+
+</body>
+</html>
