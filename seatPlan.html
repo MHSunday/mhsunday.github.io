@@ -11,6 +11,118 @@
         --aisle-width: 100px;
     }
 
+    /* 移動設備響應式設計 */
+    @media (max-width: 768px) {
+        :root {
+            --seat-size: 35px; /* 在小屏幕上縮小座位尺寸 */
+            --gap-size: 5px;   /* 減少間距 */
+            --aisle-width: 60px; /* 減少通道寬度 */
+        }
+
+        .container {
+            padding: 15px; /* 減少容器內邊距 */
+            max-width: 100%;
+            margin: 0;
+        }
+
+        .stage-screen {
+            font-size: 18px; /* 減小字體 */
+            padding: 8px 20px;
+        }
+
+        .game-zone {
+            font-size: 14px;
+        }
+
+        .row-number {
+            width: 25px;
+            font-size: 12px;
+        }
+
+        .seat {
+            font-size: 12px; /* 減小座位字體 */
+            width: var(--seat-size);
+            height: var(--seat-size);
+        }
+
+        .seat.small {
+            width: 30px; /* 縮小小椅子尺寸 */
+            height: 30px;
+            font-size: 12px;
+        }
+
+        .c-priest {
+            width: 45px; /* 縮小神父座位尺寸 */
+            height: 45px;
+            font-size: 12px;
+        }
+
+        .legend {
+            flex-direction: column; /* 在小屏幕上垂直排列圖例 */
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px; /* 確保圖例在小屏幕上適當間距 */
+            padding-top: 10px;
+        }
+
+        .stage-area {
+            margin-bottom: 20px; /* 減少講台區域的邊距 */
+        }
+
+        .section-title {
+            margin: 5px 0; /* 減少標題的邊距 */
+        }
+
+        .row {
+            margin-bottom: 8px; /* 減少行之間的邊距 */
+        }
+
+        .legend-item {
+            font-size: 12px;
+        }
+
+        body {
+            padding: 10px; /* 減少主體邊距 */
+        }
+    }
+
+    @media (max-width: 480px) {
+        :root {
+            --seat-size: 30px; /* 在更小的屏幕上進一步縮小 */
+            --gap-size: 3px;
+            --aisle-width: 40px;
+        }
+
+        .seat {
+            font-size: 10px;
+        }
+
+        .seat.small {
+            width: 25px;
+            height: 25px;
+            font-size: 10px;
+        }
+
+        .c-priest {
+            width: 35px;
+            height: 35px;
+            font-size: 10px;
+        }
+
+        .stage-screen {
+            font-size: 16px;
+            padding: 6px 15px;
+        }
+
+        .row-number {
+            font-size: 10px;
+        }
+
+        .legend-item {
+            font-size: 11px;
+        }
+    }
+
     body {
         font-family: "Microsoft JhengHei", "Heiti TC", sans-serif;
         background-color: #f0f2f5;
@@ -29,6 +141,86 @@
         max-width: 1000px;
         width: 100%;
         overflow-x: auto;
+        overflow-y: visible; /* 確保在垂直方向上內容可以完整顯示 */
+        margin: 0 auto; /* 居中對齊容器 */
+    }
+
+    /* 為整個頁面添加垂直滾動支持 */
+    body {
+        font-family: "Microsoft JhengHei", "Heiti TC", sans-serif;
+        background-color: #f0f2f5;
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh; /* 確保頁面至少佔滿整個視窗高度 */
+        -webkit-text-size-adjust: 100%; /* 防止iOS設備自動調整字體大小 */
+        -webkit-overflow-scrolling: touch; /* 確保iOS設備上的平滑滾動 */
+    }
+
+    /* 確保容器可以正確滾動 */
+    .container {
+        background: white;
+        padding: 40px;
+        border-radius: 15px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        max-width: 1000px;
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: visible; /* 確保在垂直方向上內容可以完整顯示 */
+        margin: 0 auto; /* 居中對齊容器 */
+        box-sizing: border-box; /* 確保padding不會增加額外寬度 */
+    }
+
+    /* 確保在小屏幕上的滾動行為 */
+    @media (max-width: 768px) {
+        body {
+            padding: 10px;
+            overflow-x: hidden; /* 防止不必要的水平滾動 */
+        }
+
+        .container {
+            padding: 15px;
+            margin: 5px auto;
+            overflow-x: auto;
+            overflow-y: visible;
+        }
+    }
+
+    @media (max-width: 480px) {
+        body {
+            padding: 5px;
+        }
+
+        .container {
+            padding: 10px;
+            margin: 2px auto;
+        }
+    }
+
+    /* 確保內容在小屏幕上可以正確滾動 */
+    @media (max-width: 768px) {
+        .container {
+            padding: 15px;
+            margin: 5px auto;
+        }
+
+        body {
+            padding: 10px;
+        }
+    }
+
+    /* 額外的響應式調整 */
+    @media (max-width: 480px) {
+        .container {
+            padding: 10px;
+            margin: 2px auto;
+        }
+
+        body {
+            padding: 5px;
+        }
     }
 
     /* 講台區 */
@@ -176,8 +368,8 @@
         flex-wrap: wrap;
         justify-content: center;
         gap: 15px;
-        margin-top: 40px;
-        padding-top: 20px;
+        margin-top: 0px;
+        padding-top: 0px;
         border-top: 2px solid #eee;
     }
 
@@ -211,10 +403,7 @@
 </style>
 </head>
 <body>
-
 <div class="container">
-    
-
     <!-- Legend -->
     <div class="legend">
         <div class="legend-item"><div class="legend-color c-assisi"></div>亞西西 (5)</div>
