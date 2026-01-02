@@ -46,9 +46,10 @@
         }
 
         .seat.small {
-            width: 30px; /* 縮小小椅子尺寸 */
-            height: 30px;
-            font-size: 12px;
+            width: 20px; /* 縮小小椅子尺寸，但保持圓形可見 */
+            height: 20px;
+            font-size: 8px;
+            border-radius: 50%; /* 保持圓形 */
         }
 
         .c-priest {
@@ -58,8 +59,10 @@
         }
 
         .legend {
-            flex-direction: column; /* 在小屏幕上垂直排列圖例 */
-            align-items: center;
+            flex-direction: row; /* 在小屏幕上改為水平方向，允許多排顯示 */
+            flex-wrap: wrap; /* 允許換行 */
+            justify-content: center;
+            align-items: flex-start;
             gap: 8px;
             margin-top: 10px; /* 確保圖例在小屏幕上適當間距 */
             padding-top: 10px;
@@ -98,9 +101,10 @@
         }
 
         .seat.small {
-            width: 25px;
-            height: 25px;
-            font-size: 10px;
+            width: 10px;
+            height: 10px;
+            font-size: 6px;
+            border-radius: 50%; /* 保持圓形 */
         }
 
         .c-priest {
@@ -140,7 +144,7 @@
         box-shadow: 0 10px 25px rgba(0,0,0,0.15);
         max-width: 1000px;
         width: 100%;
-        overflow-x: auto;
+        overflow-x: visible;
         overflow-y: visible; /* 確保在垂直方向上內容可以完整顯示 */
         margin: 0 auto; /* 居中對齊容器 */
     }
@@ -160,7 +164,7 @@
     }
 
     /* 確保容器可以正確滾動 */
-    .container {
+    /* .container {
         background: white;
         padding: 40px;
         border-radius: 15px;
@@ -171,13 +175,13 @@
         overflow-y: visible; /* 確保在垂直方向上內容可以完整顯示 */
         margin: 0 auto; /* 居中對齊容器 */
         box-sizing: border-box; /* 確保padding不會增加額外寬度 */
-    }
+    } */
 
     /* 確保在小屏幕上的滾動行為 */
     @media (max-width: 768px) {
         body {
             padding: 10px;
-            overflow-x: hidden; /* 防止不必要的水平滾動 */
+            overflow-x: auto; /* 允許水平滾動 */
         }
 
         .container {
@@ -191,6 +195,7 @@
     @media (max-width: 480px) {
         body {
             padding: 5px;
+            overflow-x: auto; /* 確保在小屏幕上允許水平滾動 */
         }
 
         .container {
@@ -204,10 +209,12 @@
         .container {
             padding: 15px;
             margin: 5px auto;
+            overflow-x: auto; /* 確保容器也支持水平滾動 */
         }
 
         body {
             padding: 10px;
+            overflow-x: auto; /* 確保頁面支持水平滾動 */
         }
     }
 
@@ -216,10 +223,12 @@
         .container {
             padding: 10px;
             margin: 2px auto;
+            overflow-x: auto; /* 確保在更小屏幕上也支持水平滾動 */
         }
 
         body {
             padding: 5px;
+            overflow-x: auto; /* 確保在更小屏幕上也支持水平滾動 */
         }
     }
 
@@ -416,8 +425,8 @@
         <div class="legend-item"><div class="legend-color c-therese"></div>小德蘭 (20)</div>
         <div class="legend-item"><div class="legend-color c-xavier"></div>沙勿略 (18)</div>
         <div class="legend-item"><div class="legend-color c-parent"></div>家長 (81)</div>
-        <div class="legend-item" style="border: 2px solid #333;"><div class="seat small c-assisi" style="width:20px; height:20px; font-size:0; margin-right:5px;"></div>小椅子</div>
-        <div class="legend-item" style="border: 2px solid #333;"><div class="seat c-assisi teacher" style="width:20px; height:20px; font-size:0; margin-right:5px;"></div>導師位</div>
+        <div class="legend-item" style="border: 2px solid #333;"><div class="seat small c-assisi" style="width:25px; height:25px; font-size:0; margin-right:5px;"></div>小椅子</div>
+        <div class="legend-item" style="border: 2px solid #333;"><div class="seat c-assisi teacher" style="width:25px; height:25px; font-size:0; margin-right:5px;"></div>導師位</div>
     </div>
 
     <div class="stage-area">
