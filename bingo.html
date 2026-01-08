@@ -544,6 +544,31 @@
             let isMusicPlaying = true;
             let audioReady = false;
             
+            // 從本地存儲加載已抽取的數字
+            function loadDrawnNumbersFromStorage() {
+                const storageKey = `bingo_drawn_numbers_${totalNumber}`;
+                const stored = localStorage.getItem(storageKey);
+                if (stored) {
+                    drawnNumbers = JSON.parse(stored);
+                    // 從原始數組中移除已抽取的數字
+                    numbers = numbers.filter(num => !drawnNumbers.includes(num));
+                } else {
+                    drawnNumbers = [];
+                }
+            }
+            
+            // 保存已抽取的數字到本地存儲
+            function saveDrawnNumbersToStorage() {
+                const storageKey = `bingo_drawn_numbers_${totalNumber}`;
+                localStorage.setItem(storageKey, JSON.stringify(drawnNumbers));
+            }
+            
+            // 清除本地存儲中的已抽取數字
+            function clearDrawnNumbersFromStorage() {
+                const storageKey = `bingo_drawn_numbers_${totalNumber}`;
+                localStorage.removeItem(storageKey);
+            }
+            
             // 音訊初始化狀態
             function updateAudioStatus() {
                 if (audioReady) {
@@ -605,6 +630,9 @@
             });
             
             // 初始化
+            loadDrawnNumbersFromStorage();
+            // 重建歷史記錄顯示
+            drawnNumbers.forEach(num => addToHistory(num));
             updateDrawnCount();
             updateAudioStatus();
             
@@ -666,6 +694,9 @@
                // 更新歷史記錄
                addToHistory(drawnNumber);
                updateDrawnCount();
+               
+               // 保存到本地存儲
+               saveDrawnNumbersToStorage();
                
                // 播放抽獎完成音效（僅在此處播放）
                if (audioReady) {
@@ -785,6 +816,7 @@
                 // 重新生成數字陣列
                 numbers = Array.from({length: totalNumber}, (_, i) => i + 1);
                 drawnNumbers = [];
+                clearDrawnNumbersFromStorage();
                 
                 currentNumberEl.textContent = '?';
                 historyListEl.innerHTML = '';

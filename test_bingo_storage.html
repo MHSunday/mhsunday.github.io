@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bingo Storage Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Bingo Local Storage 測試</h1>
+        
+        <div class="test-section">
+            <h3>測試說明</h3>
+            <p>這個測試頁面用於驗證 bingo.html 的本地存儲功能是否正常工作：</p>
+            <ol>
+                <li>抽獎後，已抽取的數字應保存到本地存儲</li>
+                <li>刷新頁面後，應能從本地存儲加載之前抽取的數字</li>
+                <li>重置後，本地存儲應被清除</li>
+            </ol>
+        </div>
+        
+        <div class="test-section">
+            <h3>本地存儲狀態</h3>
+            <button onclick="showStorage()">查看本地存儲內容</button>
+            <button onclick="clearAllStorage()">清除所有本地存儲</button>
+            <button onclick="testStorage()">測試存儲功能</button>
+            
+            <div id="storage-status" class="status info">
+                點擊按鈕查看本地存儲狀態
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h3>測試步驟</h3>
+            <ol>
+                <li>在新的標籤頁中打開 <a href="bingo.html" target="_blank">bingo.html</a></li>
+                <li>進行幾次抽獎</li>
+                <li>刷新此頁面並點擊"查看本地存儲內容"確認數據已保存</li>
+                <li>點擊"重置"按鈕後再次檢查存儲狀態</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        function showStorage() {
+            const storageDiv = document.getElementById('storage-status');
+            let content = '<h4>本地存儲內容：</h4>';
+            let hasBingoData = false;
+            
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.includes('bingo')) {
+                    const value = localStorage.getItem(key);
+                    content += `<p><strong>${key}:</strong> ${value}</p>`;
+                    hasBingoData = true;
+                }
+            }
+            
+            if (!hasBingoData) {
+                content += '<p>沒有找到 Bingo 相關的存儲數據</p>';
+            }
+            
+            storageDiv.innerHTML = content;
+            storageDiv.className = 'status info';
+        }
+        
+        function clearAllStorage() {
+            if (confirm('確定要清除所有本地存儲數據嗎？')) {
+                localStorage.clear();
+                document.getElementById('storage-status').innerHTML = '所有本地存儲數據已清除';
+                document.getElementById('storage-status').className = 'status success';
+            }
+        }
+        
+        function testStorage() {
+            // 測試存儲功能
+            const testKey = 'bingo_test_data';
+            const testData = [1, 2, 3, 4, 5];
+            
+            try {
+                localStorage.setItem(testKey, JSON.stringify(testData));
+                const retrievedData = JSON.parse(localStorage.getItem(testKey));
+                
+                if (JSON.stringify(retrievedData) === JSON.stringify(testData)) {
+                    document.getElementById('storage-status').innerHTML = 
+                        '存儲功能測試成功！<br>可以正常保存和讀取數據';
+                    document.getElementById('storage-status').className = 'status success';
+                } else {
+                    document.getElementById('storage-status').innerHTML = 
+                        '存儲功能測試失敗！<br>數據不一致';
+                    document.getElementById('storage-status').className = 'status error';
+                }
+                
+                // 清除測試數據
+                localStorage.removeItem(testKey);
+            } catch (e) {
+                document.getElementById('storage-status').innerHTML = 
+                    '存儲功能測試失敗！<br>錯誤: ' + e.message;
+                document.getElementById('storage-status').className = 'status error';
+            }
+        }
+    </script>
+</body>
+</html>
