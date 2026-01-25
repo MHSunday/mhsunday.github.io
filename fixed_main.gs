@@ -245,24 +245,33 @@ function getAchievedStudents(email, requestedClass = '*') {
     filteredData = filteredData.filter(row => row[classCol] === requestedClass);
   }
 
+  const redeemedCol = headers.indexOf("已換領");
+  
   // 按學生姓名分組並計算出席次數
   const studentAttendanceMap = {};
   for (let row of filteredData) {
     const className = row[classCol];
     const studentName = row[studentCol];
     const attendanceDate = row[dateCol];
+    const isRedeemed = row[redeemedCol] === "是";
     
     if (!studentAttendanceMap[studentName]) {
       studentAttendanceMap[studentName] = {
         class: className,
         studentName: studentName,
         attendanceCount: 0,
-        attendanceDates: []
+        attendanceDates: [],
+        redeemedCount: 0  // 追踪已換領次數
       };
     }
     
     studentAttendanceMap[studentName].attendanceCount++;
     studentAttendanceMap[studentName].attendanceDates.push(attendanceDate);
+    
+    // 如果已換領，增加換領計數
+    if (isRedeemed) {
+      studentAttendanceMap[studentName].redeemedCount++;
+    }
   }
 
   // 過濾出達成條件的學生 (假設達成條件是出席次數 >= 3)
@@ -274,7 +283,15 @@ function getAchievedStudents(email, requestedClass = '*') {
     if (student.attendanceCount >= ACHIEVEMENT_THRESHOLD) {
       // 找出最早達成條件的日期
       student.attendanceDates.sort(); // 排序日期
-      student.achievedDate = student.attendanceDates[ACHIEVEMENT_THRESHOLD - 1]; // 第3次出席的日期即為達成日期
+      student.achievedDate = student.attendanceDates[ACHIEVEMENT_THRESHOLD - 1]; // 第達成門檻次出席的日期即為達成日期
+      
+      // 計算達成條件的總次數（假設每次達到門檻就可換領一次禮物）
+      const qualifiedRedemptions = Math.floor(student.attendanceCount / ACHIEVEMENT_THRESHOLD);
+      
+      // 添加換領狀態信息
+      student.isFullyRedeemed = (student.redeemedCount >= qualifiedRedemptions);
+      student.redemptionStatus = `${student.redeemedCount}/${qualifiedRedemptions}`;
+      
       achievedStudents.push(student);
     }
   }

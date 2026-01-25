@@ -299,6 +299,12 @@ function initStatsPage() {
         <div class="achieved-student-header">${student.class} - ${student.studentName}</div>
         <div class="achieved-student-details">總達成次數: ${student.attendanceCount}</div>
         ${student.attendanceDates ? `<div class="achieved-student-details">達成日期: ${student.attendanceDates.map(date => formatDate(date)).join(', ')}</div>` : ''}
+        <div class="achieved-student-details">
+          換領狀態:
+          <span ${student.isFullyRedeemed ? 'style="color: green;"' : 'style="color: orange;"'}>
+            ${student.redemptionStatus} (${student.isFullyRedeemed ? '已完成' : '未完成'})
+          </span>
+        </div>
       </div>
     `).join('');
     
