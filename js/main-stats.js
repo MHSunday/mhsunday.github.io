@@ -296,15 +296,15 @@ function initStatsPage() {
 
     const html = students.map(student => `
       <div class="achieved-student-item">
-        <div class="achieved-student-header">${student.class} - ${student.studentName}</div>
-        <div class="achieved-student-details">總達成次數: ${student.attendanceCount}</div>
-        ${student.attendanceDates ? `<div class="achieved-student-details">達成日期: ${student.attendanceDates.map(date => formatDate(date)).join(', ')}</div>` : ''}
-        <div class="achieved-student-details">
-          換領狀態:
-          <span ${student.isFullyRedeemed ? 'style="color: green;"' : 'style="color: orange;"'}>
-            ${student.redemptionStatus} (${student.isFullyRedeemed ? '已完成' : '未完成'})
+        <div class="achieved-student-header">
+          <span>${student.class} - ${student.studentName}</span>
+          <span class="redemption-badge ${student.isFullyRedeemed ? 'completed' : 'pending'}">
+            ${student.isFullyRedeemed ? '✓' : '○'}
+            <span class="tooltip">${student.redemptionStatus} (${student.isFullyRedeemed ? '已完成' : '未完成'})</span>
           </span>
         </div>
+        <div class="achieved-student-details">總達成次數: ${student.attendanceCount}</div>
+        ${student.attendanceDates ? `<div class="achieved-student-details">達成日期: ${student.attendanceDates.map(date => formatDate(date)).join(', ')}</div>` : ''}
       </div>
     `).join('');
     
