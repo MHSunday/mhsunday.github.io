@@ -1,6 +1,6 @@
 // js/main-stats.js
 import { getCurrentUser, getUserRole, logout, onRoleLoaded } from './auth.js';
-import { getAllClasses, getStats, getAchievedStudents } from './api.js';
+import { getAllClasses, getStats, getAchievedStudents, getUnredeemedRecords } from './api.js';
 
 // 僅在 stat.html 執行
 if (!document.getElementById('statsContainer')) {
@@ -14,10 +14,13 @@ function initStatsPage() {
   const statsContainer = document.getElementById('statsContainer');
   const achievedStudentsContainer = document.getElementById('achievedStudentsContainer');
   const achievedStudentsList = document.getElementById('achievedStudentsList');
+  const unredeemedStudentsContainer = document.getElementById('unredeemedStudentsContainer');
+  const unredeemedStudentsList = document.getElementById('unredeemedStudentsList');
   const messageEl = document.getElementById('message');
   const achievedCard = document.getElementById('achievedCard');
   const statsTab = document.getElementById('statsTab');
   const achievedTab = document.getElementById('achievedTab');
+  const unredeemedTab = document.getElementById('unredeemedTab');
 
   // 登出
   document.getElementById('logoutBtn').onclick = logout;
@@ -25,6 +28,7 @@ function initStatsPage() {
   // 預設顯示統計區，因為初始頁籤是統計摘要
   statsContainer.style.display = 'block';
   achievedStudentsContainer.style.display = 'none';
+  unredeemedStudentsContainer.style.display = 'none';
   messageEl.innerHTML = '';
 
   // 初始化卡片狀態（不可點）
@@ -60,12 +64,49 @@ function initStatsPage() {
     }
   }
 
+  // 載入未補領禮物學生列表的函數
+  async function loadUnredeemedStudentsList(showLoading = true) {
+    const user = getCurrentUser();
+    if (!user) return;
+
+    try {
+      if (showLoading) {
+        messageEl.innerHTML = '<div class="loading">載入未補領禮物的學生名單中…</div>';
+      }
+      const unredeemedStudents = await getUnredeemedRecords(user.email);
+      
+      // Filter by selected class if not showing all
+      const selectedClass = classSelect.value;
+      let filteredStudents = unredeemedStudents;
+      if (selectedClass !== '*' && selectedClass) {
+        filteredStudents = unredeemedStudents.filter(student => student.class === selectedClass);
+      }
+      
+      // 確保在非同步操作完成後正確更新界面
+      displayUnredeemedStudents(filteredStudents);
+    } catch (err) {
+      if (showLoading) {
+        messageEl.innerHTML = `<span style="color:red">載入未補領禮物的學生名單失敗：${err.message}</span>`;
+      } else {
+        unredeemedStudentsList.innerHTML = '<p style="text-align: center; color: #7f8c8d; font-style: italic;">載入失敗</p>';
+      }
+      return; // 發生錯誤時提前返回
+    } finally {
+      // 無論成功或失敗，都要清除加載信息（如果之前顯示了）
+      if (showLoading) {
+        messageEl.innerHTML = '';
+      }
+    }
+  }
+
   // 頁籤切換功能
   statsTab.addEventListener('click', () => {
     statsTab.classList.add('active');
     achievedTab.classList.remove('active');
+    unredeemedTab.classList.remove('active');  // Remove active from unredeemed tab
     statsContainer.style.display = 'block';
     achievedStudentsContainer.style.display = 'none';
+    unredeemedStudentsContainer.style.display = 'none';  // Hide unredeemed container
   });
 
   achievedTab.addEventListener('click', async () => {
@@ -75,11 +116,30 @@ function initStatsPage() {
     // 切換頁籤樣式
     achievedTab.classList.add('active');
     statsTab.classList.remove('active');
+    unredeemedTab.classList.remove('active');  // Remove active from unredeemed tab
     statsContainer.style.display = 'none';
     achievedStudentsContainer.style.display = 'block';
+    unredeemedStudentsContainer.style.display = 'none';  // Hide unredeemed container
 
     // 載入達成換領條件的學生名單
     await loadAchievedStudentsList();
+  });
+
+  // 新增未補領禮物名單頁籤切換功能
+  unredeemedTab.addEventListener('click', async () => {
+    const user = getCurrentUser();
+    if (!user) return;
+
+    // 切換頁籤樣式
+    unredeemedTab.classList.add('active');
+    statsTab.classList.remove('active');
+    achievedTab.classList.remove('active');  // Remove active from achieved tab
+    statsContainer.style.display = 'none';
+    achievedStudentsContainer.style.display = 'none';  // Hide achieved container
+    unredeemedStudentsContainer.style.display = 'block';
+
+    // 載入未補領禮物的學生名單
+    await loadUnredeemedStudentsList();
   });
 
   // 監聽權限載入
@@ -141,6 +201,17 @@ function initStatsPage() {
         // 但不顯示加載信息，這樣當用戶切換過去時會立即看到正確結果
         await loadAchievedStudentsList(false);
       }
+      
+      // 同樣處理未補領禮物標籤頁的數據更新
+      if (unredeemedTab.classList.contains('active')) {
+        // 如果當前就在未補領禮物標籤頁，確保容器可見，並顯示加載信息
+        unredeemedStudentsContainer.style.display = 'block';
+        await loadUnredeemedStudentsList(true);
+      } else {
+        // 如果不在未補領禮物標籤頁，也預先載入數據並更新列表內容
+        // 但不顯示加載信息，這樣當用戶切換過去時會立即看到正確結果
+        await loadUnredeemedStudentsList(false);
+      }
     }
   });
 
@@ -158,6 +229,10 @@ function initStatsPage() {
     // 如果當前在達成標籤頁，則不要改變達成學生容器的顯示狀態
     if (statsTab.classList.contains('active')) {
       achievedStudentsContainer.style.display = 'none';
+    }
+    // 如果當前在未補領禮物標籤頁，則不要改變未補領禮物容器的顯示狀態
+    if (statsTab.classList.contains('active')) {
+      unredeemedStudentsContainer.style.display = 'none';
     }
 
     // 暫時禁用卡片點擊
@@ -188,6 +263,10 @@ function initStatsPage() {
       // 只有當統計標籤頁是活動狀態時才隱藏達成學生容器
       if (statsTab.classList.contains('active')) {
         achievedStudentsContainer.style.display = 'none';
+      }
+      // 只有當統計標籤頁是活動狀態時才隱藏未補領禮物學生容器
+      if (statsTab.classList.contains('active')) {
+        unredeemedStudentsContainer.style.display = 'none';
       }
     } catch (err) {
       messageEl.innerHTML = `<span style="color:red">載入失敗：${err.message}</span>`;
@@ -231,5 +310,31 @@ function initStatsPage() {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('zh-TW');
+  }
+
+  // 顯示未補領禮物的學生名單
+  function displayUnredeemedStudents(students) {
+    
+    if (!students || students.length === 0) {
+      unredeemedStudentsList.innerHTML = '<p style="text-align: center; color: #7f8c8d; font-style: italic;">沒有學生未補領禮物</p>';
+      return;
+    }
+
+    // 根據班級和學生姓名排序
+    students.sort((a, b) => {
+      if (a.class !== b.class) {
+        return a.class.localeCompare(b.class, 'zh-TW');
+      }
+      return a.studentName.localeCompare(b.studentName, 'zh-TW');
+    });
+
+    const html = students.map(student => `
+      <div class="achieved-student-item">
+        <div class="achieved-student-header">${student.class} - ${student.studentName}</div>
+        <div class="achieved-student-details">登記日期: ${formatDate(student.attendanceDate)}</div>
+      </div>
+    `).join('');
+    
+    unredeemedStudentsList.innerHTML = html;
   }
 }
