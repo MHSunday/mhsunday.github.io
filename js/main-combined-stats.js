@@ -381,7 +381,7 @@ function initCombinedStatsPage() {
       
       html += `
         <div class="class-section">
-          <div class="class-name">${classNameDisplay} - 未補領禮物學生 (${classStudents.length} 人)</div>
+          <div class="class-name">${classNameDisplay} - (${classStudents.length} 人)</div>
           <div class="unredeemed-names-list">${names}</div>
         </div>
       `;
