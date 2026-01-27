@@ -312,9 +312,14 @@ function initCombinedStatsPage() {
       const classStudents = groupedStudents[className];
       classStudents.sort((a, b) => a.studentName.localeCompare(b.studentName, 'zh-TW'));
       
+      // Show class name more clearly
+      const classNameDisplay = classStudents.length > 0 && classStudents[0].studentClassName ?
+        `${className} (${classStudents[0].studentClassName})` :
+        `${className}`;
+      
       html += `
         <div class="class-section">
-          <div class="class-name">${className} - 達成目標學生 (${classStudents.length} 人)</div>
+          <div class="class-name">${classNameDisplay} - 達成目標學生 (${classStudents.length} 人)</div>
           ${classStudents.map(student => `
             <div class="student-item">
               <div class="student-header">
@@ -369,9 +374,14 @@ function initCombinedStatsPage() {
       // 提取姓名并用逗號分隔
       const names = classStudents.map(student => student.studentName).join('、');
       
+      // Show class name more clearly
+      const classNameDisplay = classStudents.length > 0 && classStudents[0].studentClassName ?
+        `${className} (${classStudents[0].studentClassName})` :
+        `${className}`;
+      
       html += `
         <div class="class-section">
-          <div class="class-name">${className} - 未補領禮物學生 (${classStudents.length} 人)</div>
+          <div class="class-name">${classNameDisplay} - 未補領禮物學生 (${classStudents.length} 人)</div>
           <div class="unredeemed-names-list">${names}</div>
         </div>
       `;

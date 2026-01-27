@@ -307,9 +307,15 @@ function initStatsPage() {
     let html = '';
     for (const className in groupedStudents) {
       const classStudents = groupedStudents[className];
+      
+      // Show class name more clearly
+      const classNameDisplay = classStudents.length > 0 && classStudents[0].studentClassName ?
+        `${className} (${classStudents[0].studentClassName})` :
+        `${className}`;
+        
       html += `
         <div class="class-section">
-          <div class="class-name">${className} - 達成目標學生 (${classStudents.length} 人)</div>
+          <div class="class-name">${classNameDisplay} - 達成目標學生 (${classStudents.length} 人)</div>
           ${classStudents.map(student => `
             <div class="achieved-student-item">
               <div class="achieved-student-header">
@@ -364,9 +370,14 @@ function initStatsPage() {
       // 提取姓名并用逗號分隔
       const names = classStudents.map(student => student.studentName).join('、');
       
+      // Show class name more clearly
+      const classNameDisplay = classStudents.length > 0 && classStudents[0].studentClassName ?
+        `${className} (${classStudents[0].studentClassName})` :
+        `${className}`;
+      
       html += `
         <div class="class-section">
-          <div class="class-name">${className} - 未補領禮物學生 (${classStudents.length} 人)</div>
+          <div class="class-name">${classNameDisplay} - 未補領禮物學生 (${classStudents.length} 人)</div>
           <div class="unredeemed-names-list">${names}</div>
         </div>
       `;

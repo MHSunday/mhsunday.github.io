@@ -106,8 +106,14 @@
             // Create collapsible header
             const headerDiv = document.createElement('div');
             headerDiv.className = 'collapsible';
+            
+            // Extract the first student to get the class category
+            const firstStudent = report[className][0];
+            const classCategory = firstStudent ? firstStudent.classCategory : '';
+            const displayTitle = classCategory ? `${className} (${classCategory})` : className;
+            
             headerDiv.innerHTML = `
-              <strong>${className}</strong>
+              <strong>${displayTitle}</strong>
               <span class="float-right">共 ${report[className].length} 位學生</span>
             `;
             
@@ -197,8 +203,14 @@
               // Create collapsible header
               const headerDiv = document.createElement('div');
               headerDiv.className = 'collapsible';
+              
+              // Extract the first student to get the class category
+              const firstStudent = report[className][0];
+              const classCategory = firstStudent ? firstStudent.classCategory : '';
+              const displayTitle = classCategory ? `${className} (${classCategory})` : className;
+              
               headerDiv.innerHTML = `
-                <strong>${className}</strong>
+                <strong>${displayTitle}</strong>
                 <span class="float-right">共 ${report[className].length} 位學生</span>
               `;
               
