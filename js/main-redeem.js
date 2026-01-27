@@ -17,7 +17,6 @@ function initRedeemPage() {
   const redeemDate = document.getElementById('redeemDate');
   const selectAllBtn = document.getElementById('selectAllBtn');
   const updateAllBtn = document.getElementById('updateAllBtn');
-  const updateAllUnselectedBtn = document.getElementById('updateAllUnselectedBtn');
   const selectAllCheckbox = document.getElementById('selectAllCheckbox');
   const recordsTableBody = document.getElementById('recordsTableBody');
   const messageEl = document.getElementById('message');
@@ -125,43 +124,6 @@ function initRedeemPage() {
     await updateRedeemStatus(user.email, selectedRecords, '部分');
   });
 
-  // 批量更新全部項目按鈕事件
- updateAllUnselectedBtn.addEventListener('click', async () => {
-    const user = getCurrentUser();
-    if (!user) return;
-
-    const allRows = recordsTableBody.querySelectorAll('tr');
-    if (allRows.length === 0) {
-      messageEl.innerHTML = '<span style="color:orange">沒有記錄可更新</span>';
-      return;
-    }
-
-    const allRecords = [];
-    let hasDifferentDate = false;
-    allRows.forEach(row => {
-      const tableRedeemDate = row.querySelector('.redeem-date-input').value;
-      const globalRedeemDate = redeemDate.value;
-      
-      // 如果表格中的日期與全局日期不同，顯示警告
-      if (tableRedeemDate !== globalRedeemDate) {
-        hasDifferentDate = true;
-      }
-      
-      allRecords.push({
-        className: row.dataset.class,
-        studentName: row.dataset.student,
-        attendanceDate: row.dataset.attendanceDate,
-        redeemDate: tableRedeemDate  // 使用表格中的日期
-      });
-    });
-
-    // 如果存在不同的日期，顯示警告
-    if (hasDifferentDate) {
-      messageEl.innerHTML = '<span style="color:orange">注意：部分記錄使用表格中的換領日期，而非上方設定的日期</span>';
-    }
-
-    await updateRedeemStatus(user.email, allRecords, '全部');
-  });
 
   // 載入未換領記錄
   let loadCounter = 0; // 用於跟蹤加載請求的計數器
@@ -197,7 +159,7 @@ function initRedeemPage() {
           
           row.innerHTML = `
             <td class="checkbox-cell"><input type="checkbox"></td>
-            <td>${record.class}</td>
+            <td>${record.className || record.class}</td>
             <td>${record.studentName}</td>
             <td>${formatDate(record.attendanceDate)}</td>
             <td><input type="date" class="redeem-date-input" value="${redeemDate.value}" data-index="${index}"></td>
@@ -274,7 +236,6 @@ function initRedeemPage() {
     const checkedBoxes = recordsTableBody.querySelectorAll('input[type="checkbox"]:checked');
     
     updateAllBtn.disabled = checkedBoxes.length === 0;
-    updateAllUnselectedBtn.disabled = checkboxes.length === 0;
   }
 
   // 更新換領狀態
@@ -287,7 +248,6 @@ function initRedeemPage() {
     try {
       messageEl.innerHTML = `<span style="color:blue">正在更新${actionType}記錄...</span>`;
       updateAllBtn.disabled = true;
-      updateAllUnselectedBtn.disabled = true;
 
       await batchUpdateRedeemStatus(records, email);
 
@@ -304,7 +264,6 @@ function initRedeemPage() {
     } catch (err) {
       messageEl.innerHTML = `<span style="color:red">更新失敗：${err.message}</span>`;
       updateAllBtn.disabled = false;
-      updateAllUnselectedBtn.disabled = false;
     }
   }
 
