@@ -242,3 +242,18 @@ export async function getAchievedStudents(email, className = '*') {
    if (data.error) throw new Error(data.error);
    return data;
  }
+ 
+ /**
+  * 獲取全局換領統計數據
+  * @param {string} email - 用戶郵箱
+  * @returns {Object} 全局換領統計數據
+  */
+ export async function getGlobalRedemptionStats(email) {
+   if (!email) throw new Error('必須提供使用者 email');
+   
+   const url = `${API_URL}?action=getGlobalRedemptionStats&email=${encodeURIComponent(email)}`;
+   const res = await fetch(url);
+   const data = await res.json();
+   if (data.error) throw new Error(data.error);
+   return data;
+ }

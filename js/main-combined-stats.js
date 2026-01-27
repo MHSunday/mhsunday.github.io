@@ -1,15 +1,15 @@
-// js/main-stats.js
+// js/main-combined-stats.js
 import { getCurrentUser, getUserRole, logout, onRoleLoaded } from './auth.js';
-import { getAllClasses, getStats, getAchievedStudents, getUnredeemedRecords } from './api.js';
+import { getAllClasses, getStats, getAchievedStudents, getUnredeemedRecords, getClassBasedPendingRedemptionReport, getGlobalRedemptionStats } from './api.js';
 
-// 僅在 stat.html 執行
+// 僅在 combined_stats_report.html 執行
 if (!document.getElementById('statsContainer')) {
-  console.warn('main-stats.js 被載入到非 stat.html 頁面');
+  console.warn('main-combined-stats.js 被載入到非 combined_stats_report.html 頁面');
 } else {
-  initStatsPage();
+  initCombinedStatsPage();
 }
 
-function initStatsPage() {
+function initCombinedStatsPage() {
   const classSelect = document.getElementById('classSelect');
   const statsContainer = document.getElementById('statsContainer');
   const achievedStudentsContainer = document.getElementById('achievedStudentsContainer');
@@ -17,7 +17,7 @@ function initStatsPage() {
   const unredeemedStudentsContainer = document.getElementById('unredeemedStudentsContainer');
   const unredeemedStudentsList = document.getElementById('unredeemedStudentsList');
   const messageEl = document.getElementById('message');
-  const achievedCard = document.getElementById('achievedCard');
+  
   const statsTab = document.getElementById('statsTab');
   const achievedTab = document.getElementById('achievedTab');
   const unredeemedTab = document.getElementById('unredeemedTab');
@@ -30,10 +30,6 @@ function initStatsPage() {
   achievedStudentsContainer.style.display = 'none';
   unredeemedStudentsContainer.style.display = 'none';
   messageEl.innerHTML = '';
-
-  // 初始化卡片狀態（不可點）
-  achievedCard.style.cursor = 'default';
-  achievedCard.title = '';
 
   // 載入達成學生列表的函數（可重複使用）
   async function loadAchievedStudentsList(showLoading = true) {
@@ -84,11 +80,27 @@ function initStatsPage() {
       
       // 確保在非同步操作完成後正確更新界面
       displayUnredeemedStudents(filteredStudents);
+      
+      // 更新未補領總數
+      const unredeemedSummary = document.getElementById('unredeemedSummary');
+      const unredeemedTotalCount = document.getElementById('unredeemedTotalCount');
+      if (unredeemedSummary && unredeemedTotalCount) {
+        unredeemedSummary.style.display = 'block';
+        unredeemedTotalCount.textContent = filteredStudents.length;
+      }
     } catch (err) {
       if (showLoading) {
         messageEl.innerHTML = `<span style="color:red">載入未補領禮物的學生名單失敗：${err.message}</span>`;
       } else {
         unredeemedStudentsList.innerHTML = '<p style="text-align: center; color: #7f8c8d; font-style: italic;">載入失敗</p>';
+        
+        // 還是顯示總數區域，但為0
+        const unredeemedSummary = document.getElementById('unredeemedSummary');
+        const unredeemedTotalCount = document.getElementById('unredeemedTotalCount');
+        if (unredeemedSummary && unredeemedTotalCount) {
+          unredeemedSummary.style.display = 'block';
+          unredeemedTotalCount.textContent = '0';
+        }
       }
       return; // 發生錯誤時提前返回
     } finally {
@@ -103,10 +115,10 @@ function initStatsPage() {
   statsTab.addEventListener('click', () => {
     statsTab.classList.add('active');
     achievedTab.classList.remove('active');
-    unredeemedTab.classList.remove('active');  // Remove active from unredeemed tab
+    unredeemedTab.classList.remove('active');
     statsContainer.style.display = 'block';
     achievedStudentsContainer.style.display = 'none';
-    unredeemedStudentsContainer.style.display = 'none';  // Hide unredeemed container
+    unredeemedStudentsContainer.style.display = 'none';
   });
 
   achievedTab.addEventListener('click', async () => {
@@ -116,10 +128,10 @@ function initStatsPage() {
     // 切換頁籤樣式
     achievedTab.classList.add('active');
     statsTab.classList.remove('active');
-    unredeemedTab.classList.remove('active');  // Remove active from unredeemed tab
+    unredeemedTab.classList.remove('active');
     statsContainer.style.display = 'none';
     achievedStudentsContainer.style.display = 'block';
-    unredeemedStudentsContainer.style.display = 'none';  // Hide unredeemed container
+    unredeemedStudentsContainer.style.display = 'none';
 
     // 載入達成換領條件的學生名單
     await loadAchievedStudentsList();
@@ -133,9 +145,9 @@ function initStatsPage() {
     // 切換頁籤樣式
     unredeemedTab.classList.add('active');
     statsTab.classList.remove('active');
-    achievedTab.classList.remove('active');  // Remove active from achieved tab
+    achievedTab.classList.remove('active');
     statsContainer.style.display = 'none';
-    achievedStudentsContainer.style.display = 'none';  // Hide achieved container
+    achievedStudentsContainer.style.display = 'none';
     unredeemedStudentsContainer.style.display = 'block';
 
     // 載入未補領禮物的學生名單
@@ -235,22 +247,26 @@ function initStatsPage() {
       unredeemedStudentsContainer.style.display = 'none';
     }
 
-    // 暫時禁用卡片點擊
-    achievedCard.onclick = null;
-    achievedCard.style.cursor = 'default';
-    achievedCard.title = '';
-
     try {
       const stats = await getStats(email, className);
+      
+      // 普通統計數據
       document.getElementById('totalRecords').textContent = stats.totalRecords;
       document.getElementById('achievedStudents').textContent = stats.achievedStudents;
       document.getElementById('redeemedCount').textContent = stats.redeemedCount;
       document.getElementById('displayClass').textContent = stats.class === '*' ? '全部' : stats.class;
-
-      // 移除達成卡片的連結，因為功能重複
-      achievedCard.onclick = null;
-      achievedCard.style.cursor = 'default';
-      achievedCard.title = '';
+      
+      // 計算未換領數量
+      const outstandingCount = stats.totalRecords - stats.redeemedCount;
+      document.getElementById('outstandingCount').textContent = outstandingCount;
+      
+      // 獲取全局統計數據
+      const globalStats = await getGlobalRedemptionStats(email);
+      document.getElementById('globalRedeemedCount').textContent = globalStats.redeemedCount;
+      
+      // 計算全局未換領數量
+      const globalOutstandingCount = globalStats.outstandingCount;
+      document.getElementById('globalOutstandingCount').textContent = globalOutstandingCount;
 
       messageEl.innerHTML = '';
       
@@ -270,11 +286,6 @@ function initStatsPage() {
       }
     } catch (err) {
       messageEl.innerHTML = `<span style="color:red">載入失敗：${err.message}</span>`;
-      
-      // 錯誤時確保卡片不可點
-      achievedCard.onclick = null;
-      achievedCard.style.cursor = 'default';
-      achievedCard.title = '';
     }
   }
 
@@ -286,14 +297,6 @@ function initStatsPage() {
       return;
     }
 
-    // 根據班級和學生姓名排序
-    students.sort((a, b) => {
-      if (a.class !== b.class) {
-        return a.class.localeCompare(b.class, 'zh-TW');
-      }
-      return a.studentName.localeCompare(b.studentName, 'zh-TW');
-    });
-
     // 按班級分組學生
     const groupedStudents = {};
     students.forEach(student => {
@@ -303,24 +306,26 @@ function initStatsPage() {
       groupedStudents[student.class].push(student);
     });
 
-    // 生成HTML，按班級分組顯示
+    // 生成HTML
     let html = '';
     for (const className in groupedStudents) {
       const classStudents = groupedStudents[className];
+      classStudents.sort((a, b) => a.studentName.localeCompare(b.studentName, 'zh-TW'));
+      
       html += `
         <div class="class-section">
           <div class="class-name">${className} - 達成目標學生 (${classStudents.length} 人)</div>
           ${classStudents.map(student => `
-            <div class="achieved-student-item">
-              <div class="achieved-student-header">
+            <div class="student-item">
+              <div class="student-header">
                 <span>${student.studentName}</span>
                 <span class="redemption-badge ${student.isFullyRedeemed ? 'completed' : 'pending'}">
                   ${student.isFullyRedeemed ? '✓' : '○'}
                   <span class="tooltip">${student.redemptionStatus} (${student.isFullyRedeemed ? '已完成' : '未完成'})</span>
                 </span>
               </div>
-              <div class="achieved-student-details">總達成次數: ${student.attendanceCount}</div>
-              ${student.attendanceDates ? `<div class="achieved-student-details">達成日期: ${student.attendanceDates.map(date => formatDate(date)).join(', ')}</div>` : ''}
+              <div class="student-details">達成次數: ${student.attendanceCount}</div>
+              ${student.attendanceDates ? `<div class="student-details">達成日期: ${student.attendanceDates.map(date => formatDate(date)).join(', ')}</div>` : ''}
             </div>
           `).join('')}
         </div>

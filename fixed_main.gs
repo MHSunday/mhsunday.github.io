@@ -677,6 +677,8 @@ function doGet(e) {
       result = getAchievedStudents(email, className);
     } else if (action === "getClassBasedPendingRedemptionReport") {
       result = getClassBasedPendingRedemptionReport(email);
+    } else if (action === "getGlobalRedemptionStats") {
+      result = getGlobalRedemptionStats(email);
     } else {
       throw new Error("未知操作");
     }
@@ -806,4 +808,43 @@ function getClassBasedPendingRedemptionReport(email) {
   }
 
   return groupedReport;
+}
+
+/**
+ * 取得全局換領統計數據
+ */
+function getGlobalRedemptionStats(email) {
+  const user = getUserRoles(email);
+  if (!user || user.role !== "admin") {
+    throw new Error("只有管理員可執行此操作");
+  }
+
+  // Use cache to avoid repeated reads
+  const cache = CacheService.getScriptCache();
+  const cacheKey = `global_redemption_stats`;
+  const cachedData = cache.get(cacheKey);
+  
+  let data;
+  if (cachedData) {
+    data = JSON.parse(cachedData);
+  } else {
+    const attendanceSS = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
+    const sheet = attendanceSS.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
+    data = sheet.getDataRange().getValues();
+    cache.put(cacheKey, JSON.stringify(data), 5 * 60); // Cache for 5 minutes
+  }
+
+  const headers = data[0];
+  const redeemedCol = headers.indexOf("已換領");
+
+  // 計算全局統計
+  const totalRecords = data.length - 1; // 減去標題行
+  const redeemedCount = data.slice(1).filter(row => row[redeemedCol] === "是").length;
+  const outstandingCount = totalRecords - redeemedCount;
+
+  return {
+    totalRecords,
+    redeemedCount,
+    outstandingCount
+  };
 }

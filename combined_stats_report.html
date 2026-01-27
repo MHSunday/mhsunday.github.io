@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>統計報表</title>
+  <title>統計報告</title>
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <style>
     body {
       font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
-      max-width: 600px;
+      max-width: 800px;
       margin: 20px auto;
       padding: 0 16px;
       background-color: #f9f9f9;
@@ -75,7 +75,7 @@
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
       gap: 16px;
       margin-top: 20px;
     }
@@ -114,6 +114,7 @@
       display: flex;
       margin-bottom: 20px;
       border-bottom: 1px solid #ddd;
+      flex-wrap: wrap;
     }
     
     .tab-btn {
@@ -124,6 +125,7 @@
       border-radius: 4px 4px 0 0;
       cursor: pointer;
       margin-right: 5px;
+      margin-bottom: 5px;
     }
     
     .tab-btn.active {
@@ -131,7 +133,7 @@
       color: white;
     }
     
-    .achieved-student-item {
+    .student-item {
       padding: 12px;
       border: 1px solid #eee;
       border-radius: 6px;
@@ -139,7 +141,7 @@
       background: white;
     }
     
-    .achieved-student-header {
+    .student-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -189,15 +191,23 @@
       opacity: 1;
     }
     
-    .achieved-student-header {
+    .student-header-text {
       font-weight: bold;
       color: #2c3e50;
       margin-bottom: 4px;
     }
     
-    .achieved-student-details {
+    .student-details {
       color: #7f8c8d;
       font-size: 14px;
+    }
+    
+    .section-title {
+      font-size: 18px;
+      margin: 20px 0 10px 0;
+      color: #2c3e50;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 5px;
     }
     
     .class-section {
@@ -213,23 +223,24 @@
       font-size: 16px;
       color: #2980b9;
       margin-bottom: 10px;
-      border-bottom: 1px solid #eee;
-      padding-bottom: 5px;
     }
     
     .unredeemed-names-list {
       word-wrap: break-word;
       line-height: 1.6;
     }
+    
+    .summary-section {
+      margin-top: 20px;
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>統計報表</h1>
+    <h1>統計報告</h1>
     <div class="nav-buttons">
       <button class="nav-btn" onclick="window.location.href='form.html'">登記</button>
       <button class="nav-btn" onclick="window.location.href='redeem.html'">補領禮物</button>
-      <button class="nav-btn" onclick="window.location.href='combined_stats_report.html'">統計報告</button>
       <button id="logoutBtn">登出</button>
     </div>
   </header>
@@ -244,7 +255,7 @@
   <!-- 頁籤切換 -->
   <div class="tabs">
     <button id="statsTab" class="tab-btn active">統計摘要</button>
-    <button id="achievedTab" class="tab-btn">達成換領條件名單</button>
+    <button id="achievedTab" class="tab-btn">達成目標名單</button>
     <button id="unredeemedTab" class="tab-btn">未補領禮物名單</button>
   </div>
 
@@ -254,17 +265,36 @@
         <div class="stat-label">總參與人次</div>
         <div id="totalRecords" class="stat-value">0</div>
       </div>
-    <div class="stat-card" id="achievedCard">
-    <div class="stat-label">達成學生人數</div>
-    <div id="achievedStudents" class="stat-value">0</div>
-    </div>
+      <div class="stat-card">
+        <div class="stat-label">達成學生人數</div>
+        <div id="achievedStudents" class="stat-value">0</div>
+      </div>
       <div class="stat-card">
         <div class="stat-label">已換領獎品</div>
         <div id="redeemedCount" class="stat-value">0</div>
       </div>
       <div class="stat-card">
+        <div class="stat-label">未換領獎品</div>
+        <div id="outstandingCount" class="stat-value">0</div>
+      </div>
+      <div class="stat-card">
         <div class="stat-label">班級</div>
         <div id="displayClass" class="stat-value">-</div>
+      </div>
+    </div>
+    
+    <!-- 全局視圖 -->
+    <div class="summary-section">
+      <h3 class="section-title">全局視圖</h3>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">已授予禮物</div>
+          <div id="globalRedeemedCount" class="stat-value">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">未授予禮物</div>
+          <div id="globalOutstandingCount" class="stat-value">0</div>
+        </div>
       </div>
     </div>
   </div>
@@ -274,11 +304,14 @@
   </div>
 
   <div id="unredeemedStudentsContainer" style="display: none; margin-top: 20px;">
+    <div id="unredeemedSummary" style="margin-bottom: 15px; padding: 10px; background-color: #f0f8ff; border-radius: 5px; display: none;">
+      <strong>未補領總數: <span id="unredeemedTotalCount">0</span> 人</strong>
+    </div>
     <div id="unredeemedStudentsList"></div>
   </div>
 
   <div id="message"></div>
 
-  <script type="module" src="./js/main-stats.js"></script>
+  <script type="module" src="./js/main-combined-stats.js"></script>
 </body>
 </html>
