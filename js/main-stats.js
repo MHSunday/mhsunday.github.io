@@ -326,7 +326,7 @@ function initStatsPage() {
                 </span>
               </div>
               <div class="achieved-student-details">總達成次數: ${student.attendanceCount}</div>
-              ${student.attendanceDates ? `<div class="achieved-student-details">達成日期: ${student.attendanceDates.map(date => formatDate(date)).join(', ')}</div>` : ''}
+              ${student.attendanceDates ? `<div class="achieved-student-details">交咭日期: ${student.attendanceDates.map(date => formatDate(date)).join(', ')}</div>` : ''}
             </div>
           `).join('')}
         </div>

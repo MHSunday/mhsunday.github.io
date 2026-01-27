@@ -88,7 +88,7 @@ function initFormPage() {
     // Validate that the selected date is a Sunday
     const dateObj = new Date(attendanceDate);
     if (dateObj.getDay() !== 0) {
-      alert("登記日期必須為星期日！");
+      alert("交咭日期必須為星期日！");
       return;
     }
 

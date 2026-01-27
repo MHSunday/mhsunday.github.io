@@ -330,7 +330,7 @@ function initCombinedStatsPage() {
                 </span>
               </div>
               <div class="student-details">達成次數: ${student.attendanceCount}</div>
-              ${student.attendanceDates ? `<div class="student-details">達成日期: ${student.attendanceDates.map(date => formatDate(date)).join(', ')}</div>` : ''}
+              ${student.attendanceDates ? `<div class="student-details">交咭日期: ${student.attendanceDates.map(date => formatDate(date)).join(', ')}</div>` : ''}
             </div>
           `).join('')}
         </div>
