@@ -35,14 +35,6 @@
       
       <form id="attendanceForm" class="space-y-5">
         
-        <!-- 班級選擇 -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">班級</label>
-          <select id="classSelect" class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border" disabled>
-            <option>載入中…</option>
-          </select>
-        </div>
-
         <!-- 學生選擇 -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">學生姓名</label>
@@ -59,19 +51,11 @@
           </div>
           <!-- 隱藏的輸入框用於保存選擇的學生姓名 -->
           <input type="hidden" id="selectedStudent">
+          <!-- 隱藏的輸入框用於保存學生的班級 -->
+          <input type="hidden" id="studentClass">
         </div>
 
-        <hr class="border-gray-100">
-
-        <!-- 補領模式開關 -->
-        <div class="flex items-center bg-orange-50 p-3 rounded-lg border border-orange-100">
-          <input type="checkbox" id="supplementMode" class="h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
-          <label for="supplementMode" class="ml-2 block text-sm font-bold text-orange-800">
-            補領登記模式 <span class="text-xs font-normal block text-orange-600">(更新舊紀錄的換領狀態)</span>
-          </label>
-        </div>
-
-        <!-- 參與日期 (不論模式皆需顯示，以便定位紀錄) -->
+        <!-- 參與日期 -->
         <div id="dateInputGroup">
           <label class="block text-sm font-medium text-gray-700 mb-1">登記日期（星期日）</label>
           <input type="date" id="dateInput" class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border">

@@ -11,13 +11,12 @@ if (!document.getElementById('attendanceForm')) {
 }
 
 function initFormPage() {
-  const classSelect = document.getElementById('classSelect');
   const studentInput = document.getElementById('studentInput');
   const studentSuggestions = document.getElementById('studentSuggestions');
   const selectedStudent = document.getElementById('selectedStudent');
+  const studentClass = document.getElementById('studentClass');  // Hidden input for student's class
   const dateInputGroup = document.getElementById('dateInputGroup');
   const dateInput = document.getElementById('dateInput');
-  const supplementMode = document.getElementById('supplementMode');
   const redeemedCheck = document.getElementById('redeemedCheck');
   const redeemDateLabel = document.getElementById('redeemDateLabel');
   const submitBtn = document.getElementById('submitBtn');
@@ -26,8 +25,8 @@ function initFormPage() {
 
   // 安全檢查
  if (!(
-    classSelect && studentInput && studentSuggestions && selectedStudent && dateInputGroup && dateInput &&
-    supplementMode && redeemedCheck && redeemDateLabel && submitBtn && redeemDateInput
+    studentInput && studentSuggestions && selectedStudent && dateInputGroup && dateInput &&
+    redeemedCheck && redeemDateLabel && submitBtn && redeemDateInput
   )) {
     console.error('main-form.js: 缺少必要 DOM 元素');
     return;
@@ -40,38 +39,22 @@ function initFormPage() {
   // 登出
   document.getElementById('logoutBtn').onclick = logout;
 
-  /**
-   * 補領模式切換邏輯
-   * 新架構下：補領是為了「更新」之前的紀錄，所以「參與日期」依然需要，用來定位哪一天的紀錄要補領。
-   */
-  supplementMode.onchange = () => {
-    if (supplementMode.checked) {
-      // 補領模式
-      submitBtn.textContent = '更新補領狀態';
-      submitBtn.classList.replace('bg-blue-600', 'bg-orange-600');
-      
-      // 強制勾選已換領並顯示日期
-      redeemedCheck.checked = true;
-      redeemedCheck.disabled = true; // 補領模式下必然是已換領
-      redeemDateLabel.style.display = 'flex';
-      redeemDateInput.setAttribute('required', 'required');
-      
-      // 提示使用者
-      messageEl.innerHTML = '<span style="color:orange">提示：補領模式將更新該生在指定日期的換領狀態。</span>';
-    } else {
-      // 普通模式
-      submitBtn.textContent = '登記';
-      submitBtn.classList.replace('bg-orange-600', 'bg-blue-600');
-      
-      redeemedCheck.checked = false;
-      redeemedCheck.disabled = false;
-      redeemDateLabel.style.display = 'none';
-      redeemDateInput.removeAttribute('required');
-      messageEl.innerHTML = '';
-    }
-  };
+  // Set default date to today or the most recent Sunday
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 is Sunday
+  let defaultDate = new Date(today);
+  
+  if (dayOfWeek !== 0) { // If today is not Sunday
+    // Calculate the most recent Sunday
+    const daysToSubtract = dayOfWeek === 0 ? 0 : dayOfWeek;
+    defaultDate.setDate(today.getDate() - daysToSubtract);
+  }
+  
+  // Format date as YYYY-MM-DD
+  const formattedDate = defaultDate.toISOString().split('T')[0];
+  dateInput.value = formattedDate;
 
-  // 切換「已換領」勾選框 (僅在非補領模式下有效)
+  // 切換「已換領」勾選框
   redeemedCheck.onchange = function () {
     if (this.checked) {
       redeemDateLabel.style.display = 'flex';
@@ -92,8 +75,8 @@ function initFormPage() {
     }
 
     // 基礎資料收集
-    const className = classSelect.value;
     const studentName = selectedStudent.value || studentInput.value;
+    const className = studentClass.value; // Get class from student selection
     const attendanceDate = dateInput.value;
     const redeemDate = redeemDateInput.value;
 
@@ -102,39 +85,29 @@ function initFormPage() {
       return;
     }
 
+    // Validate that the selected date is a Sunday
+    const dateObj = new Date(attendanceDate);
+    if (dateObj.getDay() !== 0) {
+      alert("登記日期必須為星期日！");
+      return;
+    }
+
     submitBtn.disabled = true;
     messageEl.innerHTML = '處理中...';
 
     try {
-      if (supplementMode.checked) {
-        // --- 動作：更新補領狀態 ---
-        if (!redeemDate) throw new Error("補領必須填寫換領日期");
-        
-        const payload = {
-          action: "updateRedeemStatus", // 對應後端 doPost 的判斷
-          email: user.email,
-          className,
-          studentName,
-          attendanceDate,
-          redeemDate
-        };
+      // --- 動作：新出席登記 ---
+      const payload = {
+        className,
+        studentName,
+        attendanceDate,
+        redeemed: redeemedCheck.checked,
+        redeemDate: redeemedCheck.checked ? redeemDate : '',
+        email: user.email
+      };
 
-        await updateRedeemStatus(payload);
-        messageEl.innerHTML = '<span style="color:green">✓ 補領狀態更新成功！</span>';
-      } else {
-        // --- 動作：新出席登記 ---
-        const payload = {
-          className,
-          studentName,
-          attendanceDate,
-          redeemed: redeemedCheck.checked,
-          redeemDate: redeemedCheck.checked ? redeemDate : '',
-          email: user.email
-        };
-
-        await recordAttendance(payload);
-        messageEl.innerHTML = '<span style="color:green">✓ 出席登記成功！</span>';
-      }
+      await recordAttendance(payload);
+      messageEl.innerHTML = '<span style="color:green">✓ 出席登記成功！</span>';
       
       // 成功後重置部分表單
       resetFormAfterSuccess();
@@ -146,48 +119,39 @@ function initFormPage() {
   };
 
   function resetFormAfterSuccess() {
-    // 保留班級與學生，方便連續輸入不同日期的紀錄
-    dateInput.value = '';
-    redeemDateInput.value = '';
-    if (!supplementMode.checked) {
-      redeemedCheck.checked = false;
-      redeemDateLabel.style.display = 'none';
+    // Reset date to default (today or most recent Sunday) but keep student selection
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 is Sunday
+    let defaultDate = new Date(today);
+    
+    if (dayOfWeek !== 0) { // If today is not Sunday
+      // Calculate the most recent Sunday
+      const daysToSubtract = dayOfWeek === 0 ? 0 : dayOfWeek;
+      defaultDate.setDate(today.getDate() - daysToSubtract);
     }
+    
+    // Format date as YYYY-MM-DD
+    const formattedDate = defaultDate.toISOString().split('T')[0];
+    dateInput.value = formattedDate;
+    
+    redeemDateInput.value = '';
+    redeemedCheck.checked = false;
+    redeemDateLabel.style.display = 'none';
   }
 
-  // 監聽權限載入完成 (保持原樣)
+  // 監聽權限載入完成
   onRoleLoaded(async (role) => {
     const user = getCurrentUser();
     if (!user) return;
 
     try {
       // 不使用 updateStatus，直接設置載入狀態
-      classSelect.innerHTML = '<option>載入中…</option>';
-      classSelect.disabled = true;
       studentInput.disabled = true;
       studentInput.placeholder = '載入中…';
       submitBtn.disabled = true;
       
-      const classes = await getAllClasses();
-
+      // For admin, load all students; for teacher, load their class students
       if (role.role === 'admin') {
-        classSelect.innerHTML = '';
-        // 管理員默認選項："所有班級"
-        const allClassesOption = document.createElement('option');
-        allClassesOption.value = '*';
-        allClassesOption.textContent = '所有班級';
-        classSelect.appendChild(allClassesOption);
-        
-        // 添加所有具體班級選項
-        classes.forEach(cls => {
-          const opt = document.createElement('option');
-          opt.value = cls;
-          opt.textContent = cls;
-          classSelect.appendChild(opt);
-        });
-        classSelect.value = '*'; // 預設選擇"所有班級"
-        classSelect.disabled = false;
-        
         // 預加載所有班級的學生數據
         try {
           const user = getCurrentUser();
@@ -220,14 +184,8 @@ function initFormPage() {
           studentInput.disabled = false;
         }, 10);
       } else if (role.role === 'teacher') {
-        classSelect.innerHTML = '';
-        // 教師只能看到自己的班級，默認選中
+        // 教師只能看到自己的班級
         const cls = role.classes[0];
-        const opt = document.createElement('option');
-        opt.value = cls;
-        opt.textContent = cls;
-        classSelect.appendChild(opt);
-        classSelect.disabled = true;
         
         // 加載教師班級的學生
         await loadStudentsForClass(cls);
@@ -246,46 +204,6 @@ function initFormPage() {
       }, 10);
     } catch (err) {
       messageEl.innerHTML = `<span style="color:red">初始化失敗：${err.message}</span>`;
-    }
- });
-  
-  // 班級切換
-  classSelect.addEventListener('change', async () => {
-    if (classSelect.value) {
-      const role = getUserRole();
-      if (classSelect.value === '*') {
-        // 選擇"所有班級"：加載所有學生
-        try {
-          const user = getCurrentUser();
-          allStudents = await getAllStudents(user.email);
-        } catch (err) {
-          console.error('載入所有學生失敗:', err);
-          // 回退到逐個載入班級學生的方式
-          const allClassStudents = [];
-          const classes = await getAllClasses();
-          for (const cls of classes) {
-            try {
-              const classStudents = await getStudentsByClass(cls);
-              allClassStudents.push(...classStudents.map(student => ({
-                name: typeof student === 'string' ? student : student.name,
-                class: cls,
-                className: typeof student === 'object' ? student.className : null // Include 班名 if available
-              })));
-            } catch (err) {
-              console.error(`載入班級 ${cls} 學生失敗:`, err);
-            }
-          }
-          allStudents = allClassStudents;
-        }
-      } else {
-        // 選擇特定班級：只加載該班級的學生
-        const classStudents = await getStudentsByClass(classSelect.value);
-        allStudents = classStudents.map(student => ({
-          name: typeof student === 'string' ? student : student.name,
-          class: classSelect.value,
-          className: typeof student === 'object' ? student.className : null // Include 班名 if available
-        }));
-      }
     }
   });
   
@@ -344,32 +262,16 @@ function initFormPage() {
   function autocompleteSearch() {
     const inputValue = studentInput.value.toLowerCase();
     
-    // 根據當前班級選擇過濾學生
+    // Filter all students based on input
     let filteredStudents = [];
-    if (classSelect.value === '*') {
-      // "所有班級"選項：顯示所有學生
-      if (!inputValue) {
-        // 如果輸入為空，顯示所有學生
-        filteredStudents = allStudents;
-      } else {
-        // 如果有輸入，進行過濾
-        filteredStudents = allStudents.filter(student =>
-          student && student.name && student.name.toLowerCase().includes(inputValue)
-        );
-      }
+    if (!inputValue) {
+      // 如果輸入為空，顯示所有學生
+      filteredStudents = allStudents;
     } else {
-      // 特定班級：只顯示該班級的學生
-      if (!inputValue) {
-        // 如果輸入為空，顯示該班級的所有學生
-        filteredStudents = allStudents.filter(student =>
-          student && student.name && student.class === classSelect.value
-        );
-      } else {
-        // 如果有輸入，進行過濾
-        filteredStudents = allStudents.filter(student =>
-          student && student.name && student.class === classSelect.value && student.name.toLowerCase().includes(inputValue)
-        );
-      }
+      // 如果有輸入，進行過濾
+      filteredStudents = allStudents.filter(student =>
+        student && student.name && student.name.toLowerCase().includes(inputValue)
+      );
     }
     
     showSuggestions(filteredStudents);
@@ -510,10 +412,8 @@ function initFormPage() {
   });
 
   function updateStatus(text, disableSubmit = false) {
-    classSelect.innerHTML = `<option>${text}</option>`;
-    classSelect.disabled = true;
     studentInput.disabled = true;
-    studentInput.placeholder = '請先選擇班級';
+    studentInput.placeholder = text;
     selectedStudent.value = '';
     hideSuggestions();
     if (disableSubmit) submitBtn.disabled = true;
