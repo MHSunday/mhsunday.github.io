@@ -33,7 +33,7 @@ function getAllClasses() {
 }
 
 /**
- * 取得某班學生名單（僅「類別=學生」）
+ * 取得某班學生名單（僅「類別=學生」），同時獲取學生的班名
  */
 function getStudentsByClass(className) {
   try {
@@ -41,12 +41,20 @@ function getStudentsByClass(className) {
     const sheet = ss.getSheetByName(className);
     if (!sheet) return [];
     const data = sheet.getDataRange().getValues();
-    const nameCol = data[0].indexOf("姓名");
+    const serialCol = data[0].indexOf("序號");
     const typeCol = data[0].indexOf("類別");
+    const nameCol = data[0].indexOf("姓名");
+    const classNameCol = data[0].indexOf("班名"); // 新增班名列
+    
     const students = [];
     for (let i = 1; i < data.length; i++) {
       if (data[i][typeCol] === "學生") {
-        students.push(data[i][nameCol]);
+        students.push({
+          serial: data[i][serialCol],
+          name: data[i][nameCol],
+          className: data[i][classNameCol], // 班名字段
+          category: className // sheet name as class category
+        });
       }
     }
     return students;
@@ -56,9 +64,41 @@ function getStudentsByClass(className) {
   }
 }
 
+/**
+ * 根據班級和學生姓名獲取學生信息
+ */
+function getStudentInfo(className, studentName) {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.STUDENT_SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(className);
+    if (!sheet) return null;
+    const data = sheet.getDataRange().getValues();
+    const serialCol = data[0].indexOf("序號");
+    const typeCol = data[0].indexOf("類別");
+    const nameCol = data[0].indexOf("姓名");
+    const classNameCol = data[0].indexOf("班名"); // 班名列
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][typeCol] === "學生" && data[i][nameCol] === studentName) {
+        return {
+          serial: data[i][serialCol],
+          name: data[i][nameCol],
+          className: data[i][classNameCol], // 班名字段
+          category: className // sheet name as class category
+        };
+      }
+    }
+    return null;
+  } catch (e) {
+    console.error("Error in getStudentInfo:", e);
+    return null;
+  }
+}
+
 
 /**
- * 取得所有學生及其班級（僅限 role="admin"）
+ * 取得所有學生及其班級（僅限 role="admin"），包含學生的班名
+ * @returns {Array} 學生列表，格式為 [{class: '班級類別', name: '學生姓名', className: '班名'}, ...]
  */
 function getAllStudents(email) {
   const user = getUserRoles(email);
@@ -71,10 +111,11 @@ function getAllStudents(email) {
 
   for (const className of classes) {
     const students = getStudentsByClass(className);
-    for (const name of students) {
+    for (const student of students) {
       allStudents.push({
-        class: className,
-        name: name
+        class: student.category, // class category (sheet name)
+        name: student.name,
+        className: student.className // actual class name from 班名 column
       });
     }
   }
@@ -102,9 +143,21 @@ function getAttendanceDetails(email, className) {
     throw new Error("無權限");
   }
 
-  const attendanceSS = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
-  const sheet = attendanceSS.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
- const data = sheet.getDataRange().getValues();
+  // Use cache to avoid repeated reads
+  const cache = CacheService.getScriptCache();
+  const cacheKey = `attendance_details_${className}`;
+  const cachedData = cache.get(cacheKey);
+  
+  let data;
+  if (cachedData) {
+    data = JSON.parse(cachedData);
+  } else {
+    const attendanceSS = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
+    const sheet = attendanceSS.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
+    data = sheet.getDataRange().getValues();
+    cache.put(cacheKey, JSON.stringify(data), 5 * 60); // Cache for 5 minutes
+  }
+
   const headers = data[0];
   
   const classCol = headers.indexOf("班級");
@@ -112,6 +165,8 @@ function getAttendanceDetails(email, className) {
   const dateCol = headers.indexOf("參與日期");
   const redeemedCol = headers.indexOf("已換領");
   const redeemDateCol = headers.indexOf("換領日期");
+  // Check if there's a 班名 column (might be the 8th column if added)
+  const classNameCol = headers.length > 7 ? 7 : -1; // Assuming 班名 is added as 8th column (index 7)
 
   let filtered = data.slice(1);
   if (className !== "*") {
@@ -122,7 +177,8 @@ function getAttendanceDetails(email, className) {
     studentName: row[studentCol],
     attendanceDate: row[dateCol],
     redeemed: row[redeemedCol] === "是",
-    redeemDate: row[redeemDateCol] || ""
+    redeemDate: row[redeemDateCol] || "",
+    studentClassName: classNameCol !== -1 ? row[classNameCol] : undefined
   }));
 }
 
@@ -135,15 +191,29 @@ function getUnredeemedRecords(email) {
     throw new Error("只有管理員可執行此操作");
   }
 
-  const attendanceSS = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
-  const sheet = attendanceSS.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
-  const data = sheet.getDataRange().getValues();
+  // Use cache to avoid repeated reads
+  const cache = CacheService.getScriptCache();
+  const cacheKey = `unredeemed_records`;
+  const cachedData = cache.get(cacheKey);
+  
+  let data;
+  if (cachedData) {
+    data = JSON.parse(cachedData);
+  } else {
+    const attendanceSS = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
+    const sheet = attendanceSS.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
+    data = sheet.getDataRange().getValues();
+    cache.put(cacheKey, JSON.stringify(data), 5 * 60); // Cache for 5 minutes
+  }
+
   const headers = data[0];
   
   const classCol = headers.indexOf("班級");
   const studentCol = headers.indexOf("學生姓名");
   const dateCol = headers.indexOf("登記日期");
   const redeemedCol = headers.indexOf("已換領");
+  // Check if there's a 班名 column (might be the 8th column if added)
+  const classNameCol = headers.length > 7 ? 7 : -1; // Assuming 班名 is added as 8th column (index 7)
 
   const unredeemedRecords = [];
   for (let i = 1; i < data.length; i++) {
@@ -151,7 +221,8 @@ function getUnredeemedRecords(email) {
       unredeemedRecords.push({
         class: data[i][classCol],
         studentName: data[i][studentCol],
-        attendanceDate: data[i][dateCol]
+        attendanceDate: data[i][dateCol],
+        studentClassName: classNameCol !== -1 ? data[i][classNameCol] : undefined
       });
     }
  }
@@ -168,9 +239,21 @@ function batchUpdateRedeemStatus(records, email) {
     throw new Error("只有管理員可執行此操作");
   }
 
-  const attendanceSS = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
-  const sheet = attendanceSS.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
-  const data = sheet.getDataRange().getValues();
+  // Use cache to avoid repeated reads
+  const cache = CacheService.getScriptCache();
+  const cacheKey = `batch_update_data`;
+  const cachedData = cache.get(cacheKey);
+  
+  let data;
+  if (cachedData) {
+    data = JSON.parse(cachedData);
+  } else {
+    const attendanceSS = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
+    const sheet = attendanceSS.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
+    data = sheet.getDataRange().getValues();
+    cache.put(cacheKey, JSON.stringify(data), 2 * 60); // Cache for 2 minutes (shorter for updates)
+  }
+
   const headers = data[0];
 
   const classCol = headers.indexOf("班級");
@@ -178,6 +261,8 @@ function batchUpdateRedeemStatus(records, email) {
   const dateCol = headers.indexOf("登記日期");
   const redeemedCol = headers.indexOf("已換領");
   const redeemDateCol = headers.indexOf("換領日期");
+  // Check if there's a 班名 column (might be the 8th column if added)
+  const classNameCol = headers.length > 7 ? 7 : -1; // Assuming 班名 is added as 8th column (index 7)
 
   let updatedCount = 0;
   const errors = [];
@@ -197,6 +282,8 @@ function batchUpdateRedeemStatus(records, email) {
         rowDate === targetDate
       ) {
         // 更新換領狀態
+        const attendanceSS = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
+        const sheet = attendanceSS.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
         sheet.getRange(i + 1, redeemedCol + 1).setValue("是");
         sheet.getRange(i + 1, redeemDateCol + 1).setValue(redeemDate);
         updatedCount++;
@@ -210,8 +297,14 @@ function batchUpdateRedeemStatus(records, email) {
     }
  }
 
-  return { 
-    success: true, 
+  // Invalidate cache after update
+  cache.remove(`pending_redemption_report`);
+  cache.remove(`unredeemed_records`);
+  cache.remove(`achieved_students_*`);
+  cache.remove(`stats_all`);
+  
+  return {
+    success: true,
     updatedCount: updatedCount,
     errors: errors
   };
@@ -229,14 +322,28 @@ function getAchievedStudents(email, requestedClass = '*') {
     throw new Error("無權限");
   }
 
-  const attendanceSS = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
-  const sheet = attendanceSS.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
-  const data = sheet.getDataRange().getValues();
+  // Use cache to avoid repeated reads
+  const cache = CacheService.getScriptCache();
+  const cacheKey = `achieved_students_${requestedClass}`;
+  const cachedData = cache.get(cacheKey);
+  
+  let data;
+  if (cachedData) {
+    data = JSON.parse(cachedData);
+  } else {
+    const attendanceSS = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
+    const sheet = attendanceSS.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
+    data = sheet.getDataRange().getValues();
+    cache.put(cacheKey, JSON.stringify(data), 5 * 60); // Cache for 5 minutes
+  }
+
   const headers = data[0];
   
   const classCol = headers.indexOf("班級");
   const studentCol = headers.indexOf("學生姓名");
   const dateCol = headers.indexOf("登記日期");
+  // Check if there's a 班名 column (might be the 8th column if added)
+  const classNameCol = headers.length > 7 ? 7 : -1; // Assuming 班名 is added as 8th column (index 7)
   
   let filteredData = data.slice(1);
   if (user.role === "teacher") {
@@ -254,11 +361,13 @@ function getAchievedStudents(email, requestedClass = '*') {
     const studentName = row[studentCol];
     const attendanceDate = row[dateCol];
     const isRedeemed = row[redeemedCol] === "是";
+    const studentClassName = classNameCol !== -1 ? row[classNameCol] : undefined;
     
     if (!studentAttendanceMap[studentName]) {
       studentAttendanceMap[studentName] = {
         class: className,
         studentName: studentName,
+        studentClassName: studentClassName, // Add the student's class name
         attendanceCount: 0,
         attendanceDates: [],
         redeemedCount: 0  // 追踪已換領次數
@@ -308,9 +417,21 @@ function getStats(email, requestedClass) {
   const user = getUserRoles(email);
   if (!user) throw new Error("未授權");
 
-  const attendanceSS = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
-  const sheet = attendanceSS.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
-  const data = sheet.getDataRange().getValues();
+  // Use cache to avoid repeated reads
+  const cache = CacheService.getScriptCache();
+  const cacheKey = `stats_${requestedClass || 'all'}`;
+  const cachedData = cache.get(cacheKey);
+  
+  let data;
+  if (cachedData) {
+    data = JSON.parse(cachedData);
+  } else {
+    const attendanceSS = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
+    const sheet = attendanceSS.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
+    data = sheet.getDataRange().getValues();
+    cache.put(cacheKey, JSON.stringify(data), 5 * 60); // Cache for 5 minutes
+  }
+
   const headers = data[0];
   const classCol = headers.indexOf("班級");
   const studentCol = headers.indexOf("學生姓名");
@@ -352,13 +473,28 @@ function recordAttendance(payload) {
     throw new Error("勾選已換領時，必須填寫換領日期");
  }
 
-  const attendanceSS = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
-  const sheet = attendanceSS.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
-  const data = sheet.getDataRange().getValues();
+  // 3. Get the student's 班名 from the student sheet
+  const studentData = getStudentInfo(className, studentName);
+  const studentClassName = studentData ? studentData.className : '';
+
+  // Use cache to avoid repeated reads
+  const cache = CacheService.getScriptCache();
+  const cacheKey = `record_attendance_data`;
+  const cachedData = cache.get(cacheKey);
+  
+  let data;
+  if (cachedData) {
+    data = JSON.parse(cachedData);
+  } else {
+    const attendanceSS = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
+    const sheet = attendanceSS.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
+    data = sheet.getDataRange().getValues();
+    cache.put(cacheKey, JSON.stringify(data), 2 * 60); // Cache for 2 minutes (shorter for updates)
+  }
 
  // 使用全局的 normalizeDate 函數
 
-  // 3. Check for duplicate: same class, student, and attendance date
+  // 4. Check for duplicate: same class, student, and attendance date
   const exists = data.slice(1).some(row => {
     const rowClass = (row[0] || "").toString().trim();
     const rowStudent = (row[1] || "").toString().trim();
@@ -375,16 +511,28 @@ function recordAttendance(payload) {
     throw new Error("該學生在此日期已有登記紀錄，請勿重複登記。");
   }
 
+  // Add the record to the sheet
+  const attendanceSS = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
+  const sheet = attendanceSS.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
   const timestamp = new Date().toISOString();
   sheet.appendRow([
-    className,
-    studentName,
-    attendanceDate, // keep as string for consistency
-    redeemed ? "是" : "否",
-    redeemDate || "",
-    email,
-    timestamp
+    className,           // 班級
+    studentName,         // 學生姓名
+    attendanceDate,      // 登記日期
+    redeemed ? "是" : "否", // 已換領
+    redeemDate || "",    // 換領日期
+    email,               // 登記者Email
+    timestamp,           // 登記時間
+    studentClassName     // 新增：學生的班名 (從學生表獲取)
   ]);
+
+  // Invalidate cache after update
+  const cacheToUpdate = CacheService.getScriptCache();
+  cacheToUpdate.remove(`pending_redemption_report`);
+  cacheToUpdate.remove(`unredeemed_records`);
+  cacheToUpdate.remove(`achieved_students_*`);
+  cacheToUpdate.remove(`stats_all`);
+  cacheToUpdate.remove(`attendance_details_*`);
 
   return { success: true };
 }
@@ -405,9 +553,21 @@ function updateRedeemStatus(payload) {
   const user = getUserRoles(email);
   if (!user) throw new Error("未授權: " + email);
   
-  const ss = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
-  const sheet = ss.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
-  const data = sheet.getDataRange().getValues();
+  // Use cache to avoid repeated reads
+  const cache = CacheService.getScriptCache();
+  const cacheKey = `update_redeem_status_data`;
+  const cachedData = cache.get(cacheKey);
+  
+  let data;
+  if (cachedData) {
+    data = JSON.parse(cachedData);
+  } else {
+    const ss = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
+    data = sheet.getDataRange().getValues();
+    cache.put(cacheKey, JSON.stringify(data), 2 * 60); // Cache for 2 minutes (shorter for updates)
+  }
+
   const headers = data[0];
 
   const classCol = headers.indexOf("班級");
@@ -442,8 +602,17 @@ function updateRedeemStatus(payload) {
   }
 
   // 3. 更新欄位
+  const ss = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
   sheet.getRange(rowIndex, redeemedCol + 1).setValue("是");
   sheet.getRange(rowIndex, redeemDateCol + 1).setValue(redeemDate);
+  
+  // Invalidate cache after update
+  const cacheToUpdate = CacheService.getScriptCache();
+  cacheToUpdate.remove(`pending_redemption_report`);
+  cacheToUpdate.remove(`unredeemed_records`);
+  cacheToUpdate.remove(`achieved_students_*`);
+  cacheToUpdate.remove(`stats_all`);
   
   return { success: true, updatedRow: rowIndex };
 }
@@ -506,6 +675,8 @@ function doGet(e) {
       result = getUnredeemedRecords(email);
     } else if (action === "getAchievedStudents") {
       result = getAchievedStudents(email, className);
+    } else if (action === "getClassBasedPendingRedemptionReport") {
+      result = getClassBasedPendingRedemptionReport(email);
     } else {
       throw new Error("未知操作");
     }
@@ -572,4 +743,67 @@ function doPost(e) {
       .createTextOutput(JSON.stringify({ error: err.message }))
       .setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+/**
+ * 取得按班名分組的待兌換學生報告
+ * 返回按學生班名 (className) 分組的未兌換獎勵記錄
+ */
+function getClassBasedPendingRedemptionReport(email) {
+  const user = getUserRoles(email);
+  if (!user || user.role !== "admin") {
+    throw new Error("只有管理員可執行此操作");
+  }
+
+  // Use cache to avoid repeated reads
+  const cache = CacheService.getScriptCache();
+  const cacheKey = `pending_redemption_report`;
+  const cachedData = cache.get(cacheKey);
+  
+  let data;
+  if (cachedData) {
+    data = JSON.parse(cachedData);
+  } else {
+    const attendanceSS = SpreadsheetApp.openById(CONFIG.ATTENDANCE_SPREADSHEET_ID);
+    const sheet = attendanceSS.getSheetByName(CONFIG.ATTENDANCE_SHEET_NAME);
+    data = sheet.getDataRange().getValues();
+    cache.put(cacheKey, JSON.stringify(data), 5 * 60); // Cache for 5 minutes
+  }
+
+  const headers = data[0];
+  
+  const classCol = headers.indexOf("班級");
+  const studentCol = headers.indexOf("學生姓名");
+  const dateCol = headers.indexOf("登記日期");
+  const redeemedCol = headers.indexOf("已換領");
+  // Check if there's a 班名 column (might be the 8th column if added)
+  const classNameCol = headers.length > 7 ? 7 : -1; // Assuming 班名 is added as 8th column (index 7)
+
+  // Group unredeemed records by student's class name (班名)
+  const groupedReport = {};
+
+  for (let i = 1; i < data.length; i++) {
+    // Only include records that are not yet redeemed
+    if (data[i][redeemedCol] !== "是") {
+      const className = classNameCol !== -1 ? data[i][classNameCol] : 'Unknown'; // Use 班名 if available, otherwise 'Unknown'
+      const classCategory = data[i][classCol]; // The class category (sheet name)
+      const studentName = data[i][studentCol];
+      const attendanceDate = data[i][dateCol];
+      
+      // Initialize the class group if it doesn't exist
+      if (!groupedReport[className]) {
+        groupedReport[className] = [];
+      }
+      
+      // Add the student record to the appropriate class group
+      groupedReport[className].push({
+        classCategory: classCategory, // Original class category from sheet name
+        studentName: studentName,
+        attendanceDate: attendanceDate,
+        className: className // Student's class name (班名)
+      });
+    }
+  }
+
+  return groupedReport;
 }

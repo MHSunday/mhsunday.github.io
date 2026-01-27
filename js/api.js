@@ -34,7 +34,10 @@ export async function getStudentsByClass(className) {
   const res = await fetch(url);
   const data = await res.json();
   if (data.error) throw new Error(data.error);
-  return data;
+  
+  // If the backend returns objects instead of just names, handle appropriately
+  // Return the raw data as the new structure contains additional fields
+  return Array.isArray(data) ? data : [];
 }
 
 // ==========================================
@@ -96,7 +99,7 @@ export async function recordAttendance(data) {
 /**
  * 獲取所有學生及其班級 (僅限管理員)
  * @param {string} email - 用戶郵箱
- * @returns {Array} 學生列表，格式為 [{class: '班級名', name: '學生名'}, ...]
+ * @returns {Array} 學生列表，格式為 [{class: '班級名', name: '學生名', className: '班名'}, ...]
  */
 export async function getAllStudents(email) {
   if (!email) throw new Error('必須提供使用者 email');
@@ -219,6 +222,21 @@ export async function getAchievedStudents(email, className = '*') {
    if (!email) throw new Error('必須提供使用者 email');
    
    const url = `${API_URL}?action=getAchievedStudents&email=${encodeURIComponent(email)}&class=${encodeURIComponent(className)}`;
+   const res = await fetch(url);
+   const data = await res.json();
+   if (data.error) throw new Error(data.error);
+   return data;
+ }
+ 
+ /**
+  * 獲取按班名分組的待兌換學生報告
+  * @param {string} email - 用戶郵箱
+  * @returns {Object} 按班名分組的待兌換學生報告
+  */
+ export async function getClassBasedPendingRedemptionReport(email) {
+   if (!email) throw new Error('必須提供使用者 email');
+   
+   const url = `${API_URL}?action=getClassBasedPendingRedemptionReport&email=${encodeURIComponent(email)}`;
    const res = await fetch(url);
    const data = await res.json();
    if (data.error) throw new Error(data.error);

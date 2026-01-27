@@ -200,7 +200,11 @@ function initFormPage() {
           for (const cls of classes) {
             try {
               const classStudents = await getStudentsByClass(cls);
-              allClassStudents.push(...classStudents.map(student => ({ name: student, class: cls })));
+              allClassStudents.push(...classStudents.map(student => ({
+                name: typeof student === 'string' ? student : student.name,
+                class: cls,
+                className: typeof student === 'object' ? student.className : null // Include 班名 if available
+              })));
             } catch (err) {
               console.error(`載入班級 ${cls} 學生失敗:`, err);
             }
@@ -262,7 +266,11 @@ function initFormPage() {
           for (const cls of classes) {
             try {
               const classStudents = await getStudentsByClass(cls);
-              allClassStudents.push(...classStudents.map(student => ({ name: student, class: cls })));
+              allClassStudents.push(...classStudents.map(student => ({
+                name: typeof student === 'string' ? student : student.name,
+                class: cls,
+                className: typeof student === 'object' ? student.className : null // Include 班名 if available
+              })));
             } catch (err) {
               console.error(`載入班級 ${cls} 學生失敗:`, err);
             }
@@ -272,7 +280,11 @@ function initFormPage() {
       } else {
         // 選擇特定班級：只加載該班級的學生
         const classStudents = await getStudentsByClass(classSelect.value);
-        allStudents = classStudents.map(student => ({ name: student, class: classSelect.value }));
+        allStudents = classStudents.map(student => ({
+          name: typeof student === 'string' ? student : student.name,
+          class: classSelect.value,
+          className: typeof student === 'object' ? student.className : null // Include 班名 if available
+        }));
       }
     }
   });
@@ -304,7 +316,9 @@ function initFormPage() {
       matches.forEach((student, index) => {
         const item = document.createElement('div');
         item.className = 'autocomplete-item';
-        item.innerHTML = `${student.name} <small>(${student.class || classSelect.value})</small>`;
+        // Show student name with either 班名 or class in parentheses
+        const displayClass = student.className || student.class || classSelect.value;
+        item.innerHTML = `${student.name} <small>(${displayClass})</small>`;
         item.addEventListener('click', () => {
           studentInput.value = student.name;
           selectedStudent.value = student.name;
@@ -465,7 +479,12 @@ function initFormPage() {
     
     try {
       const students = await getStudentsByClass(className);
-      allStudents = students.map(name => ({ name, class: className })); // 保存學生列表（對象格式）
+      // Handle the new structure where students contain more fields
+      allStudents = students.map(student => ({
+        name: typeof student === 'string' ? student : student.name,
+        class: className,
+        className: typeof student === 'object' ? student.className : null // Include 班名 if available
+      })); // 保存學生列表（對象格式）
       
       if (students.length === 0) {
         studentInput.placeholder = '該班級無學生資料';

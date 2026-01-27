@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>按班名分組的待兌換學生報告</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Noto Sans TC', sans-serif; }
+    .collapsible {
+      cursor: pointer;
+      padding: 10px;
+      background-color: #f1f1f1;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin-bottom: 5px;
+    }
+    .content {
+      padding: 0 18px;
+      display: none;
+      overflow: hidden;
+      background-color: #f9f9f9;
+      border: 1px solid #ddd;
+      border-top: none;
+      border-radius: 0 0 4px 4px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- 導覽列 -->
+  <nav class="bg-blue-700 text-white shadow-lg">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
+      <h1 class="text-xl font-bold">按班名分組的待兌換學生報告</h1>
+      <div class="space-x-4">
+        <a href="form.html" class="text-sm hover:underline">登記</a>
+        <a href="stat.html" class="text-sm hover:underline">統計</a>
+        <a href="redeem.html" class="text-sm hover:underline">補領禮物</a>
+        <button id="logoutBtn" class="text-sm bg-blue-800 px-3 py-1 rounded hover:bg-blue-900 transition">登出</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-6xl mx-auto p-4 mt-4">
+    <div class="bg-white rounded-xl shadow-md p-6">
+      <div class="mb-6">
+        <button id="generateReportBtn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700 transition">
+          生成報告
+        </button>
+      </div>
+
+      <div id="reportContainer" class="hidden">
+        <h2 class="text-lg font-semibold mb-4">待兌換學生報告 (按班名分組)</h2>
+        <div id="reportContent"></div>
+      </div>
+
+      <div id="message" class="text-center text-sm font-medium min-h-[1.25rem] mt-4"></div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { getCurrentUser, logout } from './js/auth.js';
+    import { getClassBasedPendingRedemptionReport } from './js/api.js';
+
+    document.getElementById('logoutBtn').onclick = logout;
+
+    document.getElementById('generateReportBtn').addEventListener('click', async () => {
+      const user = getCurrentUser();
+      if (!user) {
+        alert('請先登入');
+        return;
+      }
+
+      const messageEl = document.getElementById('message');
+      const reportContainer = document.getElementById('reportContainer');
+      const reportContent = document.getElementById('reportContent');
+
+      try {
+        messageEl.innerHTML = '<span style="color:blue">正在載入報告...</span>';
+        reportContainer.classList.add('hidden');
+
+        const report = await getClassBasedPendingRedemptionReport(user.email);
+
+        // Clear previous content
+        reportContent.innerHTML = '';
+
+        // Check if report is empty
+        const classNames = Object.keys(report);
+        if (classNames.length === 0 || classNames.every(className => report[className].length === 0)) {
+          reportContent.innerHTML = '<p class="text-center text-gray-500">沒有待兌換的學生記錄</p>';
+          reportContainer.classList.remove('hidden');
+          messageEl.innerHTML = '<span style="color:green">載入完成</span>';
+          return;
+        }
+
+        // Store report in session storage for caching
+        sessionStorage.setItem('classRedemptionReport', JSON.stringify(report));
+        sessionStorage.setItem('classRedemptionReportTimestamp', Date.now().toString());
+
+        // Generate report content
+        for (const className of classNames) {
+          if (report[className].length > 0) {
+            // Create collapsible header
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'collapsible';
+            headerDiv.innerHTML = `
+              <strong>${className}</strong>
+              <span class="float-right">共 ${report[className].length} 位學生</span>
+            `;
+            
+            // Create content area
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'content';
+            
+            // Create table for students
+            let tableHtml = `
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">班級類別</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">學生姓名</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">登記日期</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+            `;
+            
+            report[className].forEach(student => {
+              tableHtml += `
+                <tr>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${student.classCategory}</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student.studentName}</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${student.attendanceDate ? new Date(student.attendanceDate).toLocaleDateString('zh-TW') : ''}</td>
+                </tr>
+              `;
+            });
+            
+            tableHtml += '</tbody></table>';
+            contentDiv.innerHTML = tableHtml;
+            
+            // Add to report content
+            reportContent.appendChild(headerDiv);
+            reportContent.appendChild(contentDiv);
+            
+            // Add event listener to toggle content
+            headerDiv.addEventListener('click', function() {
+              const content = this.nextElementSibling;
+              if (content.style.display === 'block') {
+                content.style.display = 'none';
+              } else {
+                content.style.display = 'block';
+              }
+            });
+          }
+        }
+
+        reportContainer.classList.remove('hidden');
+        messageEl.innerHTML = '<span style="color:green">報告載入完成</span>';
+      } catch (err) {
+        messageEl.innerHTML = `<span style="color:red">載入失敗：${err.message}</span>`;
+      }
+    });
+
+    // Try to load cached report on page load
+    window.addEventListener('load', function() {
+      const cachedReport = sessionStorage.getItem('classRedemptionReport');
+      const cachedTimestamp = sessionStorage.getItem('classRedemptionReportTimestamp');
+      
+      if (cachedReport && cachedTimestamp) {
+        const age = Date.now() - parseInt(cachedTimestamp);
+        const maxAge = 5 * 60 * 1000; // 5 minutes in milliseconds
+        
+        if (age < maxAge) {
+          // Use cached data
+          const report = JSON.parse(cachedReport);
+          const messageEl = document.getElementById('message');
+          const reportContainer = document.getElementById('reportContainer');
+          const reportContent = document.getElementById('reportContent');
+          
+          // Clear previous content
+          reportContent.innerHTML = '';
+          
+          // Generate report content from cache
+          const classNames = Object.keys(report);
+          if (classNames.length === 0 || classNames.every(className => report[className].length === 0)) {
+            reportContent.innerHTML = '<p class="text-center text-gray-500">沒有待兌換的學生記錄</p>';
+            reportContainer.classList.remove('hidden');
+            messageEl.innerHTML = '<span style="color:blue">載入完成 (快取)</span>';
+            return;
+          }
+          
+          for (const className of classNames) {
+            if (report[className].length > 0) {
+              // Create collapsible header
+              const headerDiv = document.createElement('div');
+              headerDiv.className = 'collapsible';
+              headerDiv.innerHTML = `
+                <strong>${className}</strong>
+                <span class="float-right">共 ${report[className].length} 位學生</span>
+              `;
+              
+              // Create content area
+              const contentDiv = document.createElement('div');
+              contentDiv.className = 'content';
+              
+              // Create table for students
+              let tableHtml = `
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">班級類別</th>
+                      <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">學生姓名</th>
+                      <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">登記日期</th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
+              `;
+              
+              report[className].forEach(student => {
+                tableHtml += `
+                  <tr>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${student.classCategory}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student.studentName}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${student.attendanceDate ? new Date(student.attendanceDate).toLocaleDateString('zh-TW') : ''}</td>
+                  </tr>
+                `;
+              });
+              
+              tableHtml += '</tbody></table>';
+              contentDiv.innerHTML = tableHtml;
+              
+              // Add to report content
+              reportContent.appendChild(headerDiv);
+              reportContent.appendChild(contentDiv);
+              
+              // Add event listener to toggle content
+              headerDiv.addEventListener('click', function() {
+                const content = this.nextElementSibling;
+                if (content.style.display === 'block') {
+                  content.style.display = 'none';
+                } else {
+                  content.style.display = 'block';
+                }
+              });
+            }
+          }
+          
+          reportContainer.classList.remove('hidden');
+          messageEl.innerHTML = '<span style="color:blue">載入完成 (快取)</span>';
+        }
+      }
+    });
+  </script>
+</body>
+</html>
