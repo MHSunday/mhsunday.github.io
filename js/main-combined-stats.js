@@ -25,10 +25,10 @@ function initCombinedStatsPage() {
   // 登出
   document.getElementById('logoutBtn').onclick = logout;
 
-  // 預設顯示統計區，因為初始頁籤是統計摘要
-  statsContainer.style.display = 'block';
+  // 預設顯示未補領禮物區，因為初始頁籤是未頒發禮物
+  statsContainer.style.display = 'none';
   achievedStudentsContainer.style.display = 'none';
-  unredeemedStudentsContainer.style.display = 'none';
+  unredeemedStudentsContainer.style.display = 'block';
   messageEl.innerHTML = '';
 
   // 載入達成學生列表的函數（可重複使用）
@@ -189,8 +189,8 @@ function initCombinedStatsPage() {
         classSelect.value = cls;
       }
 
-      // 首次載入統計
-      await loadStats(user.email, classSelect.value);
+      // 首次載入未補領禮物記錄，因為現在默認標籤是未頒發禮物
+      await loadUnredeemedStudentsList();
     } catch (err) {
       messageEl.innerHTML = `<span style="color:red">初始化失敗：${err.message}</span>`;
     }
