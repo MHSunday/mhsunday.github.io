@@ -242,7 +242,7 @@ function initFormPage() {
           selectedStudent.value = student.name;
           // 自動設置班級為該學生所在的班級
           if (student.class) {
-            classSelect.value = student.class;
+            studentClass.value = student.class;
           }
           hideSuggestions();
         });
