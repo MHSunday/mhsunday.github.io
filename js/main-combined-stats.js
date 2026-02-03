@@ -21,6 +21,9 @@ function initCombinedStatsPage() {
   const statsTab = document.getElementById('statsTab');
   const achievedTab = document.getElementById('achievedTab');
   const unredeemedTab = document.getElementById('unredeemedTab');
+  
+  // 存儲班級順序，以保持與下拉選擇框一致的排序
+  let classOrder = [];
 
   // 登出
   document.getElementById('logoutBtn').onclick = logout;
@@ -163,6 +166,9 @@ function initCombinedStatsPage() {
       const classes = await getAllClasses();
       classSelect.disabled = false;
       classSelect.innerHTML = '';
+      
+      // 存儲班級順序以供後續排序使用
+      classOrder = [...classes];
 
       if (role.role === 'admin') {
         // 校務：可選所有班級 + 「全部」
@@ -187,6 +193,12 @@ function initCombinedStatsPage() {
         classSelect.appendChild(opt);
         classSelect.disabled = true;
         classSelect.value = cls;
+      }
+
+      // 載入初始統計數據，確保統計摘要標籤有正確數據
+      const initialClassName = classSelect.value;
+      if (initialClassName) {
+        await loadStats(user.email, initialClassName);
       }
 
       // 首次載入未補領禮物記錄，因為現在默認標籤是未頒發禮物
@@ -306,9 +318,12 @@ function initCombinedStatsPage() {
       groupedStudents[student.class].push(student);
     });
 
-    // 生成HTML
+    // 生成HTML - 使用與下拉選擇框相同的班級順序
     let html = '';
-    for (const className in groupedStudents) {
+    const classNames = classOrder.length > 0
+      ? classOrder.filter(cls => groupedStudents[cls]) // 使用存儲的班級順序
+      : Object.keys(groupedStudents).sort((a, b) => a.localeCompare(b, 'zh-TW')); // 後備排序
+    for (const className of classNames) {
       const classStudents = groupedStudents[className];
       classStudents.sort((a, b) => a.studentName.localeCompare(b.studentName, 'zh-TW'));
       
@@ -364,9 +379,12 @@ function initCombinedStatsPage() {
       groupedStudents[student.class].push(student);
     });
 
-    // 生成HTML，按班級分組，以逗號分隔的名字列表形式顯示
+    // 生成HTML，按班級分組，以逗號分隔的名字列表形式顯示 - 使用與下拉選擇框相同的班級順序
     let html = '';
-    for (const className in groupedStudents) {
+    const classNames = classOrder.length > 0
+      ? classOrder.filter(cls => groupedStudents[cls]) // 使用存儲的班級順序
+      : Object.keys(groupedStudents).sort((a, b) => a.localeCompare(b, 'zh-TW')); // 後備排序
+    for (const className of classNames) {
       const classStudents = groupedStudents[className];
       // 按姓名排序
       classStudents.sort((a, b) => a.studentName.localeCompare(b.studentName, 'zh-TW'));
