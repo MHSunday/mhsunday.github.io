@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>聖安多尼堂座位表</title>
+    <style>
+        :root {
+            --c1: #ffadad; /* 1班 */
+            --c2: #ffd6a5; /* 2班 */
+            --c3: #fdffb6; /* 3班 */
+            --c4: #caffbf; /* 4班 */
+            --c5: #9bf6ff; /* 5班 */
+            --c6: #a0c4ff; /* 6班 */
+            --c7: #bdb2ff; /* 7班 */
+            --c8: #ffc6ff; /* 8班 */
+            --c9: #e2ece9; /* 9班 */
+            --parent: #e0e0e0;
+            --staff: #f4a261;
+            --empty: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .altar {
+            text-align: center;
+            background-color: #d4af37;
+            color: white;
+            padding: 15px;
+            font-size: 1.2em;
+            font-weight: bold;
+            border-radius: 5px;
+            margin: 20px 0 30px 0;
+            letter-spacing: 5px;
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 30px;
+            padding: 15px;
+            background: #f1f2f6;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .legend-box {
+            width: 20px;
+            height: 20px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+
+        .church-layout {
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+        }
+
+        .side {
+            flex: 1;
+            max-width: 500px;
+        }
+
+        .side-title {
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #ccc;
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            justify-content: center;
+        }
+
+        .row-num {
+            width: 50px;
+            font-weight: bold;
+            font-size: 0.85em;
+            color: #666;
+            text-align: right;
+            padding-right: 10px;
+        }
+
+        .seats {
+            display: flex;
+            gap: 4px;
+            width: 260px; /* Fixed width to align 4-seat and 5-seat rows */
+            justify-content: center;
+        }
+
+        .seat {
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+            font-weight: bold;
+            border: 1px solid #aaa;
+            border-radius: 4px;
+            box-sizing: border-box;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .seat.teacher {
+            border: 2px solid #e74c3c;
+            color: #c0392b;
+            font-weight: 900;
+            box-shadow: inset 0 0 0 2px rgba(255,255,255,0.5);
+        }
+
+        /* Colors */
+        .c1 { background-color: var(--c1); }
+        .c2 { background-color: var(--c2); }
+        .c3 { background-color: var(--c3); }
+        .c4 { background-color: var(--c4); }
+        .c5 { background-color: var(--c5); }
+        .c6 { background-color: var(--c6); }
+        .c7 { background-color: var(--c7); }
+        .c8 { background-color: var(--c8); }
+        .c9 { background-color: var(--c9); }
+        .cp { background-color: var(--parent); }
+        .cs { background-color: var(--staff); color: white; }
+        .ce { background-color: var(--empty); color: #ccc; border: 1px dashed #ccc; }
+
+        .aisle {
+            width: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #aaa;
+            writing-mode: vertical-rl;
+            text-orientation: upright;
+            letter-spacing: 10px;
+            font-weight: bold;
+        }
+
+        @media (max-width: 800px) {
+            .church-layout {
+                flex-direction: column;
+                align-items: center;
+            }
+            .aisle {
+                width: 100%;
+                height: 40px;
+                writing-mode: horizontal-tb;
+                text-orientation: mixed;
+                letter-spacing: 5px;
+            }
+        }
+
+        @media print {
+            body { background: white; padding: 0; }
+            .container { box-shadow: none; padding: 0; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .church-layout { gap: 20px; }
+            .seat { width: 40px; height: 40px; font-size: 0.75em; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>聖安多尼堂座位安排</h1>
+    
+    <div class="legend">
+        <div class="legend-item"><div class="legend-box c1"></div> 1班(方濟各)</div>
+        <div class="legend-item"><div class="legend-box c2"></div> 2班(安多尼)</div>
+        <div class="legend-item"><div class="legend-box c3"></div> 3班(依納爵)</div>
+        <div class="legend-item"><div class="legend-box c4"></div> 4班(亞納)</div>
+        <div class="legend-item"><div class="legend-box c5"></div> 5班(保祿)</div>
+        <div class="legend-item"><div class="legend-box c6"></div> 6班(鮑思高A)</div>
+        <div class="legend-item"><div class="legend-box c7"></div> 7班(鮑思高B)</div>
+        <div class="legend-item"><div class="legend-box c8"></div> 8班(小德蘭)</div>
+        <div class="legend-item"><div class="legend-box c9"></div> 9班(沙勿略)</div>
+        <div class="legend-item"><div class="legend-box cp"></div> 家長</div>
+        <div class="legend-item"><div class="legend-box cs"></div> 校務/小導師</div>
+        <div class="legend-item"><div class="legend-box c1" style="border: 2px solid #e74c3c; color:#c0392b; text-align:center; font-weight:bold; line-height:16px;">師</div> 老師留座</div>
+    </div>
+
+    <div class="altar">祭 台 方 向</div>
+
+    <div class="church-layout">
+        <!-- 左邊 -->
+        <div class="side">
+            <div class="side-title">左邊 (花地瑪聖母像)</div>
+            
+            <div class="row"><div class="row-num">第1行</div><div class="seats">
+                <div class="seat c1 teacher">1師</div><div class="seat c1">1班</div><div class="seat c1">1班</div><div class="seat c1">1班</div><div class="seat c1 teacher">1師</div>
+            </div></div>
+            <div class="row"><div class="row-num">第2行</div><div class="seats">
+                <div class="seat c3 teacher">3師</div><div class="seat c3">3班</div><div class="seat c3">3班</div><div class="seat c3">3班</div><div class="seat c3">3班</div>
+            </div></div>
+            <div class="row"><div class="row-num">第3行</div><div class="seats">
+                <div class="seat c3">3班</div><div class="seat c3">3班</div><div class="seat c3">3班</div><div class="seat c3 teacher">3師</div><div class="seat c5 teacher">5師</div>
+            </div></div>
+            <div class="row"><div class="row-num">第4行</div><div class="seats">
+                <div class="seat c5">5班</div><div class="seat c5">5班</div><div class="seat c5">5班</div><div class="seat c5">5班</div><div class="seat c5">5班</div>
+            </div></div>
+            <div class="row"><div class="row-num">第5行</div><div class="seats">
+                <div class="seat c5">5班</div><div class="seat c5">5班</div><div class="seat c5">5班</div><div class="seat c5 teacher">5師</div><div class="seat c7 teacher">7師</div>
+            </div></div>
+            <div class="row"><div class="row-num">第6行</div><div class="seats">
+                <div class="seat c7">7班</div><div class="seat c7">7班</div><div class="seat c7">7班</div><div class="seat c7">7班</div><div class="seat c7">7班</div>
+            </div></div>
+            <div class="row"><div class="row-num">第7行</div><div class="seats">
+                <div class="seat c7">7班</div><div class="seat c7">7班</div><div class="seat c7">7班</div><div class="seat c7">7班</div><div class="seat c7">7班</div>
+            </div></div>
+            <div class="row"><div class="row-num">第8行</div><div class="seats">
+                <div class="seat c7 teacher">7師</div><div class="seat c9 teacher">9師</div><div class="seat c9">9班</div><div class="seat c9">9班</div>
+            </div></div>
+            <div class="row"><div class="row-num">第9行</div><div class="seats">
+                <div class="seat c9">9班</div><div class="seat c9">9班</div><div class="seat c9">9班</div><div class="seat c9">9班</div>
+            </div></div>
+            <div class="row"><div class="row-num">第10行</div><div class="seats">
+                <div class="seat c9">9班</div><div class="seat c9">9班</div><div class="seat c9">9班</div><div class="seat c9 teacher">9師</div><div class="seat ce">空</div>
+            </div></div>
+            <div class="row"><div class="row-num">第11行</div><div class="seats">
+                <div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div>
+            </div></div>
+            <div class="row"><div class="row-num">第12行</div><div class="seats">
+                <div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div>
+            </div></div>
+            <div class="row"><div class="row-num">第13行</div><div class="seats">
+                <div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div>
+            </div></div>
+            <div class="row"><div class="row-num">第14行</div><div class="seats">
+                <div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div>
+            </div></div>
+            <div class="row"><div class="row-num">第15行</div><div class="seats">
+                <div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div>
+            </div></div>
+            <div class="row"><div class="row-num">第16行</div><div class="seats">
+                <div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div>
+            </div></div>
+        </div>
+
+        <!-- 中央通道 -->
+        <div class="aisle">中央通道</div>
+
+        <!-- 右邊 -->
+        <div class="side">
+            <div class="side-title">右邊 (聖若瑟像)</div>
+            
+            <div class="row"><div class="row-num">第1行</div><div class="seats">
+                <div class="seat c2 teacher">2師</div><div class="seat c2">2班</div><div class="seat c2">2班</div><div class="seat c2">2班</div><div class="seat c2">2班</div>
+            </div></div>
+            <div class="row"><div class="row-num">第2行</div><div class="seats">
+                <div class="seat c2">2班</div><div class="seat c2">2班</div><div class="seat c2 teacher">2師</div><div class="seat c4 teacher">4師</div><div class="seat c4">4班</div>
+            </div></div>
+            <div class="row"><div class="row-num">第3行</div><div class="seats">
+                <div class="seat c4">4班</div><div class="seat c4">4班</div><div class="seat c4">4班</div><div class="seat c4">4班</div><div class="seat c4 teacher">4師</div>
+            </div></div>
+            <div class="row"><div class="row-num">第4行</div><div class="seats">
+                <div class="seat c6 teacher">6師</div><div class="seat c6">6班</div><div class="seat c6">6班</div><div class="seat c6">6班</div><div class="seat c6">6班</div>
+            </div></div>
+            <div class="row"><div class="row-num">第5行</div><div class="seats">
+                <div class="seat c6">6班</div><div class="seat c6">6班</div><div class="seat c6">6班</div><div class="seat c6 teacher">6師</div><div class="seat c8 teacher">8師</div>
+            </div></div>
+            <div class="row"><div class="row-num">第6行</div><div class="seats">
+                <div class="seat c8">8班</div><div class="seat c8">8班</div><div class="seat c8">8班</div><div class="seat c8">8班</div><div class="seat c8">8班</div>
+            </div></div>
+            <div class="row"><div class="row-num">第7行</div><div class="seats">
+                <div class="seat c8">8班</div><div class="seat c8">8班</div><div class="seat c8">8班</div><div class="seat c8">8班</div><div class="seat c8">8班</div>
+            </div></div>
+            <div class="row"><div class="row-num">第8行</div><div class="seats">
+                <div class="seat c8">8班</div><div class="seat c8">8班</div><div class="seat c8 teacher">8師</div><div class="seat ce">空</div><div class="seat ce">空</div>
+            </div></div>
+            <div class="row"><div class="row-num">第9行</div><div class="seats">
+                <div class="seat cs">校務</div><div class="seat cs">校務</div><div class="seat cs">校務</div><div class="seat cs">校務</div><div class="seat cs">校務</div>
+            </div></div>
+            <div class="row"><div class="row-num">第10行</div><div class="seats">
+                <div class="seat cs">校務</div><div class="seat cs">校務</div><div class="seat cs">校務</div><div class="seat cs">校務</div><div class="seat cs">校務</div>
+            </div></div>
+            <div class="row"><div class="row-num">第11行</div><div class="seats">
+                <div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div>
+            </div></div>
+            <div class="row"><div class="row-num">第12行</div><div class="seats">
+                <div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div>
+            </div></div>
+            <div class="row"><div class="row-num">第13行</div><div class="seats">
+                <div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div>
+            </div></div>
+            <div class="row"><div class="row-num">第14行</div><div class="seats">
+                <div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div>
+            </div></div>
+            <div class="row"><div class="row-num">第15行</div><div class="seats">
+                <div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat cp">家長</div><div class="seat ce">空</div>
+            </div></div>
+            <div class="row"><div class="row-num">第16行</div><div class="seats">
+                <div class="seat ce">空</div><div class="seat ce">空</div><div class="seat ce">空</div><div class="seat ce">空</div>
+            </div></div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
