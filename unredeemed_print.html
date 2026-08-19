@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>未頒發禮物名單 - 列印版</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 12mm;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: #f5f5f5;
+      color: #222;
+    }
+
+    .toolbar {
+      max-width: 210mm;
+      margin: 0 auto 16px auto;
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .toolbar button, .toolbar select {
+      padding: 6px 12px;
+      font-size: 14px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      background: white;
+      cursor: pointer;
+    }
+    .toolbar .print-btn {
+      background: #2980b9;
+      color: white;
+      border-color: #2980b9;
+    }
+    .toolbar .print-btn:hover { background: #1f6391; }
+    .toolbar label { font-weight: bold; }
+
+    .page {
+      background: white;
+      width: 210mm;
+      min-height: 297mm;
+      padding: 12mm 14mm;
+      margin: 0 auto;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      page-break-after: always;
+    }
+
+    .doc-header {
+      text-align: center;
+      border-bottom: 2px solid #2c3e50;
+      padding-bottom: 8px;
+      margin-bottom: 14px;
+    }
+    .doc-header h1 {
+      margin: 0;
+      font-size: 22px;
+      color: #2c3e50;
+    }
+    .doc-header .meta {
+      margin-top: 4px;
+      font-size: 12px;
+      color: #555;
+    }
+
+    .summary-bar {
+      display: flex;
+      justify-content: space-around;
+      background: #f0f8ff;
+      padding: 8px;
+      border-radius: 4px;
+      margin-bottom: 14px;
+      font-size: 13px;
+    }
+    .summary-bar div strong { color: #2980b9; font-size: 16px; }
+
+    .class-block {
+      margin-bottom: 14px;
+      page-break-inside: avoid;
+    }
+    .class-block table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .class-block th, .class-block td {
+      border: 1px solid #888;
+      padding: 4px 8px;
+      text-align: left;
+    }
+    .class-block th {
+      background: #ecf0f1;
+      font-weight: bold;
+    }
+    .class-block td.center { text-align: center; width: 60px; }
+    .class-block td.name { width: 50%; }
+    .class-block td.check { text-align: center; width: 70px; }
+    .class-block .class-title {
+      background: #2980b9;
+      color: white;
+      padding: 6px 10px;
+      font-weight: bold;
+      font-size: 14px;
+      border-radius: 4px 4px 0 0;
+      display: flex;
+      justify-content: space-between;
+    }
+    .class-block .class-title .subtotal {
+      background: white;
+      color: #2980b9;
+      padding: 1px 8px;
+      border-radius: 10px;
+      font-size: 12px;
+    }
+
+    .class-block tr.empty td {
+      text-align: center;
+      color: #888;
+      font-style: italic;
+      padding: 8px;
+    }
+
+    .grand-total {
+      margin-top: 12px;
+      padding: 8px 12px;
+      background: #2c3e50;
+      color: white;
+      border-radius: 4px;
+      text-align: right;
+      font-size: 14px;
+    }
+    .grand-total strong { font-size: 16px; }
+
+    #message {
+      max-width: 210mm;
+      margin: 0 auto 12px auto;
+      text-align: center;
+      font-weight: bold;
+      min-height: 22px;
+    }
+    .loading { color: #7f8c8d; font-style: italic; }
+
+    @media print {
+      body { background: white; padding: 0; }
+      .toolbar, #message { display: none; }
+      .page {
+        box-shadow: none;
+        margin: 0;
+        width: auto;
+        min-height: auto;
+        padding: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <label for="classSelect">班級：</label>
+    <select id="classSelect">
+      <option value="*">全部班級</option>
+    </select>
+    <button class="print-btn" onclick="window.print()">🖨️ 列印 / 匯出 PDF</button>
+  </div>
+
+  <div id="message"></div>
+
+  <div id="report" class="page">
+    <div class="doc-header">
+      <h1>未頒發禮物名單</h1>
+      <div class="meta">
+        <span id="reportClass">全部班級</span> ·
+        列印日期：<span id="reportDate"></span>
+      </div>
+    </div>
+
+    <div class="summary-bar">
+      <div>未頒發總數：<strong id="grandTotal">0</strong> 人次</div>
+      <div>涉及學生：<strong id="studentTotal">0</strong> 人</div>
+      <div>班級數：<strong id="classTotal">0</strong></div>
+    </div>
+
+    <div id="reportBody"></div>
+
+    <div class="grand-total">
+      合計未頒發：<strong id="grandTotalBottom">0</strong> 人次
+    </div>
+  </div>
+
+  <script type="module">
+    import { getCurrentUser, onRoleLoaded } from './js/auth.js';
+    import { getAllClasses, getUnredeemedRecords } from './js/api.js';
+
+    const classSelect = document.getElementById('classSelect');
+    const reportBody = document.getElementById('reportBody');
+    const messageEl = document.getElementById('message');
+    let classOrder = [];
+
+    document.getElementById('reportDate').textContent =
+      new Date().toLocaleDateString('zh-TW');
+
+    function showMessage(text, isError = false) {
+      messageEl.innerHTML = `<span style="color:${isError ? 'crimson' : '#7f8c8d'}" class="loading">${text}</span>`;
+    }
+    function clearMessage() { messageEl.innerHTML = ''; }
+
+    async function init() {
+      showMessage('驗證登入中…');
+      onRoleLoaded(async (role) => {
+        const user = getCurrentUser();
+        if (!user) {
+          showMessage('尚未登入，請回到首頁登入', true);
+          return;
+        }
+        try {
+          const classes = await getAllClasses();
+          classOrder = [...classes];
+          classSelect.innerHTML = '<option value="*">全部班級</option>';
+          classes.forEach(cls => {
+            const opt = document.createElement('option');
+            opt.value = cls;
+            opt.textContent = cls;
+            classSelect.appendChild(opt);
+          });
+          classSelect.disabled = false;
+          await loadReport(user.email);
+        } catch (err) {
+          showMessage('初始化失敗：' + err.message, true);
+        }
+      });
+    }
+
+    classSelect.addEventListener('change', async () => {
+      const user = getCurrentUser();
+      if (user) await loadReport(user.email);
+    });
+
+    async function loadReport(email) {
+      const selectedClass = classSelect.value;
+      const classLabel = selectedClass === '*' ? '全部班級' : selectedClass;
+      document.getElementById('reportClass').textContent = classLabel;
+
+      showMessage('載入未頒發名單中…');
+      try {
+        const records = await getUnredeemedRecords(email);
+        const filtered = selectedClass === '*'
+          ? records
+          : records.filter(r => (r.class || r.className) === selectedClass);
+
+        renderReport(filtered);
+        clearMessage();
+      } catch (err) {
+        showMessage('載入失敗：' + err.message, true);
+      }
+    }
+
+    function renderReport(records) {
+      if (!records || records.length === 0) {
+        reportBody.innerHTML =
+          '<div class="class-block"><div class="class-title">沒有未頒發紀錄</div>' +
+          '<table><tr class="empty"><td>所有學生已頒發禮物 🎉</td></tr></table></div>';
+        document.getElementById('grandTotal').textContent = 0;
+        document.getElementById('studentTotal').textContent = 0;
+        document.getElementById('classTotal').textContent = 0;
+        document.getElementById('grandTotalBottom').textContent = 0;
+        return;
+      }
+
+      // 依班級分組
+      const byClass = {};
+      records.forEach(r => {
+        const cls = r.class || r.className || '未分班';
+        if (!byClass[cls]) byClass[cls] = [];
+        byClass[cls].push(r);
+      });
+
+      // 依 classOrder 排序
+      const orderedClasses = classOrder.length > 0
+        ? classOrder.filter(c => byClass[c]).concat(
+            Object.keys(byClass).filter(c => !classOrder.includes(c)).sort((a,b)=>a.localeCompare(b,'zh-TW'))
+          )
+        : Object.keys(byClass).sort((a, b) => a.localeCompare(b, 'zh-TW'));
+
+      let html = '';
+      let grandCount = 0;
+      const studentSet = new Set();
+
+      orderedClasses.forEach(cls => {
+        const list = byClass[cls];
+        // 依姓名排序
+        list.sort((a, b) =>
+          (a.studentName || '').localeCompare(b.studentName || '', 'zh-TW'));
+
+        // 統計每位學生未頒發次數
+        const nameCounts = {};
+        list.forEach(r => {
+          const name = r.studentName || '(無名)';
+          nameCounts[name] = (nameCounts[name] || 0) + 1;
+        });
+
+        const studentClassName = list.find(r => r.studentClassName)?.studentClassName;
+        const classDisplay = studentClassName
+          ? `${cls} (${studentClassName})`
+          : cls;
+
+        html += `<div class="class-block">`;
+        html += `<div class="class-title">${escapeHtml(classDisplay)}<span class="subtotal">${list.length} 人次</span></div>`;
+        html += `<table><thead><tr><th class="center">#</th><th class="name">姓名</th><th class="center">次數</th><th class="check">☑ 已頒</th></tr></thead><tbody>`;
+
+        let idx = 1;
+        Object.keys(nameCounts).sort((a, b) => a.localeCompare(b, 'zh-TW')).forEach(name => {
+          const count = nameCounts[name];
+          const suffix = count > 1 ? ` ×${count}` : '';
+          studentSet.add(`${cls}::${name}`);
+          html += `<tr><td class="center">${idx++}</td><td class="name">${escapeHtml(name)}${suffix}</td><td class="center">${count}</td><td class="check"></td></tr>`;
+        });
+
+        html += `</tbody></table></div>`;
+        grandCount += list.length;
+      });
+
+      reportBody.innerHTML = html;
+      document.getElementById('grandTotal').textContent = grandCount;
+      document.getElementById('studentTotal').textContent = studentSet.size;
+      document.getElementById('classTotal').textContent = orderedClasses.length;
+      document.getElementById('grandTotalBottom').textContent = grandCount;
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[c]);
+    }
+
+    init();
+  </script>
+</body>
+</html>
