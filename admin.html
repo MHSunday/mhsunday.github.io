@@ -1,146 +1,56 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>主日學 • 管理後台</title>
-  <meta name="color-scheme" content="light only" />
-  <link rel="stylesheet" href="assets/css/styles.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poll Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-<header>
-  <div class="header-container">
-    <div class="header-content">
-      <div class="brand">
-        <div class="logo" aria-hidden="true"></div>
-        <div class="brand-text">
-          <h1>管理後台</h1>
-          <p class="subtitle">公告設定與維護</p>
+<body class="bg-gray-100 min-h-screen p-4">
+    <div class="max-w-2xl mx-auto bg-white p-6 rounded-2xl shadow-xl">
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">🛠️ Poll Admin</h1>
+        <p class="text-sm text-gray-500 mb-4">管理投票選項與重置投票（無密碼保護，請勿公開此頁）</p>
+
+        <div class="flex justify-between items-center mb-3">
+            <h2 class="text-lg font-bold">目前選項（尚未儲存）</h2>
+            <span id="dirty-indicator" class="text-xs text-orange-600 font-semibold hidden">● 有未儲存變更</span>
         </div>
-      </div>
-      <div class="auth-section">
-        <div id="signin-container" class="signin-wrapper">
-          <div id="g_id_onload"
-               data-client_id=""
-               data-auto_prompt="false"
-               data-callback="onGoogleSignIn">
-          </div>
-          <div class="g_id_signin"
-               data-type="standard"
-               data-size="large"
-               data-theme="outline"
-               data-text="sign_in_with"
-               data-shape="pill"
-               data-logo_alignment="left">
-          </div>
+        <div id="options-list" class="space-y-2 mb-6"></div>
+
+        <h2 class="text-lg font-bold mb-2">新增選項</h2>
+        <div class="flex flex-col sm:flex-row gap-2 mb-6">
+            <input id="option-name" placeholder="選項名稱"
+                   class="border border-gray-300 p-2 rounded flex-1 focus:outline-none focus:border-blue-500">
+            <select id="option-color" class="border border-gray-300 p-2 rounded">
+                <option value="bg-blue-500">藍</option>
+                <option value="bg-green-500">綠</option>
+                <option value="bg-yellow-500">黃</option>
+                <option value="bg-purple-500">紫</option>
+                <option value="bg-red-500">紅</option>
+                <option value="bg-pink-500">粉</option>
+                <option value="bg-indigo-500">靛</option>
+                <option value="bg-teal-500">青</option>
+            </select>
+            <button id="add-option" class="bg-green-500 hover:bg-green-600 text-white font-bold px-4 py-2 rounded whitespace-nowrap">
+                ➕ 加入
+            </button>
         </div>
-        <div id="user-box" class="user-info hidden">
-          <div class="user-details">
-            <div class="user-avatar"><span id="user-initial">U</span></div>
-            <div class="user-meta">
-              <span id="user-email" class="user-email"></span>
-              <span id="user-role" class="user-role"></span>
-            </div>
-          </div>
-          <button id="signout" class="btn-signout">登出</button>
+
+        <div class="border-t pt-4 flex flex-col sm:flex-row gap-2">
+            <button id="save-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold px-4 py-2 rounded flex-1">
+                💾 儲存所有變更
+            </button>
+            <button id="reset-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold px-4 py-2 rounded flex-1">
+                🗑️ 重置投票（清空所有票數）
+            </button>
         </div>
-      </div>
+
+        <p id="status-msg" class="mt-4 text-sm font-semibold"></p>
+        <p class="text-xs text-gray-500 mt-2">
+            ⚠️ 儲存或重置後，<code>vote.html</code> 會在下次輪詢（最長 5 秒）自動更新。
+        </p>
     </div>
-  </div>
-</header>
 
-<main class="main-container">
-  <div class="content-wrapper">
-
-    <section class="content-card">
-      <div class="card-header">
-        <h2 class="card-title"><span class="title-icon">⚙</span> 公告管理</h2>
-        <button id="reload-admin" class="btn-secondary btn-small">↻ 重新載入</button>
-      </div>
-      <div class="card-content">
-        <div class="admin-form">
-          <div class="form-grid">
-            <div class="form-field">
-              <label for="a-title">標題 <span class="required">*</span></label>
-              <input id="a-title" type="text" placeholder="輸入公告標題" />
-            </div>
-            <div class="form-field span-2">
-              <label for="a-body">內容</label>
-              <textarea id="a-body" rows="4" placeholder="輸入公告內容"></textarea>
-            </div>
-            <div class="form-field">
-              <label for="a-class">目標班級</label>
-              <select id="a-class">
-                <option value="">選擇班級</option>
-              </select>
-            </div>
-            <div class="form-field">
-              <label for="a-audience">目標對象</label>
-              <select id="a-audience">
-                <option value="All">全部</option>
-                <option value="Teachers">所有老師</option>
-                <option value="Coordinators">協調同工</option>
-              </select>
-            </div>
-            <div class="form-field">
-              <label for="a-priority">優先級</label>
-              <select id="a-priority">
-                <option value="normal">一般</option>
-                <option value="warn">提醒</option>
-                <option value="danger">緊急</option>
-              </select>
-            </div>
-            <div class="form-field">
-              <label for="a-start">開始日期</label>
-              <input id="a-start" type="date" />
-            </div>
-            <div class="form-field">
-              <label for="a-end">結束日期</label>
-              <input id="a-end" type="date" />
-            </div>
-          </div>
-          <div class="form-actions">
-            <button id="a-save" class="btn-primary">💾 儲存</button>
-            <button id="a-clear" class="btn-secondary">🗑 清除</button>
-          </div>
-        </div>
-
-        <div class="admin-list">
-          <h3 class="section-title">現有公告</h3>
-          <div class="table-container">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>標題</th>
-                  <th>對象</th>
-                  <th>開始</th>
-                  <th>結束</th>
-                  <th>優先</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody id="admin-ann-list"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </section>
-
-  </div>
-</main>
-
-<footer class="footer">
-  <div class="footer-content">
-    <p>© 2025 主日學 • 管理後台</p>
-  </div>
-</footer>
-
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="assets/js/config.js"></script>
-<script src="assets/js/api.js"></script>
-<script src="assets/js/state.js"></script>
-<script src="assets/js/ui-admin-shell.js"></script>
-<script src="assets/js/admin.js"></script>
-<script src="assets/js/admin.main.js"></script>
+    <script type="module" src="./js/admin.js?v=2"></script>
 </body>
 </html>
