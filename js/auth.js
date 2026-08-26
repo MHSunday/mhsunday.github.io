@@ -21,6 +21,11 @@ auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 export function getCurrentUser() { return currentUser; }
 export function getUserRole() { return userRole; }
 
+// 取得目前登入使用者的 Firebase ID Token（後端需要驗證身份用）
+export function getAuthToken() {
+  return auth.currentUser ? auth.currentUser.getIdToken() : Promise.resolve(null);
+}
+
 /**
  * 控制載入動畫顯示/隱藏
  */
@@ -132,8 +137,10 @@ auth.onAuthStateChanged(async (user) => {
 
     try {
       // 修正 CORS：加入 timestamp 避免 GAS 緩存，並明確設定 mode: 'cors'
+      // 以 ID Token 取代 email，讓後端 server-side 驗證身份
+      const idToken = await user.getIdToken();
       const response = await fetch(
-        `${APP_CONFIG.appsScriptUrl}?action=getUserRoles&email=${encodeURIComponent(user.email)}&t=${Date.now()}`,
+        `${APP_CONFIG.appsScriptUrl}?action=getUserRoles&idToken=${encodeURIComponent(idToken)}&t=${Date.now()}`,
         {
           method: 'GET',
           mode: 'cors',

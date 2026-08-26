@@ -1,7 +1,8 @@
 // js/vote.js
 import { APP_CONFIG } from './config.js';
 
-const GAS_URL = APP_CONFIG.appsScriptUrl;
+// 投票系統使用獨立的 voteScriptUrl（若未設定則退回 appsScriptUrl）
+const GAS_URL = APP_CONFIG.voteScriptUrl || APP_CONFIG.appsScriptUrl;
 
 // 不再有預設選項 — 必須從伺服器取得，避免閃現舊的硬編碼選項
 let OPTIONS = [];

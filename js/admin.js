@@ -1,7 +1,9 @@
 // js/admin.js
 import { APP_CONFIG } from './config.js';
+import { getAuthToken, onRoleLoaded } from './auth.js';
 
-const GAS_URL = APP_CONFIG.appsScriptUrl;
+// 投票系統使用獨立的 voteScriptUrl（若未設定則退回 appsScriptUrl）
+const GAS_URL = APP_CONFIG.voteScriptUrl || APP_CONFIG.appsScriptUrl;
 
 const COLOR_SWATCH = {
     "bg-blue-500": "bg-blue-500",
@@ -106,6 +108,8 @@ function onAddOption() {
 }
 
 async function callBackend(body) {
+    // 附上登入 token，後端會驗證管理員身份
+    body.idToken = await getAuthToken();
     const resp = await fetch(GAS_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -158,9 +162,16 @@ async function onReset() {
 }
 
 (function init() {
-    loadInitial();
-    $("add-option").addEventListener("click", onAddOption);
-    $("option-name").addEventListener("keydown", e => { if (e.key === "Enter") onAddOption(); });
-    $("save-btn").addEventListener("click", onSave);
-    $("reset-btn").addEventListener("click", onReset);
+    // 需管理員登入才能操作
+    onRoleLoaded((role) => {
+        if (!role || role.role !== 'admin') {
+            window.location.replace('./index.html');
+            return;
+        }
+        loadInitial();
+        $("add-option").addEventListener("click", onAddOption);
+        $("option-name").addEventListener("keydown", e => { if (e.key === "Enter") onAddOption(); });
+        $("save-btn").addEventListener("click", onSave);
+        $("reset-btn").addEventListener("click", onReset);
+    });
 })();

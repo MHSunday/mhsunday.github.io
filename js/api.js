@@ -1,7 +1,17 @@
 // js/api.js
 import { APP_CONFIG } from './config.js';
+import { getAuthToken } from './auth.js';
 
 const API_URL = APP_CONFIG.appsScriptUrl;
+
+/**
+ * 取得目前登入使用者的 ID Token 作為 query string。
+ * 後端會用這個 token server-side 驗證身份，不再信任前端傳的 email。
+ */
+async function getTokenQS() {
+  const token = await getAuthToken();
+  return token ? 'idToken=' + encodeURIComponent(token) : 'idToken=';
+}
 
 /**
  * 將物件轉換為 URLSearchParams 格式
@@ -22,7 +32,8 @@ function toFormData(obj) {
 // ==========================================
 
 export async function getAllClasses() {
-  const res = await fetch(`${API_URL}?action=getAllClasses`);
+  const qs = await getTokenQS();
+  const res = await fetch(`${API_URL}?action=getAllClasses&${qs}`);
   const data = await res.json();
   if (data.error) throw new Error(data.error);
   return data;
@@ -30,7 +41,8 @@ export async function getAllClasses() {
 
 export async function getStudentsByClass(className) {
   if (!className) throw new Error('班級名稱不能為空');
-  const url = `${API_URL}?action=getStudentsByClass&class=${encodeURIComponent(className)}`;
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=getStudentsByClass&class=${encodeURIComponent(className)}&${qs}`;
   const res = await fetch(url);
   const data = await res.json();
   if (data.error) throw new Error(data.error);
@@ -49,7 +61,8 @@ export async function getStudentsByClass(className) {
  */
 export async function getStats(email, className = '*') {
   if (!email) throw new Error('必須提供使用者 email');
-  const url = `${API_URL}?action=getStats&email=${encodeURIComponent(email)}&class=${encodeURIComponent(className)}`;
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=getStats&email=${encodeURIComponent(email)}&class=${encodeURIComponent(className)}&${qs}`;
   const res = await fetch(url);
   const data = await res.json();
   if (data.error) throw new Error(data.error);
@@ -61,7 +74,8 @@ export async function getStats(email, className = '*') {
  */
 export async function fetchAttendanceDetails(email, className) {
   if (!email || !className) throw new Error('缺少必要參數');
-  const url = `${API_URL}?action=getAttendanceDetails&email=${encodeURIComponent(email)}&class=${encodeURIComponent(className)}`;
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=getAttendanceDetails&email=${encodeURIComponent(email)}&class=${encodeURIComponent(className)}&${qs}`;
   const res = await fetch(url);
   const data = await res.json();
   if (data.error) throw new Error(data.error);
@@ -82,7 +96,8 @@ export async function recordAttendance(data) {
 
   const formData = toFormData({
     action: 'recordAttendance',
-    ...data
+    ...data,
+    idToken: await getAuthToken()
   });
 
   const response = await fetch(API_URL, {
@@ -103,8 +118,8 @@ export async function recordAttendance(data) {
  */
 export async function getAllStudents(email) {
   if (!email) throw new Error('必須提供使用者 email');
-  
-  const url = `${API_URL}?action=getAllStudents&email=${encodeURIComponent(email)}`;
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=getAllStudents&email=${encodeURIComponent(email)}&${qs}`;
   const res = await fetch(url);
   const data = await res.json();
   if (data.error) throw new Error(data.error);
@@ -132,7 +147,8 @@ export async function updateRedeemStatus(data) {
   
   const formData = toFormData({
     action: 'updateRedeemStatus',
-    ...processedData
+    ...processedData,
+    idToken: await getAuthToken()
   });
 
   const response = await fetch(API_URL, {
@@ -153,8 +169,8 @@ export async function updateRedeemStatus(data) {
  */
 export async function getUnredeemedRecords(email) {
   if (!email) throw new Error('必須提供使用者 email');
-  
-  const url = `${API_URL}?action=getUnredeemedRecords&email=${encodeURIComponent(email)}`;
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=getUnredeemedRecords&email=${encodeURIComponent(email)}&${qs}`;
   const res = await fetch(url);
   const data = await res.json();
   if (data.error) throw new Error(data.error);
@@ -180,7 +196,8 @@ export async function batchUpdateRedeemStatus(records, email) {
   const formData = toFormData({
     action: 'batchUpdateRedeemStatus',
     email: email,
-    records: JSON.stringify(processedRecords)
+    records: JSON.stringify(processedRecords),
+    idToken: await getAuthToken()
   });
 
   const response = await fetch(API_URL, {
@@ -220,8 +237,8 @@ function formatDateForApi(dateString) {
  */
 export async function getAchievedStudents(email, className = '*') {
    if (!email) throw new Error('必須提供使用者 email');
-   
-   const url = `${API_URL}?action=getAchievedStudents&email=${encodeURIComponent(email)}&class=${encodeURIComponent(className)}`;
+   const qs = await getTokenQS();
+   const url = `${API_URL}?action=getAchievedStudents&email=${encodeURIComponent(email)}&class=${encodeURIComponent(className)}&${qs}`;
    const res = await fetch(url);
    const data = await res.json();
    if (data.error) throw new Error(data.error);
@@ -235,8 +252,8 @@ export async function getAchievedStudents(email, className = '*') {
   */
  export async function getClassBasedPendingRedemptionReport(email) {
    if (!email) throw new Error('必須提供使用者 email');
-   
-   const url = `${API_URL}?action=getClassBasedPendingRedemptionReport&email=${encodeURIComponent(email)}`;
+   const qs = await getTokenQS();
+   const url = `${API_URL}?action=getClassBasedPendingRedemptionReport&email=${encodeURIComponent(email)}&${qs}`;
    const res = await fetch(url);
    const data = await res.json();
    if (data.error) throw new Error(data.error);
@@ -250,8 +267,8 @@ export async function getAchievedStudents(email, className = '*') {
   */
  export async function getGlobalRedemptionStats(email) {
    if (!email) throw new Error('必須提供使用者 email');
-   
-   const url = `${API_URL}?action=getGlobalRedemptionStats&email=${encodeURIComponent(email)}`;
+   const qs = await getTokenQS();
+   const url = `${API_URL}?action=getGlobalRedemptionStats&email=${encodeURIComponent(email)}&${qs}`;
    const res = await fetch(url);
    const data = await res.json();
    if (data.error) throw new Error(data.error);
