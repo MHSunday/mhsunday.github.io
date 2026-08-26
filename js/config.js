@@ -14,13 +14,11 @@ const APP_CONFIG = {
   // 替換為你的 Cloud Function URL
   //apiProxyUrl: "https://us-central1-your-project.cloudfunctions.net/api",
 
-  appsScriptUrl: "https://script.google.com/macros/s/AKfycbwYuh0JoIG3yUFCm2rL6DTbXeyaCfx-4K1kswX3gnPNNqFRwqB5cmNiqBT3RmNkXUQ/exec",
+  appsScriptUrl: "https://script.google.com/macros/s/AKfycbzBbEZzIIKRsrXNkMhGHJh4vutfLRfTMkK-Cs9pp82TEN59wvOEjA40rWnk74mGlqw/exec",
 
   // 投票系統獨立的 Apps Script URL（vote.html / admin.html 使用）
-  // ⚠️ 目前暫時與 appsScriptUrl 相同（同一部署）；重新部署主系統後需分開：
-  //   appsScriptUrl  = 主系統（fixed_main.gs + config.gs）的 /exec URL
-  //   voteScriptUrl  = 投票系統（voting.gs + config.gs）的 /exec URL
-  voteScriptUrl: "https://script.google.com/macros/s/AKfycbwYuh0JoIG3yUFCm2rL6DTbXeyaCfx-4K1kswX3gnPNNqFRwqB5cmNiqBT3RmNkXUQ/exec"
+  // ⚠️ 仍未分離投票系統（按 session_context.md 未完成項目）；暫時同主系統指向同一 URL
+  voteScriptUrl: "https://script.google.com/macros/s/AKfycbzBbEZzIIKRsrXNkMhGHJh4vutfLRfTMkK-Cs9pp82TEN59wvOEjA40rWnk74mGlqw/exec"
 };
 
   // 🔥 替換為你的 Google Apps Script Web App URL
