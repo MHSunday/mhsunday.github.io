@@ -15,38 +15,36 @@
 <body class="bg-gray-50 min-h-screen">
 
   <nav class="bg-blue-700 text-white shadow-lg">
-    <div class="max-w-3xl mx-auto px-4 py-3 flex justify-between items-center">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
       <h1 class="text-xl font-bold">上堂日曆管理</h1>
       <div class="space-x-4">
-        <a href="form.html" class="text-sm hover:underline">彌撒登記</a>
+        <a href="class_portal.html" class="text-sm hover:underline">每班Portal</a>
+        <a href="rollcall.html" class="text-sm hover:underline">課堂點名</a>
         <button id="logoutBtn" class="text-sm bg-blue-800 px-3 py-1 rounded hover:bg-blue-900 transition">登出</button>
       </div>
     </div>
   </nav>
 
-  <main class="max-w-3xl mx-auto p-4 mt-4">
-    <div class="bg-white rounded-xl shadow-md p-6">
-
-      <div class="flex items-center justify-between mb-4">
+  <main class="max-w-5xl mx-auto p-4 mt-4">
+    <div class="bg-white rounded-xl shadow-md p-4 mb-4">
+      <div class="flex items-center justify-between mb-3">
         <div>
           <h2 class="text-lg font-bold">2026-2027 上堂日</h2>
-          <p class="text-sm text-gray-500">類型：上課 / 活動 / 假期 / 停課。逐日修改後按「儲存」。</p>
+          <p class="text-sm text-gray-500">逐日填主日（節日 + 福音）同主日學活動；「假期：」字眼會自動灰底。</p>
         </div>
         <div class="space-x-2">
-          <button id="resetBtn" class="text-sm bg-orange-500 text-white px-3 py-2 rounded hover:bg-orange-600 transition">一鍵重置</button>
+          <button id="importBtn" class="text-sm bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 transition">import 預設日曆</button>
           <button id="saveBtn" class="text-sm bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">儲存</button>
         </div>
       </div>
-
       <div id="message" class="text-center text-sm font-medium min-h-[1.25rem] mb-2"></div>
-
       <div class="overflow-x-auto">
         <table class="w-full text-sm border-collapse">
           <thead>
             <tr class="bg-gray-100">
-              <th class="border p-2 text-left w-28">日期</th>
-              <th class="border p-2 text-left w-28">類型</th>
-              <th class="border p-2 text-left">備註</th>
+              <th class="border p-2 text-left w-28 whitespace-nowrap">日期</th>
+              <th class="border p-2 text-left">主日</th>
+              <th class="border p-2 text-left w-64">主日學活動</th>
             </tr>
           </thead>
           <tbody id="sessionsBody">
@@ -54,7 +52,6 @@
           </tbody>
         </table>
       </div>
-
     </div>
   </main>
 

@@ -3,7 +3,18 @@ import { getAllClasses, getSessions, getClassRoster, getRollCall, saveRollCall, 
 import { getUserRole, onRoleLoaded, logout } from './auth.js';
 
 const CATEGORY_LABEL = { '學生': '學生', '小導師': '小導師', '老師': '導師' };
-const TYPE_SHORT = { '上課': '課', '活動': '活', '假期': '假', '停課': '停' };
+
+function isClassDay(s) {
+  // 假期：xxx → 非上堂日；其他一律當上堂日
+  return !(s.event || '').startsWith('假期');
+}
+
+function shortType(s) {
+  // 顯示一隻字嘅類型標記
+  if (!s.event) return '課';
+  if (s.event.startsWith('假期')) return '假';
+  return '活';
+}
 
 const $ = (id) => document.getElementById(id);
 
@@ -91,7 +102,7 @@ function fillDateSelect() {
   sessions.forEach(s => {
     const opt = document.createElement('option');
     opt.value = s.date;
-    opt.textContent = `${s.date}（${s.type}${s.note ? ' ' + s.note : ''}）`;
+    opt.textContent = `${s.date}（${s.title ? s.title.split('　')[0] : ''}${s.event ? ' · ' + s.event : ''}）`;
     sel.appendChild(opt);
   });
 }
@@ -253,14 +264,14 @@ function buildMatrixTable() {
   typeTr.appendChild(corner2);
 
   sessions.forEach(s => {
-    const isClassDay = s.type === '上課' || s.type === '活動';
+    const isDay = isClassDay(s);
     const th1 = document.createElement('th');
-    th1.className = `sticky-head border p-1.5 text-center whitespace-nowrap ${isClassDay ? 'bg-gray-100' : 'bg-gray-200 text-gray-400'}`;
+    th1.className = `sticky-head border p-1.5 text-center whitespace-nowrap ${isDay ? 'bg-gray-100' : 'bg-gray-200 text-gray-400'}`;
     th1.textContent = shortDate(s.date);
 
     const th2 = document.createElement('th');
-    th2.className = `border p-0.5 text-center text-[10px] ${isClassDay ? 'text-gray-500' : 'text-gray-400'}`;
-    th2.textContent = TYPE_SHORT[s.type] || s.type;
+    th2.className = `border p-0.5 text-center text-[10px] ${isDay ? 'text-gray-500' : 'text-gray-400'}`;
+    th2.textContent = shortType(s);
 
     headTr.appendChild(th1);
     typeTr.appendChild(th2);
@@ -286,8 +297,8 @@ function buildMatrixTable() {
 
     sessions.forEach(sess => {
       const td = document.createElement('td');
-      const isClassDay = sess.type === '上課' || sess.type === '活動';
-      td.className = `border cell ${isClassDay ? '' : 'bg-gray-100'}`;
+      const isDay = isClassDay(sess);
+      td.className = `border cell ${isDay ? '' : 'bg-gray-100'}`;
       const present = yearMarks[sess.date] && yearMarks[sess.date][s.name] === true;
       if (present) td.textContent = '✓';
       tr.appendChild(td);
@@ -336,8 +347,8 @@ function buildPrintSheet() {
     let cells = `<td style="border:1px solid #000;padding:2px 6px;white-space:nowrap;">${s.name}</td>`;
     sessions.forEach(sess => {
       const present = yearMarks[sess.date] && yearMarks[sess.date][s.name] === true;
-      const isClassDay = sess.type === '上課' || sess.type === '活動';
-      const style = `border:1px solid #000;width:26px;height:26px;text-align:center;font-size:13px;${isClassDay ? '' : 'background:#f3f4f6;'}`;
+      const isDay = isClassDay(sess);
+      const style = `border:1px solid #000;width:26px;height:26px;text-align:center;font-size:13px;${isDay ? '' : 'background:#f3f4f6;'}`;
       cells += `<td style="${style}">${present ? '✓' : ''}</td>`;
     });
     rows += `<tr style="page-break-inside:avoid;">${cells}</tr>`;
@@ -345,8 +356,8 @@ function buildPrintSheet() {
 
   let headers = '<td style="border:1px solid #000;padding:2px 6px;font-weight:bold;">姓名</td>';
   sessions.forEach(s => {
-    const isClassDay = s.type === '上課' || s.type === '活動';
-    headers += `<td style="border:1px solid #000;width:26px;font-size:9px;text-align:center;${isClassDay ? '' : 'background:#f3f4f6;'}">${shortDate(s.date)}</td>`;
+    const isDay = isClassDay(s);
+    headers += `<td style="border:1px solid #000;width:26px;font-size:9px;text-align:center;${isDay ? '' : 'background:#f3f4f6;'}">${shortDate(s.date)}</td>`;
   });
 
   html += `
