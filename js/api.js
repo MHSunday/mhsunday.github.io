@@ -260,17 +260,172 @@ export async function getAchievedStudents(email, className = '*') {
    return data;
  }
  
- /**
-  * 獲取全局換領統計數據
-  * @param {string} email - 用戶郵箱
-  * @returns {Object} 全局換領統計數據
-  */
- export async function getGlobalRedemptionStats(email) {
-   if (!email) throw new Error('必須提供使用者 email');
-   const qs = await getTokenQS();
-   const url = `${API_URL}?action=getGlobalRedemptionStats&email=${encodeURIComponent(email)}&${qs}`;
-   const res = await fetch(url);
-   const data = await res.json();
-   if (data.error) throw new Error(data.error);
-   return data;
- }
+/**
+ * 獲取全局換領統計數據
+ * @param {string} email - 用戶郵箱
+ * @returns {Object} 全局換領統計數據
+ */
+export async function getGlobalRedemptionStats(email) {
+  if (!email) throw new Error('必須提供使用者 email');
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=getGlobalRedemptionStats&email=${encodeURIComponent(email)}&${qs}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+// ==========================================
+// 上堂日曆 (sessions) API
+// ==========================================
+
+/**
+ * 取得上堂日曆（全部上堂日/活動/假期/停課）
+ * @returns {Array} [{date:'yyyy-MM-dd', type:'上課', note:''}]
+ */
+export async function getSessions() {
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=getSessions&${qs}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return Array.isArray(data) ? data : [];
+}
+
+/**
+ * 批量覆寫上堂日曆（僅管理員）
+ * @param {Array} sessions - [{date, type, note}]
+ */
+export async function saveSessions(sessions) {
+  if (!Array.isArray(sessions)) throw new Error('sessions 必須是數組');
+  const formData = toFormData({
+    action: 'saveSessions',
+    sessions: JSON.stringify(sessions),
+    idToken: await getAuthToken()
+  });
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: formData
+  });
+  const result = await response.json();
+  if (result.error) throw new Error(result.error);
+  return result;
+}
+
+/**
+ * 一鍵重置上堂日曆為「學年內全部週日」（僅管理員）
+ */
+export async function resetSessions() {
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=resetSessions&${qs}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+// ==========================================
+// 課堂點名 (rollcall) API
+// ==========================================
+
+/**
+ * 取得某班完整名單（學生 + 小導師 + 老師）
+ * @param {string} className
+ * @returns {Array} [{serial, name, category, className}]
+ */
+export async function getClassRoster(className) {
+  if (!className) throw new Error('班級名稱不能為空');
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=getClassRoster&class=${encodeURIComponent(className)}&${qs}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return Array.isArray(data) ? data : [];
+}
+
+/**
+ * 取得某班某日嘅點名狀態（roster + 已填出席）
+ * @param {string} className
+ * @param {string} date - yyyy-MM-dd
+ * @returns {Array} [{serial, name, category, className, present}]
+ */
+export async function getRollCall(className, date) {
+  if (!className || !date) throw new Error('缺少必要參數');
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=getRollCall&class=${encodeURIComponent(className)}&date=${encodeURIComponent(date)}&${qs}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return Array.isArray(data) ? data : [];
+}
+
+/**
+ * 批量儲存點名（日期可為過去 = 補填）
+ * @param {string} className
+ * @param {string} date - yyyy-MM-dd
+ * @param {Array} records - [{name, category, className, present}]
+ */
+export async function saveRollCall(className, date, records) {
+  if (!className || !date || !Array.isArray(records)) throw new Error('缺少必要參數');
+  const formData = toFormData({
+    action: 'saveRollCall',
+    className: className,
+    date: formatDateForApi(date),
+    records: JSON.stringify(records),
+    idToken: await getAuthToken()
+  });
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: formData
+  });
+  const result = await response.json();
+  if (result.error) throw new Error(result.error);
+  return result;
+}
+
+/**
+ * 取得某班學年範圍內全部點名記錄（全年矩陣 VIEW）
+ * @param {string} className
+ * @param {string} [startDate] - yyyy-MM-dd
+ * @param {string} [endDate] - yyyy-MM-dd
+ * @returns {Object} { date: { 姓名: true/false } }
+ */
+export async function getRollCallYear(className, startDate, endDate) {
+  if (!className) throw new Error('缺少必要參數');
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=getRollCallYear&class=${encodeURIComponent(className)}&startDate=${encodeURIComponent(startDate || '')}&endDate=${encodeURIComponent(endDate || '')}&${qs}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data || {};
+}
+
+/**
+ * 取得某班學生補充資料（Form 收集）
+ * @param {string} className
+ */
+export async function getStudentDetails(className) {
+  if (!className) throw new Error('缺少必要參數');
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=getStudentDetails&class=${encodeURIComponent(className)}&${qs}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return Array.isArray(data) ? data : [];
+}
+
+/**
+ * 取得某班 portal 資料（links + roster + sessions + details）
+ * @param {string} className
+ */
+export async function getClassPortal(className) {
+  if (!className) throw new Error('缺少必要參數');
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=getClassPortal&class=${encodeURIComponent(className)}&${qs}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
