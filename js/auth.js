@@ -151,6 +151,8 @@ auth.onAuthStateChanged(async (user) => {
       if (!response.ok) throw new Error(`權限服務錯誤: ${response.status}`);
 
       const roleData = await response.json();
+      console.log("[auth] 登入 email:", user.email);
+      console.log("[auth] getUserRoles 回傳:", roleData);
 
       if (roleData && (roleData.role === 'admin' || roleData.role === 'teacher')) {
         userRole = roleData;
@@ -167,7 +169,8 @@ auth.onAuthStateChanged(async (user) => {
           window.location.replace('./form.html');
         }
       } else {
-        alert("您沒有使用此系統的權限");
+        const detail = roleData && roleData.error ? `｜後端回覆：${roleData.error}` : `｜回傳：${JSON.stringify(roleData)}`;
+        alert(`您沒有使用此系統的權限｜登入帳號：${user.email}${detail}`);
         await logout();
       }
     } catch (err) {
