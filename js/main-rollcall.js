@@ -1,5 +1,5 @@
 // js/main-rollcall.js — 課堂點名（當日點名 / 全年矩陣 / 列印點名紙）
-import { getAllClasses, getSessions, getClassRoster, getRollCall, saveRollCall, getRollCallYear } from './api.js';
+import { getAllClasses, getSessions, getClassRoster, getRollCall, saveRollCall, getRollCallYear } from './data.js';
 import { getUserRole, onRoleLoaded, logout } from './auth.js';
 
 const CATEGORY_LABEL = { '學生': '學生', '小導師': '小導師', '老師': '導師' };
@@ -152,7 +152,8 @@ async function renderDay() {
     roster = await getRollCall(currentClass, currentDate);
     renderDayRows();
     const attended = roster.filter(r => r.present === true).length;
-    setMessage(`共 ${roster.length} 人，出席 ${attended} 人`);
+    const pct = roster.length ? Math.round((attended / roster.length) * 100) : 0;
+    setMessage(`共 ${roster.length} 人，出席 ${attended} 人（${pct}%）`);
   } catch (err) {
     setMessage(`載入失敗：${err.message}`, true);
     body.innerHTML = '';
@@ -258,10 +259,18 @@ function buildMatrixTable() {
   corner.textContent = '姓名';
   headTr.appendChild(corner);
 
+  const pctHead = document.createElement('th');
+  pctHead.className = 'sticky-head border p-1.5 text-center whitespace-nowrap bg-gray-100';
+  pctHead.textContent = '出席%';
+  headTr.appendChild(pctHead);
+
   const typeTr = document.createElement('tr');
   const corner2 = document.createElement('th');
   corner2.className = 'sticky-name border p-1.5 bg-gray-50';
   typeTr.appendChild(corner2);
+  const corner3 = document.createElement('th');
+  corner3.className = 'border p-0.5 bg-gray-50';
+  typeTr.appendChild(corner3);
 
   sessions.forEach(s => {
     const isDay = isClassDay(s);
@@ -280,12 +289,14 @@ function buildMatrixTable() {
   body.appendChild(headTr);
   body.appendChild(typeTr);
   // 資料列
+  const today = todayStr();
+  const eligibleDays = sessions.filter(s => isClassDay(s) && s.date <= today);
   let lastCat = '';
   roster.forEach((s) => {
     if (s.category !== lastCat) {
       lastCat = s.category;
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="${sessions.length + 1}" class="bg-gray-100 border p-1.5 text-xs font-bold text-gray-600">${CATEGORY_LABEL[s.category] || s.category}</td>`;
+      tr.innerHTML = `<td colspan="${sessions.length + 2}" class="bg-gray-100 border p-1.5 text-xs font-bold text-gray-600">${CATEGORY_LABEL[s.category] || s.category}</td>`;
       body.appendChild(tr);
     }
 
@@ -294,6 +305,17 @@ function buildMatrixTable() {
     nameTd.className = 'sticky-name border p-1.5 whitespace-nowrap';
     nameTd.textContent = s.name;
     tr.appendChild(nameTd);
+
+    // 出席%（分母 = 已過嘅上堂日）
+    let attended = 0;
+    eligibleDays.forEach(sess => {
+      if (yearMarks[sess.date] && yearMarks[sess.date][s.name] === true) attended++;
+    });
+    const pctTd = document.createElement('td');
+    const pct = eligibleDays.length ? Math.round((attended / eligibleDays.length) * 100) : null;
+    pctTd.className = 'border p-1.5 text-center whitespace-nowrap font-bold text-blue-700';
+    pctTd.textContent = pct === null ? '—' : `${pct}%`;
+    tr.appendChild(pctTd);
 
     sessions.forEach(sess => {
       const td = document.createElement('td');

@@ -1,5 +1,5 @@
 // js/main-sessions.js — 上堂日曆管理頁（僅管理員）
-import { getSessions, saveSessions } from './api.js';
+import { getSessions, saveSessions, importDefaultSessions, syncAllFromGAS, exportRollcallsToGAS } from './data.js';
 import { onRoleLoaded, logout } from './auth.js';
 
 const $ = (id) => document.getElementById(id);
@@ -103,12 +103,34 @@ async function handleImport() {
   if (!confirm('確定覆寫為預設日曆？現有資料會被取代。')) return;
   setMessage('import 中...');
   try {
-    // 後端 RUN_ImportSessionsCalendar 已寫入；前端只需重新載入
-    // 由於 RUN_* 只可喺 GAS 編輯器行，我哋提供 webhook 用 GAS 部署嘅 doPost 不適用
-    // → 改為提示 user 喺 GAS 執行 RUN_ImportSessionsCalendar
-    setMessage('請喺 GAS 編輯器執行 RUN_ImportSessionsCalendar；執行後 reload 呢個頁', true);
+    await importDefaultSessions();
+    setMessage('已載入預設日曆');
+    await loadSessions();
   } catch (err) {
     setMessage(`import 失敗：${err.message}`, true);
+  }
+}
+
+async function handleSync() {
+  if (!confirm('將 Sheets 嘅名單/日曆/全年點名同步去 Firestore？\n\n⚠️ 一次性操作，逐班 fetch 需時（可能幾分鐘），期間請勿關閉頁面。')) return;
+  setMessage('同步中（逐班進行，請耐心等候）...');
+  try {
+    const out = await syncAllFromGAS();
+    setMessage(`同步完成：${out.classes} 班、${out.sessions} 個上堂日`);
+    await loadSessions();
+  } catch (err) {
+    setMessage(`同步失敗：${err.message}`, true);
+  }
+}
+
+async function handleExport() {
+  if (!confirm('將 Firestore 嘅點名匯出返去 GAS 試算表（rollcalls 表）？')) return;
+  setMessage('匯出中...');
+  try {
+    const out = await exportRollcallsToGAS();
+    setMessage(`已匯出 ${out.exported} 筆點名到試算表`);
+  } catch (err) {
+    setMessage(`匯出失敗：${err.message}`, true);
   }
 }
 
@@ -116,6 +138,10 @@ function init() {
   $('logoutBtn').addEventListener('click', () => logout());
   $('saveBtn').addEventListener('click', handleSave);
   $('importBtn').addEventListener('click', handleImport);
+  const syncBtn = $('syncBtn');
+  const exportBtn = $('exportBtn');
+  if (syncBtn) syncBtn.addEventListener('click', handleSync);
+  if (exportBtn) exportBtn.addEventListener('click', handleExport);
 }
 
 onRoleLoaded((role) => {

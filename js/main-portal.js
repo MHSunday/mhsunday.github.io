@@ -1,5 +1,5 @@
 // js/main-portal.js — 每班 Portal 頁
-import { getAllClasses, getClassPortal } from './api.js';
+import { getAllClasses, getClassPortal, getAttendanceStats } from './data.js';
 import { onRoleLoaded, logout } from './auth.js';
 
 const CATEGORY_LABEL = { '學生': '學生', '小導師': '小導師', '老師': '導師' };
@@ -62,16 +62,33 @@ async function loadPortal() {
     renderActions(p);
     renderLinks(p);
     renderDetails(p);
+    await renderAttendance(p);
     setMessage(`${currentClass}：共 ${p.rosterCount} 人`);
   } catch (err) {
     setMessage(`載入失敗：${err.message}`, true);
   }
 }
 
+async function renderAttendance(p) {
+  const card = $('attendanceCard');
+  if (!card) return;
+  try {
+    const s = await getAttendanceStats(currentClass);
+    const attended = s.eligibleDays ? `${s.presentCount}/${s.totalCount}` : '—';
+    $('attendanceInfo').textContent = `${attended} 人次（${s.eligibleDays} 個上堂日）`;
+    $('attendancePct').textContent = `${s.rate}%`;
+    card.classList.remove('hidden');
+  } catch (err) {
+    card.classList.add('hidden');
+  }
+}
+
 function renderToday(p) {
   const card = $('todayCard');
   if (p.todaySession) {
-    $('todayInfo').textContent = `${p.todaySession.date}（${p.todaySession.type}${p.todaySession.note ? ' ' + p.todaySession.note : ''}）`;
+    const s = p.todaySession;
+    const label = [s.title, s.event].filter(Boolean).join(' · ');
+    $('todayInfo').textContent = `${s.date}${label ? '（' + label + '）' : ''}`;
     card.classList.remove('hidden');
   } else {
     card.classList.add('hidden');

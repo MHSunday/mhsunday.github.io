@@ -1,6 +1,6 @@
 # Session Context — 主日學登記系統 登入修復 + 安全強化
 
-> 更新日期：2026-08-26
+> 更新日期：2026-08-26（登入修復）/ 2026-08-27（Firestore 整合實作）
 
 ## 1. 原始問題
 
@@ -107,6 +107,7 @@ FIREBASE_PROJECT_ID = "githublogin-49a54"
 - [ ] **API key 正式限制**（可選）：整 server-only API key 畀後端用，前端 key 先可以加返 referrer 限制
 - [ ] **檢查 Google Sheets 權限**：確認三張 Sheet 唔係「anyone with link can view」公開
 - [ ] **`.gs` 唔好再放返入 public repo**（已移去 `C:\Dev\SundaySchoolPortal\apps-script-backup\`）
+- [ ] **Firestore 整合**（Portal + 課堂點名 已實作，**未啟用/未設 rules**）：見 `plans/firestore_setup.md` + `plans/firestore_design.md` + `plans/firestore.rules`
 
 ---
 
@@ -176,3 +177,198 @@ FIREBASE_PROJECT_ID = "githublogin-49a54"
 - [ ] `class_links` 表填入各班表單連結
 - [ ] 可選：`CFG_ATTENDANCE_OUTPUT_FOLDER_ID`（想保留管線產出 Sheets 出席表先填）
 - [ ] 投票系統分離仍按舊計劃（`voting.gs` 獨立專案）
+
+---
+
+# 附錄：Firestore 整合設計（2026-08-26）
+
+> 完整設計文件：`plans/firestore_design.md`
+> 目的：解決 `class_portal` load 過慢（>10s）嘅問題
+
+## 背景
+
+- 現有 GAS + Sheets 架構：`getClassPortal` 同步 fetch 4 個 sheet + `getUserRoles` 每次 read permissions → load ~10s
+- 目標：Class portal load < 1s；roll call save < 500ms（40人 batch）；全年矩陣 < 1s
+- 沿用現有 Firebase Auth（無需新登入）；保留 Sheets 為 roster 編輯界面
+
+## Firestore 資料模型
+
+```
+/schools/mhsunday (singleton)
+  /classes/{className}             班級 metadata
+  /roster/{className}/members/{name}   學生/小導師/老師 { serial, category, className, order }
+  /sessions/{date}                 主日日曆 { date, title, event, order }
+  /rollcalls/{className}/{date}/{name} 點名 { present, category, recorder, timestamp }
+  /studentDetails/{className}/{name}   Form 補充資料
+  /classLinks/{className}           表單連結
+  /permissions/{email}              角色權限 { role, classes }
+```
+
+## 重點決策
+
+- **唔用 Firebase custom claims**（GAS 唔可以直接 call Admin SDK；rules 讀 `permissions/{email}` doc 已夠）
+- **Security Rules**：roster read=isAuthed / write=admin；rollcalls + studentDetails write=admin 或 isTeacherOf(className)；permissions 只可讀自己
+- **前端新增 `js/db.js`**（Firebase modular SDK）：`getRoster` / `getSessions` / `getRollCall` / `saveRollCall`(writeBatch) / `getRollCallYear` / `getStudentDetails` / `getClassLink` / `saveSession`
+- **保留 GAS API**：`getAllClasses` / `recordAttendance` / `getStats` / `getAchievedStudents`（form/redeem/details 唔郁）
+- **GAS Sync 工具**：`RUN_SyncRosterToFirestore` / `RUN_SyncSessionsToFirestore`（用 Firestore REST API + `ScriptApp.getOAuthToken()`，需 IAM 權限）
+- **Rollback**：前端 feature flag `USE_FIRESTORE`
+
+## 效能預期
+
+| 操作 | 現（GAS+Sheets） | 新（Firestore） |
+|---|---|---|
+| Class portal load | ~10s | ~1-2s |
+| Save roll call (40人) | ~3-5s | ~300ms |
+| 全年矩陣 (40×42) | ~5s | ~800ms |
+
+Free tier（50,000 reads/day）完全足夠。
+
+## Migration Plan（Phase）
+
+1. **設置**：啟用 Firestore、建 `permissions/sfxsunday@gmail.com`、設定 Security Rules、budget alert
+2. **Sync 工具**：寫 `firestoreSync.js`、測 sync
+3. **Frontend**：`js/db.js` + 改 `class_portal.html` / `rollcall.html` / `admin_sessions.html`
+4. **Rollback**：feature flag 切返 GAS
+
+## 待確認
+
+- [ ] Firestore region（asia-east1 / asia-east2）
+- [ ] `sfxsunday@gmail.com` 為 first admin
+- [ ] 保留 form.html / redeem.html 用 GAS
+- [ ] Security Rules：teacher 睇唔睇到其他班 roster
+
+---
+
+# 附錄：Firestore 整合實作（2026-08-27）
+
+> 設計見上節「Firestore 整合設計」+ `plans/firestore_design.md`。本節記實作 + 真實踩過嘅坑。
+
+## 範圍
+
+**只做**「每班 Portal + 課堂點名（含出席%）」。彌撒/換領/投票/詳細資料**繼續用 GAS**（唔郁）。
+
+## 改動檔案
+
+### 新增
+
+| 檔案 | 內容 |
+|---|---|
+| `js/db.js` | Firestore v8 資料層（roster / sessions / rollcalls / classes / classLinks / studentDetails）+ `getAttendanceStats` + `syncAllFromGAS`（Sheets→Firestore）+ `exportRollcallsToGAS`（Firestore→GAS） |
+| `js/data.js` | `USE_FIRESTORE` flag adapter（portal / 點名 / 日曆都經呢度 import，rollback = 改 flag） |
+| `plans/firestore.rules` | Security Rules（admin / teacher / authed） |
+| `plans/firestore_setup.md` | 部署步驟 + 出席% 定義 + 決策 |
+| `apps-script-backup/portal-integrated/firestoreSync.js` | 可選 GAS REST 同步工具（需 IAM，已由瀏覽器版 `syncAllFromGAS` 取代） |
+
+### 修改
+
+| 檔案 | 內容 |
+|---|---|
+| `js/config.js` | + `USE_FIRESTORE: true`（改 `false` 即時 rollback） |
+| `js/main-portal.js` | 改用 `data.js` + 「本班出席率」卡片 |
+| `js/main-rollcall.js` | 改用 `data.js` + 當日出席% + 全年矩陣「出席%」欄 |
+| `js/main-sessions.js` | 改用 `data.js` + 瀏覽器 import 預設日曆 + 同步/匯出按鈕 |
+| `class_portal.html` / `rollcall.html` / `admin_sessions.html` | + `firebase-firestore.js` CDN；admin_sessions + 同步卡片 |
+
+## 關鍵決策
+
+1. **沿用 Firebase v8 namespaced SDK**（CDN）—— 同現有 `auth.js` 一致，GitHub Pages 靜態部署，**無 build step**
+2. **「輸出返 GAS spreadsheet」唔使改 GAS 後端**：admin 撳「匯出點名 → 試算表」→ `db.exportRollcallsToGAS()` 讀 Firestore → 調用**既有** `saveRollCall`（GAS POST）寫入營運試算表 `rollcalls` 表
+3. **同步方向**：Sheets → Firestore 由 admin 喺瀏覽器做（用 admin 自己嘅 token），**唔需要 GAS service account / IAM** —— 比 GAS REST 版可靠好多
+4. **出席% 定義**（可改）：分母 = 已過嘅非「假期：」開頭嘅上堂日（日期 ≤ 今日）；分子 = 出席人次。改 `js/db.js` 嘅 `getAttendanceStats`
+5. **rollback**：`USE_FIRESTORE: false` 即時切返 GAS + Sheets，唔需要改其他嘢
+
+## 真實踩過嘅坑（Rules 部署）
+
+### 坑 1：殘留預設規則 → syntax error
+
+貼 rules 時如果**冇 Ctrl+A → Delete** 就 paste，原本嘅預設：
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+```
+
+仲喺度，後面接住你嘅規則 → parser 喺錯誤位置見到 `if` → 報「Line 8: mismatched input 'if'」。
+
+**解：編輯器一定要全清空，再貼。**
+
+### 坑 2：Rules Playground 測試嘅係「已發佈」嘅規則
+
+唔係編輯器現有 draft。所以「Simulated read denied」出現時，就算編輯器已經改好都仲係 deny。
+
+**解：一定要先撳「發佈 / Publish」再去模擬器。**
+
+### 坑 3：Auth 冇填 email → read denied
+
+模擬器 Authentication 揀咗 Firebase Auth / Google 之後，**一定要喺 payload 填 `email`**（同你要讀嘅 doc `{email}` 一致）。淨揀 provider 唔填 email → `request.auth.token.email` 為空 → rules 條件不成立 → deny。
+
+### 坑 4：Doc 唔存在 ≠ read denied
+
+`permissions` 嗰條 read rule 只係 `isAuthed() && request.auth.token.email == email`，**唔 check doc 存在**。換言之未建 doc 嘅情況下 admin email 讀都應該 allowed（會收到「not found」）。
+
+**所以一旦 deny，幾乎一定係規則錯／未發佈／未登入，唔關 doc 事。**
+
+## Firebase Console 設定 checklist（真實做過嘅順序）
+
+1. Firestore Database → 建立資料庫
+   - Region：**asia-east2（香港）**（香港用家延遲最低；揀錯改唔到）
+   - 模式：**正式模式**（Production）
+2. 資料 → 開始新增集合 → `permissions`
+   - 文件 ID：`sfxsunday@gmail.com`
+   - 欄位：`role` = `"admin"`（string，唔好有空格）
+3. Rules → Ctrl+A → Delete → 貼 `plans/firestore.rules` → **發佈**
+4. Rules Playground 驗證：
+   - Location：`databases/(default)/documents/permissions/sfxsunday@gmail.com`
+   - Type：`get`
+   - Auth：Firebase Auth，email = `sfxsunday@gmail.com`
+   - 預期：`Simulated read allowed`
+5. 反向測：Auth 揀「None」 → `Simulated read denied` ✅
+6. Push repo → GitHub Pages 自動更新
+7. 用 admin 登入 → `admin_sessions.html` → 「同步 Sheets → Firestore」（一次性，數分鐘）
+8. 測試：portal load <2s、rollcall save <500s、矩陣 + 出席% 出到
+
+## 設定值
+
+```js
+// js/config.js
+firebase: { projectId: "githublogin-49a54", ... },
+USE_FIRESTORE: true
+```
+
+```js
+// plans/firestore.rules（isAdmin 讀呢個 doc）
+permissions/sfxsunday@gmail.com  { role: "admin" }
+```
+
+## 日常用法
+
+| 操作 | 邊個 | 點做 |
+|---|---|---|
+| 點名 | 老師 | `rollcall.html` → 直接寫 Firestore（<500ms） |
+| 睇出席% | 老師/管理員 | `class_portal.html` 頂部卡片 + `rollcall.html` 全年矩陣「出席%」欄 |
+| 加新班 / 加新學生 | 管理員 | 改 Sheets STUDENT 試算表 → admin_sessions.html → 「同步 Sheets → Firestore」 |
+| 改上堂日曆 | 管理員 | `admin_sessions.html` 直接編 → 寫 Firestore |
+| 點名落試算表 | 管理員 | `admin_sessions.html` → 「匯出點名 → 試算表」→ 寫返 rollcalls 表 |
+
+## Rollback
+
+```js
+// js/config.js
+USE_FIRESTORE: false
+```
+
+Commit + push。即時切返舊 GAS + Sheets 架構。Firestore 資料保留，之後可以 re-enable。
+
+## 未做（低優先）
+
+- [ ] Budget alert（避免爆 Firestore 免費額）
+- [ ] 將「輸出回 GAS spreadsheet」自動化（cron / on-write trigger），唔使人手撳匯出
+- [ ] Teacher 權限 doc 流程（依家要人手建 teacher doc + 部署 Firestore write）
+- [ ] Offline persistence（Firestore SDK 內建 `enableIndexedDbPersistence`，未啟用）
+- [ ] Region 最終確認（已推薦 asia-east2，但 console 要揀）

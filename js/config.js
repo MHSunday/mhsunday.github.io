@@ -18,7 +18,16 @@ const APP_CONFIG = {
 
   // 投票系統獨立的 Apps Script URL（vote.html / admin.html 使用）
   // ⚠️ 仍未分離投票系統（按 session_context.md 未完成項目）；暫時同主系統指向同一 URL
-  voteScriptUrl: "https://script.google.com/macros/s/AKfycbzBbEZzIIKRsrXNkMhGHJh4vutfLRfTMkK-Cs9pp82TEN59wvOEjA40rWnk74mGlqw/exec"
+  voteScriptUrl: "https://script.google.com/macros/s/AKfycbzBbEZzIIKRsrXNkMhGHJh4vutfLRfTMkK-Cs9pp82TEN59wvOEjA40rWnk74mGlqw/exec",
+
+  // ==========================================
+  // Firestore 整合開關（每班 Portal / 課堂點名 專用）
+  // ==========================================
+  // true  = 每班 Portal + 課堂點名 改用 Firestore（快：portal <2s、save <500ms）
+  //         ⚠️ 前提：Firebase Console 已啟用 Firestore + 已部署 security rules
+  //         （見 plans/firestore_setup.md），否則呢啲頁會報錯。
+  // false = 用返 GAS + Sheets（舊架構，用嚟 rollback）
+  USE_FIRESTORE: true
 };
 
   // 🔥 替換為你的 Google Apps Script Web App URL
