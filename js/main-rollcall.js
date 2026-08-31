@@ -1,6 +1,7 @@
-// js/main-rollcall.js — 課堂點名（當日點名 / 全年矩陣 / 列印點名紙）
+// js/main-rollcall.js — 課堂點名（當日點名 / 全年矩陣）
+// 每個星期日記兩種出席：上堂（present）+ 彌撒（mass）
 import { getAllClasses, getSessions, getClassRoster, getRollCall, saveRollCall, getRollCallYear } from './data.js';
-import { getUserRole, onRoleLoaded, logout } from './auth.js';
+import { onRoleLoaded, logout } from './auth.js';
 
 const CATEGORY_LABEL = { '學生': '學生', '小導師': '小導師', '老師': '導師' };
 
@@ -54,11 +55,10 @@ async function init() {
   $('logoutBtn').addEventListener('click', () => logout());
   $('tabDayBtn').addEventListener('click', () => switchTab('day'));
   $('tabMatrixBtn').addEventListener('click', () => switchTab('matrix'));
-  $('tabPrintBtn').addEventListener('click', () => switchTab('print'));
-  $('allPresentBtn').addEventListener('click', () => setAll(true));
-  $('allAbsentBtn').addEventListener('click', () => setAll(false));
+  $('allPresentBtn').addEventListener('click', () => setByKind('present', true));
+  $('allMassBtn').addEventListener('click', () => setByKind('mass', true));
+  $('clearAllBtn').addEventListener('click', () => renderDay());
   $('saveDayBtn').addEventListener('click', saveDay);
-  $('printBtn').addEventListener('click', () => window.print());
   $('classSelect').addEventListener('change', (e) => { currentClass = e.target.value; onClassOrDateChanged(); });
   $('dateSelect').addEventListener('change', (e) => { currentDate = e.target.value; renderDay(); });
 
@@ -119,7 +119,6 @@ function defaultSessionDate() {
 function onClassOrDateChanged() {
   if (currentTab === 'day') renderDay();
   else if (currentTab === 'matrix') renderMatrix();
-  else if (currentTab === 'print') renderPrint();
 }
 
 function switchTab(tab) {
@@ -127,15 +126,12 @@ function switchTab(tab) {
   const isDay = tab === 'day';
   $('dayView').classList.toggle('hidden', !isDay);
   $('matrixView').classList.toggle('hidden', tab !== 'matrix');
-  $('printView').classList.toggle('hidden', tab !== 'print');
 
   $('tabDayBtn').className = `px-4 py-2 rounded-md text-sm font-bold ${isDay ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`;
   $('tabMatrixBtn').className = `px-4 py-2 rounded-md text-sm font-bold ${tab === 'matrix' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`;
-  $('tabPrintBtn').className = `px-4 py-2 rounded-md text-sm font-bold ${tab === 'print' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`;
 
   if (tab === 'day') renderDay();
   else if (tab === 'matrix') renderMatrix();
-  else if (tab === 'print') renderPrint();
 }
 
 // ---------- 當日點名 ----------
@@ -144,23 +140,29 @@ async function renderDay() {
   if (!currentClass || !currentDate) return;
   $('backfillBadge').classList.toggle('hidden', currentDate >= todayStr());
 
+  const daySession = sessions.find(s => s.date === currentDate);
+  const dayIsHoliday = daySession ? !isClassDay(daySession) : false;
+
   setMessage('載入中...');
   const body = $('dayBody');
-  body.innerHTML = '<tr><td colspan="3" class="border p-4 text-center text-gray-400">載入中...</td></tr>';
+  body.innerHTML = '<tr><td colspan="4" class="border p-4 text-center text-gray-400">載入中...</td></tr>';
 
   try {
     roster = await getRollCall(currentClass, currentDate);
-    renderDayRows();
+    renderDayRows(dayIsHoliday);
+    const n = roster.length;
     const attended = roster.filter(r => r.present === true).length;
-    const pct = roster.length ? Math.round((attended / roster.length) * 100) : 0;
-    setMessage(`共 ${roster.length} 人，出席 ${attended} 人（${pct}%）`);
+    const mass = roster.filter(r => r.mass === true).length;
+    const pct = n ? Math.round((attended / n) * 100) : 0;
+    const mpct = n ? Math.round((mass / n) * 100) : 0;
+    setMessage(`共 ${n} 人，上堂 ${attended}（${pct}%）、彌撒 ${mass}（${mpct}%）`);
   } catch (err) {
     setMessage(`載入失敗：${err.message}`, true);
     body.innerHTML = '';
   }
 }
 
-function renderDayRows() {
+function renderDayRows(dayIsHoliday) {
   const body = $('dayBody');
   body.innerHTML = '';
 
@@ -169,7 +171,7 @@ function renderDayRows() {
     if (s.category !== lastCat) {
       lastCat = s.category;
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="3" class="bg-gray-100 border p-1.5 text-xs font-bold text-gray-600">${CATEGORY_LABEL[s.category] || s.category}</td>`;
+      tr.innerHTML = `<td colspan="4" class="bg-gray-100 border p-1.5 text-xs font-bold text-gray-600">${CATEGORY_LABEL[s.category] || s.category}</td>`;
       body.appendChild(tr);
     }
 
@@ -184,39 +186,49 @@ function renderDayRows() {
     nameTd.className = 'border p-2';
     nameTd.textContent = s.name;
 
-    const presentTd = document.createElement('td');
-    presentTd.className = 'border p-2 text-center';
-    const chk = document.createElement('input');
-    chk.type = 'checkbox';
-    chk.className = 'h-5 w-5';
-    chk.dataset.name = s.name;
-    chk.dataset.category = s.category;
-    chk.dataset.className = s.className || '';
-    chk.checked = s.present === true;
-    presentTd.appendChild(chk);
+    const mkChk = (kind, checked, tdClass, disabled) => {
+      const td = document.createElement('td');
+      td.className = tdClass;
+      const chk = document.createElement('input');
+      chk.type = 'checkbox';
+      chk.className = 'h-5 w-5';
+      chk.dataset.name = s.name;
+      chk.dataset.category = s.category;
+      chk.dataset.className = s.className || '';
+      chk.dataset.kind = kind;
+      chk.checked = checked === true;
+      if (disabled) {
+        chk.disabled = true;
+        chk.checked = false;
+      }
+      td.appendChild(chk);
+      return td;
+    };
 
     tr.appendChild(numTd);
     tr.appendChild(nameTd);
-    tr.appendChild(presentTd);
+    tr.appendChild(mkChk('present', s.present, `border p-2 text-center ${dayIsHoliday ? 'bg-gray-100' : ''}`, dayIsHoliday));
+    tr.appendChild(mkChk('mass', s.mass, 'border p-2 text-center bg-orange-50', false));
     body.appendChild(tr);
   });
 }
 
-function setAll(present) {
-  document.querySelectorAll('#dayBody input[type=checkbox]').forEach(c => { c.checked = present; });
+function setByKind(kind, checked) {
+  document.querySelectorAll('#dayBody input[type=checkbox]').forEach(c => {
+    if (c.disabled) return;
+    if (!kind || c.dataset.kind === kind) c.checked = checked;
+  });
 }
 
 async function saveDay() {
   if (!currentClass || !currentDate) return;
-  const records = [];
+  const map = new Map();
   document.querySelectorAll('#dayBody input[type=checkbox]').forEach(c => {
-    records.push({
-      name: c.dataset.name,
-      category: c.dataset.category,
-      className: c.dataset.className,
-      present: c.checked
-    });
+    const name = c.dataset.name;
+    if (!map.has(name)) map.set(name, { name, category: c.dataset.category, className: c.dataset.className });
+    map.get(name)[c.dataset.kind] = c.checked;
   });
+  const records = Array.from(map.values());
   if (!records.length) return;
 
   setMessage('儲存中...');
@@ -242,7 +254,7 @@ async function renderMatrix() {
     roster = r;
     yearMarks = ym;
     buildMatrixTable();
-    setMessage(`全年 ${roster.length} 人 × ${sessions.length} 日`);
+    setMessage(`全年 ${roster.length} 人 × ${sessions.length} 日（上堂 + 彌撒）`);
   } catch (err) {
     setMessage(`載入失敗：${err.message}`, true);
   }
@@ -252,7 +264,7 @@ function buildMatrixTable() {
   const body = $('matrixBody');
   body.innerHTML = '';
 
-  // 表頭
+  // 表頭第一行：姓名 / 出席% / 每日一欄（colspan=2）
   const headTr = document.createElement('tr');
   const corner = document.createElement('th');
   corner.className = 'sticky-name sticky-head border p-1.5 text-left whitespace-nowrap bg-gray-100';
@@ -264,30 +276,38 @@ function buildMatrixTable() {
   pctHead.textContent = '出席%';
   headTr.appendChild(pctHead);
 
-  const typeTr = document.createElement('tr');
-  const corner2 = document.createElement('th');
-  corner2.className = 'sticky-name border p-1.5 bg-gray-50';
-  typeTr.appendChild(corner2);
-  const corner3 = document.createElement('th');
-  corner3.className = 'border p-0.5 bg-gray-50';
-  typeTr.appendChild(corner3);
+  sessions.forEach(s => {
+    const isDay = isClassDay(s);
+    const th = document.createElement('th');
+    th.colSpan = 2;
+    th.className = `sticky-head border p-1 text-center whitespace-nowrap ${isDay ? 'bg-gray-100' : 'bg-gray-200 text-gray-400'}`;
+    th.textContent = `${shortDate(s.date)}${s.event ? '·' + shortType(s) : ''}`;
+    headTr.appendChild(th);
+  });
 
+  // 表頭第二行：上 / 彌 標籤
+  const typeTr = document.createElement('tr');
+  const c2 = document.createElement('th');
+  c2.className = 'sticky-name border p-1 bg-gray-50';
+  typeTr.appendChild(c2);
+  const c3 = document.createElement('th');
+  c3.className = 'border p-0.5 bg-gray-50';
+  typeTr.appendChild(c3);
   sessions.forEach(s => {
     const isDay = isClassDay(s);
     const th1 = document.createElement('th');
-    th1.className = `sticky-head border p-1.5 text-center whitespace-nowrap ${isDay ? 'bg-gray-100' : 'bg-gray-200 text-gray-400'}`;
-    th1.textContent = shortDate(s.date);
-
+    th1.className = `border p-0.5 text-center text-[10px] ${isDay ? 'bg-gray-50 text-gray-600' : 'bg-gray-200 text-gray-400'}`;
+    th1.textContent = '上';
     const th2 = document.createElement('th');
-    th2.className = `border p-0.5 text-center text-[10px] ${isDay ? 'text-gray-500' : 'text-gray-400'}`;
-    th2.textContent = shortType(s);
-
-    headTr.appendChild(th1);
+    th2.className = 'border p-0.5 text-center text-[10px] bg-orange-50 text-orange-600';
+    th2.textContent = '彌';
+    typeTr.appendChild(th1);
     typeTr.appendChild(th2);
   });
 
   body.appendChild(headTr);
   body.appendChild(typeTr);
+
   // 資料列
   const today = todayStr();
   const eligibleDays = sessions.filter(s => isClassDay(s) && s.date <= today);
@@ -296,7 +316,7 @@ function buildMatrixTable() {
     if (s.category !== lastCat) {
       lastCat = s.category;
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="${sessions.length + 2}" class="bg-gray-100 border p-1.5 text-xs font-bold text-gray-600">${CATEGORY_LABEL[s.category] || s.category}</td>`;
+      tr.innerHTML = `<td colspan="${sessions.length * 2 + 2}" class="bg-gray-100 border p-1.5 text-xs font-bold text-gray-600">${CATEGORY_LABEL[s.category] || s.category}</td>`;
       body.appendChild(tr);
     }
 
@@ -306,10 +326,11 @@ function buildMatrixTable() {
     nameTd.textContent = s.name;
     tr.appendChild(nameTd);
 
-    // 出席%（分母 = 已過嘅上堂日）
+    // 出席%（分母 = 已過嘅上堂日；用上堂出席計）
     let attended = 0;
     eligibleDays.forEach(sess => {
-      if (yearMarks[sess.date] && yearMarks[sess.date][s.name] === true) attended++;
+      const m = yearMarks[sess.date] && yearMarks[sess.date][s.name];
+      if (m && m.present === true) attended++;
     });
     const pctTd = document.createElement('td');
     const pct = eligibleDays.length ? Math.round((attended / eligibleDays.length) * 100) : null;
@@ -318,75 +339,23 @@ function buildMatrixTable() {
     tr.appendChild(pctTd);
 
     sessions.forEach(sess => {
-      const td = document.createElement('td');
       const isDay = isClassDay(sess);
-      td.className = `border cell ${isDay ? '' : 'bg-gray-100'}`;
-      const present = yearMarks[sess.date] && yearMarks[sess.date][s.name] === true;
-      if (present) td.textContent = '✓';
-      tr.appendChild(td);
+      const m = yearMarks[sess.date] && yearMarks[sess.date][s.name];
+
+      // 上堂：假期日唔適用（灰、冇得 tick）
+      const td1 = document.createElement('td');
+      td1.className = `border cell ${isDay ? 'bg-white' : 'bg-gray-100'}`;
+      if (isDay && m && m.present === true) td1.textContent = '✓';
+      tr.appendChild(td1);
+
+      // 彌撒：假期日照可以出席（橙）
+      const td2 = document.createElement('td');
+      td2.className = 'border cell bg-orange-50';
+      if (m && m.mass === true) td2.textContent = '✓';
+      tr.appendChild(td2);
     });
     body.appendChild(tr);
   });
 }
 
-// ---------- 列印點名紙 ----------
-
-async function renderPrint() {
-  if (!currentClass) return;
-  setMessage('載入中...');
-  try {
-    const [r, ym] = await Promise.all([
-      getClassRoster(currentClass),
-      getRollCallYear(currentClass)
-    ]);
-    roster = r;
-    yearMarks = ym;
-    buildPrintSheet();
-  } catch (err) {
-    setMessage(`載入失敗：${err.message}`, true);
-  }
-}
-
-function buildPrintSheet() {
-  const el = $('printSheet');
-  const classLabel = CATEGORY_LABEL;
-
-  let html = `
-    <div class="text-center mb-3">
-      <h1 class="text-lg font-bold">${currentClass} — 點名紙</h1>
-      <p class="text-sm">${sessions.length} 個上堂日（${sessions[0] ? sessions[0].date : ''} ~ ${sessions[sessions.length - 1] ? sessions[sessions.length - 1].date : ''}）</p>
-      <p class="text-xs text-gray-500">出席填 ✓，缺席留空</p>
-    </div>
-  `;
-
-  let lastCat = '';
-  let rows = '';
-  roster.forEach((s) => {
-    if (s.category !== lastCat) {
-      lastCat = s.category;
-      rows += `<tr><td colspan="${sessions.length + 1}" style="background:#f3f4f6;font-weight:bold;font-size:11px;padding:3px 6px;border:1px solid #000;">${classLabel[s.category] || s.category}</td></tr>`;
-    }
-    let cells = `<td style="border:1px solid #000;padding:2px 6px;white-space:nowrap;">${s.name}</td>`;
-    sessions.forEach(sess => {
-      const present = yearMarks[sess.date] && yearMarks[sess.date][s.name] === true;
-      const isDay = isClassDay(sess);
-      const style = `border:1px solid #000;width:26px;height:26px;text-align:center;font-size:13px;${isDay ? '' : 'background:#f3f4f6;'}`;
-      cells += `<td style="${style}">${present ? '✓' : ''}</td>`;
-    });
-    rows += `<tr style="page-break-inside:avoid;">${cells}</tr>`;
-  });
-
-  let headers = '<td style="border:1px solid #000;padding:2px 6px;font-weight:bold;">姓名</td>';
-  sessions.forEach(s => {
-    const isDay = isClassDay(s);
-    headers += `<td style="border:1px solid #000;width:26px;font-size:9px;text-align:center;${isDay ? '' : 'background:#f3f4f6;'}">${shortDate(s.date)}</td>`;
-  });
-
-  html += `
-    <table style="border-collapse:collapse;width:100%;">
-      <thead><tr style="page-break-inside:avoid;">${headers}</tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-  `;
-  el.innerHTML = html;
-}
+onRoleLoaded(() => { init(); });

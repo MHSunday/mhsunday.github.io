@@ -28,7 +28,7 @@
 
   <main class="max-w-5xl mx-auto p-4 mt-4">
     <!-- Firestore 同步（管理員） -->
-    <div class="bg-indigo-50 border border-indigo-200 rounded-xl shadow-md p-4 mb-4">
+    <div id="syncCard" class="bg-indigo-50 border border-indigo-200 rounded-xl shadow-md p-4 mb-4">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 class="text-lg font-bold text-indigo-800">Firestore 同步</h2>
@@ -36,6 +36,7 @@
         </div>
         <div class="space-x-2">
           <button id="syncBtn" class="text-sm bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition">同步 Sheets → Firestore</button>
+          <button id="permSyncBtn" class="text-sm bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition">同步權限 → Firestore</button>
           <button id="exportBtn" class="text-sm bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 transition">匯出點名 → 試算表</button>
         </div>
       </div>

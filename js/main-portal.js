@@ -60,6 +60,7 @@ async function loadPortal() {
     const p = await getClassPortal(currentClass);
     renderToday(p);
     renderActions(p);
+    renderRoster(p);
     renderLinks(p);
     renderDetails(p);
     await renderAttendance(p);
@@ -103,7 +104,7 @@ function renderActions(p) {
     { label: '全年矩陣', desc: '睇全年出席', href: `rollcall.html?class=${encodeURIComponent(p.className)}` },
     { label: '列印點名紙', desc: 'A4 硬copies', href: `rollcall.html?class=${encodeURIComponent(p.className)}` },
     { label: '彌撒登記', desc: '彌撒出席 + 獎勵', href: 'form.html' },
-    { label: '上堂日曆', desc: '管理員設定', href: 'admin_sessions.html' },
+    { label: '上堂日曆', desc: '睇全年日曆', href: 'calendar.html' },
     { label: '學生名單', desc: `${p.rosterCount} 人`, href: '#details' }
   ];
 
@@ -117,6 +118,24 @@ function renderActions(p) {
       <div class="text-xs text-gray-500 mt-0.5">${b.desc}</div>
     `;
     grid.appendChild(a);
+  });
+}
+
+function renderRoster(p) {
+  const card = $('rosterCard');
+  const body = $('rosterBody');
+  body.innerHTML = '';
+  if (!p.roster || !p.roster.length) {
+    card.classList.add('hidden');
+    return;
+  }
+  card.classList.remove('hidden');
+  $('rosterCount').textContent = `（${p.roster.length} 人）`;
+  p.roster.forEach(s => {
+    const span = document.createElement('span');
+    span.className = 'inline-flex items-center gap-1.5 border border-gray-200 rounded-lg px-2.5 py-1 text-sm bg-gray-50';
+    span.innerHTML = `${escapeHtml(s.name)}<span class="text-xs text-gray-400">${escapeHtml(CATEGORY_LABEL[s.category] || s.category)}</span>`;
+    body.appendChild(span);
   });
 }
 

@@ -30,8 +30,10 @@
     <div class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
       <h1 class="text-xl font-bold">課堂點名</h1>
       <div class="space-x-4">
+        <a href="class_portal.html" class="text-sm hover:underline">每班Portal</a>
+        <span class="text-white/40">｜</span>
         <a href="form.html" class="text-sm hover:underline">彌撒登記</a>
-        <a href="admin_sessions.html" class="text-sm hover:underline">上堂日曆</a>
+        <a href="calendar.html" class="text-sm hover:underline">上堂日曆</a>
         <button id="logoutBtn" class="text-sm bg-blue-800 px-3 py-1 rounded hover:bg-blue-900 transition">登出</button>
       </div>
     </div>
@@ -53,7 +55,6 @@
         <div class="space-x-2">
           <button id="tabDayBtn" class="px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-bold">當日點名</button>
           <button id="tabMatrixBtn" class="px-4 py-2 rounded-md bg-gray-200 text-gray-700 text-sm font-bold">全年矩陣</button>
-          <button id="tabPrintBtn" class="px-4 py-2 rounded-md bg-gray-200 text-gray-700 text-sm font-bold">列印點名紙</button>
         </div>
       </div>
       <div id="backfillBadge" class="hidden mt-2 text-sm font-bold text-orange-600">⚠️ 補填模式：日期早於今日，會記錄補填人與時間</div>
@@ -65,8 +66,9 @@
       <div class="flex items-center justify-between mb-3 no-print">
         <h2 class="text-lg font-bold">當日出席</h2>
         <div class="space-x-2">
-          <button id="allPresentBtn" class="text-sm bg-green-100 text-green-700 px-3 py-1 rounded">全選出席</button>
-          <button id="allAbsentBtn" class="text-sm bg-gray-100 text-gray-600 px-3 py-1 rounded">全選缺席</button>
+          <button id="allPresentBtn" class="text-sm bg-green-100 text-green-700 px-3 py-1 rounded">全部課堂</button>
+          <button id="allMassBtn" class="text-sm bg-orange-100 text-orange-700 px-3 py-1 rounded">全部彌撒</button>
+          <button id="clearAllBtn" class="text-sm bg-gray-100 text-gray-600 px-3 py-1 rounded">取消</button>
           <button id="saveDayBtn" class="text-sm bg-blue-600 text-white px-4 py-1.5 rounded font-bold">儲存</button>
         </div>
       </div>
@@ -76,11 +78,12 @@
             <tr>
               <th class="border p-2 text-left w-10">#</th>
               <th class="border p-2 text-left">姓名</th>
-              <th class="border p-2 text-center w-24">出席</th>
+              <th class="border p-2 text-center w-20">上堂</th>
+              <th class="border p-2 text-center w-20 bg-orange-50">彌撒</th>
             </tr>
           </thead>
           <tbody id="dayBody">
-            <tr><td colspan="3" class="border p-4 text-center text-gray-400">載入中...</td></tr>
+            <tr><td colspan="4" class="border p-4 text-center text-gray-400">載入中...</td></tr>
           </tbody>
         </table>
       </div>
@@ -90,22 +93,13 @@
     <section id="matrixView" class="bg-white rounded-xl shadow-md p-4 mb-4 hidden">
       <div class="flex items-center justify-between mb-3 no-print">
         <h2 class="text-lg font-bold">全年出席矩陣</h2>
-        <span class="text-xs text-gray-500">左右滑動睇更多日期；姓名欄固定</span>
+        <span class="text-xs text-gray-500">左右滑動睇更多日期；姓名欄固定。上堂（白）／彌撒（橙）／假期（灰）</span>
       </div>
       <div class="matrix-scroll overflow-x-auto">
         <table class="text-xs border-collapse" id="matrixTable">
           <tbody id="matrixBody"></tbody>
         </table>
       </div>
-    </section>
-
-    <!-- 列印點名紙 -->
-    <section id="printView" class="hidden print-block">
-      <div class="no-print flex items-center justify-between mb-3">
-        <h2 class="text-lg font-bold">點名紙（A4）</h2>
-        <button id="printBtn" class="text-sm bg-blue-600 text-white px-4 py-2 rounded font-bold">列印 / 存 PDF</button>
-      </div>
-      <div id="printSheet"></div>
     </section>
   </main>
 

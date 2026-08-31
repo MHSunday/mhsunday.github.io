@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>上堂日曆</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Noto Sans TC', sans-serif; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <nav class="bg-blue-700 text-white shadow-lg">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+      <h1 class="text-xl font-bold">上堂日曆</h1>
+      <div class="space-x-4">
+        <a href="class_portal.html" class="text-sm hover:underline">每班Portal</a>
+        <a href="rollcall.html" class="text-sm hover:underline">課堂點名</a>
+        <a href="admin_sessions.html" id="editLink" class="hidden text-sm bg-blue-800 px-3 py-1 rounded hover:bg-blue-900 transition">編輯日曆（管理員）</a>
+        <button id="logoutBtn" class="text-sm bg-blue-800 px-3 py-1 rounded hover:bg-blue-900 transition">登出</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-4xl mx-auto p-4 mt-4">
+    <div id="message" class="text-center text-sm font-medium min-h-[1.25rem] mb-2"></div>
+    <div class="bg-white rounded-xl shadow-md p-4">
+      <table class="w-full text-sm border-collapse">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="border p-2 text-left w-28 whitespace-nowrap">日期</th>
+            <th class="border p-2 text-left">主日</th>
+            <th class="border p-2 text-left w-64">主日學活動</th>
+          </tr>
+        </thead>
+        <tbody id="calendarBody">
+          <tr><td colspan="3" class="border p-4 text-center text-gray-400">載入中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module" src="js/main-calendar.js"></script>
+</body>
+</html>

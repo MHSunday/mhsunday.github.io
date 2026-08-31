@@ -39,6 +39,18 @@ export async function getAllClasses() {
   return data;
 }
 
+/**
+ * 取得全部權限（僅管理員；用嚟 sync 去 Firestore permissions/{email}）
+ * @returns {Array} [{ email, role, class }]
+ */
+export async function getPermissions() {
+  const qs = await getTokenQS();
+  const res = await fetch(`${API_URL}?action=getPermissions&${qs}`);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return Array.isArray(data) ? data : [];
+}
+
 export async function getStudentsByClass(className) {
   if (!className) throw new Error('班級名稱不能為空');
   const qs = await getTokenQS();

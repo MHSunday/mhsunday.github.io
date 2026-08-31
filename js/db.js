@@ -152,7 +152,8 @@ export async function getRollCall(className, date) {
   const roster = await getRoster(className);
   return roster.map(s => ({
     ...s,
-    present: marks[s.name] ? marks[s.name].present : null
+    present: marks[s.name] ? marks[s.name].present : null,
+    mass: marks[s.name] ? marks[s.name].mass : null
   }));
 }
 
@@ -168,6 +169,7 @@ export async function saveRollCall(className, date, records) {
     const ref = db.collection('rollcalls').doc(className).collection(date).doc(name);
     batch.set(ref, {
       present: r.present === true,
+      mass: r.mass === true,
       category: r.category || '學生',
       className: r.className || className,
       recorder: recorder,
@@ -180,14 +182,17 @@ export async function saveRollCall(className, date, records) {
 }
 
 export async function getRollCallYear(className) {
-  const parent = db.collection('rollcalls').doc(className);
-  const cols = await parent.listCollections();
+  // web SDK 冇 listCollections()，改為對 sessions 嘅每個日期逐日查
+  const sessions = await getSessions();
   const result = {};
-  await Promise.all(cols.map(async col => {
-    const snap = await col.get();
-    const date = col.id;
-    result[date] = {};
-    snap.forEach(d => { result[date][d.id] = d.data().present === true; });
+  await Promise.all(sessions.map(async (s) => {
+    const snap = await db.collection('rollcalls').doc(className).collection(s.date).get();
+    if (snap.empty) return;
+    result[s.date] = {};
+    snap.forEach(d => {
+      const dt = d.data();
+      result[s.date][d.id] = { present: dt.present === true, mass: dt.mass === true };
+    });
   }));
   return result;
 }
@@ -259,7 +264,7 @@ export async function getAttendanceStats(className) {
   for (const s of classDays) {
     const marks = yearMarks[s.date] || {};
     roster.forEach(m => {
-      if (marks[m.name] === true) presentCount++;
+      if (marks[m.name] && marks[m.name].present === true) presentCount++;
       totalCount++;
     });
   }
@@ -329,7 +334,7 @@ export async function syncAllFromGAS() {
   for (const cls of classes) {
     const year = await gas.getRollCallYear(cls);
     for (const [date, marks] of Object.entries(year)) {
-      const records = Object.entries(marks).map(([name, present]) => ({ name, present }));
+      const records = Object.entries(marks).map(([name, present]) => ({ name, present, mass: false }));
       await writeBatchToFirestore_(db.collection('rollcalls').doc(cls).collection(date), records, 'name');
     }
   }
@@ -355,7 +360,8 @@ export async function exportRollcallsToGAS() {
           name,
           category: data.category || '學生',
           className: data.className || cls,
-          present
+          present,
+          mass: data.mass === true
         });
       }
       if (records.length) {
@@ -365,4 +371,29 @@ export async function exportRollcallsToGAS() {
     }
   }
   return { exported: total };
+}
+
+/**
+ * 將 GAS permissions 表同步去 Firestore permissions/{email}（管理員撳掣）。
+ * 令老師喺 Firestore 都可以寫自己班點名（rules isTeacherOf 會讀呢度）。
+ * @returns { { users: number } }
+ */
+export async function syncPermissionsFromGAS() {
+  const rows = await gas.getPermissions();
+  const byEmail = new Map();
+  for (const r of rows) {
+    if (!r.email) continue;
+    if (!byEmail.has(r.email)) byEmail.set(r.email, { email: r.email, role: r.role || '', classes: [] });
+    const e = byEmail.get(r.email);
+    if (r.class && !e.classes.includes(r.class)) e.classes.push(r.class);
+  }
+  const batch = db.batch();
+  for (const e of byEmail.values()) {
+    batch.set(db.collection('permissions').doc(e.email), {
+      role: e.role,
+      classes: e.classes
+    }, { merge: true });
+  }
+  await batch.commit();
+  return { users: byEmail.size };
 }

@@ -1,10 +1,11 @@
-// js/main-sessions.js — 上堂日曆管理頁（僅管理員）
-import { getSessions, saveSessions, importDefaultSessions, syncAllFromGAS, exportRollcallsToGAS } from './data.js';
+// js/main-sessions.js — 上堂日曆（admin 可編輯+同步；teacher 唯讀）
+import { getSessions, saveSessions, importDefaultSessions, syncAllFromGAS, syncPermissionsFromGAS, exportRollcallsToGAS } from './data.js';
 import { onRoleLoaded, logout } from './auth.js';
 
 const $ = (id) => document.getElementById(id);
 
 let sessionsCache = [];
+let isAdminView = false;
 
 function setMessage(text, isError = false) {
   const el = $('message');
@@ -43,6 +44,7 @@ function renderSessions(list) {
     titleInput.dataset.field = 'title';
     titleInput.value = s.title || '';
     titleInput.placeholder = '例：常年期第25主日　瑪20:1-16';
+    if (!isAdminView) titleInput.disabled = true;
     titleTd.appendChild(titleInput);
 
     const eventTd = document.createElement('td');
@@ -55,13 +57,30 @@ function renderSessions(list) {
     eventInput.dataset.field = 'event';
     eventInput.value = s.event || '';
     eventInput.placeholder = '例：開學禮 / 假期：聖誕假期';
+    if (!isAdminView) eventInput.disabled = true;
     eventTd.appendChild(eventInput);
+    if (isAdminView) {
+      const hbtn = document.createElement('button');
+      hbtn.type = 'button';
+      hbtn.className = 'ml-2 text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-100';
+      hbtn.textContent = '假期';
+      hbtn.title = '標記/取消為假期（天氣惡劣停課）';
+      hbtn.addEventListener('click', () => toggleHoliday(s.date));
+      eventTd.appendChild(hbtn);
+    }
 
     tr.appendChild(dateTd);
     tr.appendChild(titleTd);
     tr.appendChild(eventTd);
     body.appendChild(tr);
   }
+}
+
+function toggleHoliday(date) {
+  const inp = document.querySelector(`#sessionsBody input[data-date="${date}"][data-field="event"]`);
+  if (!inp) return;
+  const v = (inp.value || '').trim();
+  inp.value = v.startsWith('假期') ? '' : '假期：停課（天氣惡劣）';
 }
 
 function collectSessions() {
@@ -80,7 +99,7 @@ async function loadSessions() {
   try {
     sessionsCache = await getSessions();
     renderSessions(sessionsCache);
-    setMessage(`共 ${sessionsCache.length} 筆`);
+    setMessage(`${sessionsCache.length} 筆${isAdminView ? '' : '（唯讀，僅管理員可編輯）'}`);
   } catch (err) {
     setMessage(`載入失敗：${err.message}`, true);
   }
@@ -123,6 +142,17 @@ async function handleSync() {
   }
 }
 
+async function handlePermSync() {
+  if (!confirm('將 GAS permissions 表同步去 Firestore（老師先可以寫點名）？')) return;
+  setMessage('同步權限中...');
+  try {
+    const out = await syncPermissionsFromGAS();
+    setMessage(`已同步 ${out.users} 個權限到 Firestore`);
+  } catch (err) {
+    setMessage(`同步權限失敗：${err.message}`, true);
+  }
+}
+
 async function handleExport() {
   if (!confirm('將 Firestore 嘅點名匯出返去 GAS 試算表（rollcalls 表）？')) return;
   setMessage('匯出中...');
@@ -134,22 +164,33 @@ async function handleExport() {
   }
 }
 
-function init() {
+function init(role) {
+  isAdminView = !!(role && role.role === 'admin');
   $('logoutBtn').addEventListener('click', () => logout());
-  $('saveBtn').addEventListener('click', handleSave);
-  $('importBtn').addEventListener('click', handleImport);
-  const syncBtn = $('syncBtn');
-  const exportBtn = $('exportBtn');
-  if (syncBtn) syncBtn.addEventListener('click', handleSync);
-  if (exportBtn) exportBtn.addEventListener('click', handleExport);
+  if (isAdminView) {
+    $('saveBtn').addEventListener('click', handleSave);
+    $('importBtn').addEventListener('click', handleImport);
+    const syncBtn = $('syncBtn');
+    const exportBtn = $('exportBtn');
+    const permSyncBtn = $('permSyncBtn');
+    if (syncBtn) syncBtn.addEventListener('click', handleSync);
+    if (exportBtn) exportBtn.addEventListener('click', handleExport);
+    if (permSyncBtn) permSyncBtn.addEventListener('click', handlePermSync);
+  } else {
+    // teacher：唯讀，隱藏編輯/import/sync/export 按鈕
+    $('saveBtn').style.display = 'none';
+    $('importBtn').style.display = 'none';
+    const syncCard = $('syncCard');
+    if (syncCard) syncCard.style.display = 'none';
+  }
 }
 
 onRoleLoaded((role) => {
-  if (role && role.role === 'admin') {
-    init();
+  if (role && (role.role === 'admin' || role.role === 'teacher')) {
+    init(role);
     loadSessions();
   } else {
-    setMessage('此頁僅限管理員使用', true);
+    setMessage('此頁僅限教職員使用', true);
     setTimeout(() => window.location.replace('./form.html'), 1500);
   }
 });

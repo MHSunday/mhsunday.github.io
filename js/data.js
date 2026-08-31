@@ -22,4 +22,5 @@ export const resetSessions = fb.resetSessions;
 export const importDefaultSessions = fb.importDefaultSessions;
 export const getAttendanceStats = fb.getAttendanceStats;
 export const syncAllFromGAS = fb.syncAllFromGAS;
+export const syncPermissionsFromGAS = fb.syncPermissionsFromGAS;
 export const exportRollcallsToGAS = fb.exportRollcallsToGAS;
