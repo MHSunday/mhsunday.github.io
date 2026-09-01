@@ -77,10 +77,15 @@ export async function login() {
   const provider = new firebase.auth.GoogleAuthProvider();
   // 強制要求選擇帳號，避免自動登入舊帳號導致的 Session 混亂
   provider.setCustomParameters({ prompt: 'select_account' });
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   try {
-    //await auth.signInWithRedirect(provider);
     toggleLoading(true);
-    await auth.signInWithPopup(provider);
+    if (isIOS) {
+      // iOS Safari 對 popup 登入不穩定，改用 redirect 登入
+      await auth.signInWithRedirect(provider);
+    } else {
+      await auth.signInWithPopup(provider);
+    }
   } catch (error) {
     console.error("Login error:", error);
     toggleLoading(false); // 失敗則關閉 Loading
@@ -111,11 +116,15 @@ export function onRoleLoaded(callback) {
 // 檢查初始狀態的輔助函數
 function checkInitialState() {
   const currentPage = window.location.pathname.split('/').pop() || 'index.html';
-  if (!auth.currentUser && !isProcessingRedirect) {
-    if (currentPage !== 'index.html' && currentPage !== '') {
+  if (currentPage === 'index.html' || currentPage === '') return;
+  // 等 Firebase 還原持久化 session 先決定係咪踢返去登入頁，
+  // 避免手機還原較慢時（auth.currentUser 仲係 null）誤判為未登入。
+  const unsubscribe = auth.onAuthStateChanged((user) => {
+    unsubscribe();
+    if (!user) {
       window.location.replace('./index.html');
     }
-  }
+  });
 }
 
 // --- 登入狀態監聽 ---
@@ -171,6 +180,12 @@ auth.onAuthStateChanged(async (user) => {
           window.location.replace('./hub.html');
         }
       } else {
+        // 已經有快取 role（例如跨頁導航）→ 唔好因為 refresh 失敗就踢走用戶
+        if (roleLoaded && userRole) {
+          console.warn("[auth] getUserRoles refresh 失敗，繼續用快取 role");
+          toggleLoading(false);
+          return;
+        }
         const detail = roleData && roleData.error ? `｜後端回覆：${roleData.error}` : `｜回傳：${JSON.stringify(roleData)}`;
         alert(`您沒有使用此系統的權限｜登入帳號：${user.email}${detail}`);
         await logout();
@@ -178,6 +193,11 @@ auth.onAuthStateChanged(async (user) => {
     } catch (err) {
       console.error("獲取權限失敗", err);
       toggleLoading(false);
+      // 已經有快取 role（跨頁導航）→ 唔好因為 refresh 失敗就登出
+      if (roleLoaded && userRole) {
+        console.warn("[auth] getUserRoles fetch 失敗，繼續用快取 role");
+        return;
+      }
       // 網路錯誤時不立即登出，給予重試機會
       if (!navigator.onLine) {
         alert("網路連線中斷，請檢查網路設定");
