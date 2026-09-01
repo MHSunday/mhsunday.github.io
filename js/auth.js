@@ -23,7 +23,8 @@ export function getUserRole() { return userRole; }
 
 // 取得目前登入使用者的 Firebase ID Token（後端需要驗證身份用）
 export function getAuthToken() {
-  return auth.currentUser ? auth.currentUser.getIdToken() : Promise.resolve(null);
+  // forceRefresh=true：手機時鐘偏差可能令 SDK 誤判 token 未過期，強制 refresh 攞新 token
+  return auth.currentUser ? auth.currentUser.getIdToken(true) : Promise.resolve(null);
 }
 
 /**
@@ -138,7 +139,8 @@ auth.onAuthStateChanged(async (user) => {
     try {
       // 修正 CORS：加入 timestamp 避免 GAS 緩存，並明確設定 mode: 'cors'
       // 以 ID Token 取代 email，讓後端 server-side 驗證身份
-      const idToken = await user.getIdToken();
+      // 用 getIdToken(true) 強制 refresh：手機時鐘偏差/長開頁面會令舊 token 過期 → 被誤判無權限
+      const idToken = await user.getIdToken(true);
       const response = await fetch(
         `${APP_CONFIG.appsScriptUrl}?action=getUserRoles&idToken=${encodeURIComponent(idToken)}&t=${Date.now()}`,
         {

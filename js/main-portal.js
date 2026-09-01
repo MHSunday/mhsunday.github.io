@@ -19,7 +19,7 @@ function urlParam(name) {
   return new URLSearchParams(window.location.search).get(name);
 }
 
-async function init() {
+async function init(role) {
   $('logoutBtn').addEventListener('click', () => logout());
   $('gotoRollcallBtn').addEventListener('click', () => {
     const url = `rollcall.html?class=${encodeURIComponent(currentClass)}`;
@@ -36,6 +36,16 @@ async function init() {
     setMessage(`載入失敗：${err.message}`, true);
     return;
   }
+
+  // 權限過濾：管理員睇全部；老師只可以睇自己班
+  const myClasses = (role && role.role === 'teacher' && Array.isArray(role.classes) && role.classes.length)
+    ? classes.filter(c => role.classes.includes(c))
+    : classes;
+  if (!myClasses.length) {
+    setMessage('您沒有可用的班級權限', true);
+    return;
+  }
+  classes = myClasses;
 
   const sel = $('classSelect');
   sel.innerHTML = '';
@@ -199,4 +209,4 @@ function escapeHtml(s) {
   return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-onRoleLoaded(() => { init(); });
+onRoleLoaded((role) => { init(role); });
