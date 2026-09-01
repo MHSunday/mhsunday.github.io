@@ -144,6 +144,13 @@ function initFormPage() {
     const user = getCurrentUser();
     if (!user) return;
 
+    // 暫時：老師唔可以入彌撒登記，只有管理員
+    if (role.role !== 'admin') {
+      messageEl.innerHTML = '<span style="color:red">⚠️ 此頁暫時只限管理員使用</span>';
+      setTimeout(() => window.location.replace('./hub.html'), 1500);
+      return;
+    }
+
     try {
       // 不使用 updateStatus，直接設置載入狀態
       studentInput.disabled = true;

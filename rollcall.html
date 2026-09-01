@@ -13,95 +13,68 @@
     body { font-family: 'Noto Sans TC', sans-serif; }
     .sticky-name { position: sticky; left: 0; background: #fff; z-index: 1; box-shadow: 1px 0 0 #e5e7eb; }
     .sticky-head { position: sticky; top: 0; background: #f3f4f6; z-index: 2; }
-    .cell { width: 44px; height: 34px; text-align: center; vertical-align: middle; }
-    @media print {
-      .no-print { display: none !important; }
-      body { background: #fff; }
-      .print-block { display: block !important; }
-      .matrix-scroll { overflow: visible !important; }
-      .sticky-name { position: static; box-shadow: none; }
-      .sticky-head { position: static; }
-    }
+    .cell { width: 40px; height: 36px; text-align: center; vertical-align: middle; }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
 
-  <nav class="no-print bg-blue-700 text-white shadow-lg">
-    <div class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
-      <h1 class="text-xl font-bold">課堂點名</h1>
-      <div class="space-x-4">
-        <a href="class_portal.html" class="text-sm hover:underline">每班Portal</a>
-        <span class="text-white/40">｜</span>
-        <a href="form.html" class="text-sm hover:underline">彌撒登記</a>
-        <a href="calendar.html" class="text-sm hover:underline">上堂日曆</a>
-        <button id="logoutBtn" class="text-sm bg-blue-800 px-3 py-1 rounded hover:bg-blue-900 transition">登出</button>
+  <!-- 精簡 Header -->
+  <nav class="no-print bg-blue-700 text-white shadow">
+    <div class="px-3 py-2 flex justify-between items-center">
+      <div class="flex items-center gap-2">
+        <a href="class_portal.html" class="text-sm hover:underline">‹ 返回</a>
+        <h1 class="text-lg font-bold">課堂點名</h1>
       </div>
+      <button id="logoutBtn" class="text-xs bg-blue-800 px-2.5 py-1 rounded hover:bg-blue-900">登出</button>
     </div>
   </nav>
 
-  <main class="max-w-5xl mx-auto p-4 mt-4">
-    <!-- 控制列 -->
-    <div class="no-print bg-white rounded-xl shadow-md p-4 mb-4">
-      <div class="flex flex-wrap items-end gap-3">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">班級</label>
-          <select id="classSelect" class="border border-gray-300 rounded-md p-2 min-w-[8rem]"></select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">上堂日</label>
-          <select id="dateSelect" class="border border-gray-300 rounded-md p-2 min-w-[11rem]"></select>
-        </div>
-        <div class="flex-1"></div>
-        <div class="space-x-2">
-          <button id="tabDayBtn" class="px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-bold">當日點名</button>
-          <button id="tabMatrixBtn" class="px-4 py-2 rounded-md bg-gray-200 text-gray-700 text-sm font-bold">全年矩陣</button>
-        </div>
-      </div>
-      <div id="backfillBadge" class="hidden mt-2 text-sm font-bold text-orange-600">⚠️ 補填模式：日期早於今日，會記錄補填人與時間</div>
-      <div id="message" class="text-center text-sm font-medium min-h-[1.25rem] mt-2"></div>
+  <!-- 控制列：日期下拉 + 切換 + 動作 -->
+  <div class="no-print bg-white border-b border-gray-200 px-3 py-2 sticky top-0 z-10 shadow-sm">
+    <div class="flex flex-wrap items-center gap-2">
+      <span id="classNameLabel" class="font-bold text-gray-800"></span>
+      <select id="dateSelect" class="border border-gray-300 rounded-md px-2 py-1.5 text-base min-w-[8.5rem]"></select>
+      <div class="flex-1"></div>
+      <button id="tabDayBtn" class="px-3 py-1.5 rounded-md text-sm font-bold bg-blue-600 text-white">當日</button>
+      <button id="tabMatrixBtn" class="px-3 py-1.5 rounded-md text-sm font-bold bg-gray-200 text-gray-700">全年</button>
     </div>
+    <div class="flex flex-wrap items-center gap-2 mt-2">
+      <button id="allPresentBtn" class="text-sm bg-green-100 text-green-700 px-3 py-1.5 rounded">全部課堂</button>
+      <button id="clearAllBtn" class="text-sm bg-gray-100 text-gray-600 px-3 py-1.5 rounded">取消</button>
+      <div class="flex-1"></div>
+      <button id="saveDayBtn" class="text-sm bg-blue-600 text-white px-5 py-1.5 rounded font-bold">儲存</button>
+    </div>
+    <div id="backfillBadge" class="hidden mt-1 text-xs font-bold text-orange-600">⚠️ 補填模式：日期早於今日</div>
+    <div id="message" class="text-center text-sm font-medium min-h-[1.25rem] mt-1"></div>
+  </div>
 
-    <!-- 當日點名 -->
-    <section id="dayView" class="bg-white rounded-xl shadow-md p-4 mb-4">
-      <div class="flex items-center justify-between mb-3 no-print">
-        <h2 class="text-lg font-bold">當日出席</h2>
-        <div class="space-x-2">
-          <button id="allPresentBtn" class="text-sm bg-green-100 text-green-700 px-3 py-1 rounded">全部課堂</button>
-          <button id="allMassBtn" class="text-sm bg-orange-100 text-orange-700 px-3 py-1 rounded">全部彌撒</button>
-          <button id="clearAllBtn" class="text-sm bg-gray-100 text-gray-600 px-3 py-1 rounded">取消</button>
-          <button id="saveDayBtn" class="text-sm bg-blue-600 text-white px-4 py-1.5 rounded font-bold">儲存</button>
-        </div>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm border-collapse">
-          <thead>
-            <tr>
-              <th class="border p-2 text-left w-10">#</th>
-              <th class="border p-2 text-left">姓名</th>
-              <th class="border p-2 text-center w-20">上堂</th>
-              <th class="border p-2 text-center w-20 bg-orange-50">彌撒</th>
-            </tr>
-          </thead>
-          <tbody id="dayBody">
-            <tr><td colspan="4" class="border p-4 text-center text-gray-400">載入中...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+  <!-- 當日點名：全螢幕學生表 -->
+  <section id="dayView" class="bg-white">
+    <div class="overflow-x-auto">
+      <table class="w-full text-base border-collapse">
+        <thead>
+          <tr>
+            <th class="border p-2 text-left w-10">#</th>
+            <th class="border p-2 text-left">姓名</th>
+            <th class="border p-2 text-center w-16">上堂</th>
+            <th class="border p-2 text-center w-16 bg-orange-50">彌撒</th>
+          </tr>
+        </thead>
+        <tbody id="dayBody">
+          <tr><td colspan="4" class="border p-4 text-center text-gray-400">載入中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
 
-    <!-- 全年矩陣 -->
-    <section id="matrixView" class="bg-white rounded-xl shadow-md p-4 mb-4 hidden">
-      <div class="flex items-center justify-between mb-3 no-print">
-        <h2 class="text-lg font-bold">全年出席矩陣</h2>
-        <span class="text-xs text-gray-500">左右滑動睇更多日期；姓名欄固定。上堂（白）／彌撒（橙）／假期（灰）</span>
-      </div>
-      <div class="matrix-scroll overflow-x-auto">
-        <table class="text-xs border-collapse" id="matrixTable">
-          <tbody id="matrixBody"></tbody>
-        </table>
-      </div>
-    </section>
-  </main>
+  <!-- 全年矩陣 -->
+  <section id="matrixView" class="bg-white hidden">
+    <div class="matrix-scroll overflow-x-auto">
+      <table class="text-sm border-collapse" id="matrixTable">
+        <tbody id="matrixBody"></tbody>
+      </table>
+    </div>
+  </section>
 
   <script type="module" src="js/main-rollcall.js"></script>
 </body>

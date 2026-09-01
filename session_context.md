@@ -372,3 +372,128 @@ Commit + push。即時切返舊 GAS + Sheets 架構。Firestore 資料保留，�
 - [ ] Teacher 權限 doc 流程（依家要人手建 teacher doc + 部署 Firestore write）
 - [ ] Offline persistence（Firestore SDK 內建 `enableIndexedDbPersistence`，未啟用）
 - [ ] Region 最終確認（已推薦 asia-east2，但 console 要揀）
+
+---
+
+# 附錄：彌撒出席 + 老師權限匯入 + 唯讀日曆（2026-08-31）
+
+> 範圍：rollcall 兩種出席（**每日兩欄：上堂 + 彌撒**）、老師權限由 Roster 自動匯入、分離唯讀日曆、修咗多個 bug。
+
+## 1. Rollcall：兩種出席（上堂 + 彌撒）
+
+### 模型
+- 每個星期日記**兩種**出席：`rollcalls/{班}/{日期}/{姓名}` doc = `{ present (上堂), mass (彌撒), category, className, recorder, timestamp }`
+- **每日都兩欄**（唔係淨係彌撒日先有）—— 用戶決定：matrix 每日兩欄（上堂白 + 彌撒橙），day view 每人兩個 checkbox
+
+### 假期規則
+- `event` 以「假期」開頭 → 假期日
+- Day view：**上堂格 disabled 灰**，**彌撒橙格照常可 tick**（假期都可能有彌撒）
+- Matrix：上堂欄假期日灰色冇 tick；**彌撒欄永遠橙色**可 tick
+- `isClassDay` 照舊：`!(event.startsWith('假期'))`
+
+### 「取消」按鈕
+- 唔再係 uncheck 全部，而係 **`renderDay()`** —— 回復返已儲存狀態（revert unsaved），避免誤刪已存資料
+
+### 「全部課堂 / 全部彌撒 / 取消」三掣
+- 跳過 disabled 格（假期上堂冇得 tick）
+
+## 2. 取消列印點名紙
+- 移除 `tabPrintBtn` / `printView` / `renderPrint` / `buildPrintSheet` / 印表相關 CSS
+
+## 3. 每版回 Class Portal
+- `rollcall.html` / `form.html` nav 加「**每班Portal**」link
+- `admin_sessions.html` / `class_portal.html` 本身已有
+
+## 4. 新分頁：唯讀上堂日曆（`calendar.html`）
+- 唔再由 Portal / rollcall 連去 `admin_sessions.html`（避免老師誤入編輯版）
+- 新 `calendar.html` + `js/main-calendar.js`：
+  - teacher / admin 都睇得，**唯讀**顯示全年日曆，假期日灰底
+  - **admin 先見到「編輯日曆（管理員）」** link → `admin_sessions.html`
+- Portal action「上堂日曆」+ `rollcall.html` nav「上堂日曆」都指去 `calendar.html`
+
+## 5. `admin_sessions.html`：老師唯讀 + admin 一撳標記假期
+- `main-sessions.js`：
+  - `onRoleLoaded` 接受 admin **同 teacher**（之前淨 admin，會 redirect）
+  - `init(role)` 設定 `isAdminView`：admin 見全部按鈕；teacher 隱藏 `saveBtn` / `importBtn` / 成張 `syncCard`（`#syncCard`）
+  - 輸入格 teacher `disabled=true`
+  - 每行 event 加「**假期**」toggle 掣（admin only）—— 一撳切換 `假期：停課（天氣惡劣）` ↔ 清空
+
+## 6. Bug fix：`main-rollcall.js` 從未 boot `init()`
+- 由 commit `c609278` 起 `main-rollcall.js` 漏咗 `onRoleLoaded(() => { init(); });`（module 結尾）—— `init()` 從未被觸發，下拉空 + dayBody 永遠「載入中」
+- 已補返
+
+## 7. Bug fix：`listCollections is not a function`
+- `db.js getRollCallYear` 用 `parent.listCollections()`（Admin SDK only）→ web SDK 爆
+- 改為對 `sessions` 每個日期逐日查 `rollcalls/{班}/{日期}`（42 日並行）
+
+## 8. 老師權限由 Roster 自動匯入（減少人手打）
+
+### 思路
+- Roster 試算表（`CFG_ROSTER_FILE_ID = 1boMa56S…`，tab `25/26`）有 `班別 / 導師Email` mapping（`accessControl.js: buildTeacherEmailMapFlexible_`）
+- `permissions` 表（`OPERATION_SPREADSHEET_ID = 1Uwa0Tis…`，`permissions` sheet，欄位 `role/class/email`）原本要人手打
+- 自動由 Roster 匯入老師權限
+
+### 改動
+- `apps-script-backup\portal-integrated\importTeachers.gs`（**新**）：
+  - `RUN_ImportTeachersToPermissions()` —— 由 Roster map → 保留 admin + 重寫 teacher 行（`teacher / 班別 / email`）
+  - 喺 GAS 編輯器行一次就 OK（唔使重新部署 web app，純啲操作 spreadsheet）
+- `web_main.gs getUserRoles`：支援老師**多班**（原本 first-match only），同一個 email 多班會聚合
+- `web_main.gs getPermissions`（**新**）：admin-only action，回傳全部 `{email,role,class}` 畀前端 sync
+- `js/api.js getPermissions`（**新**）
+- `js/db.js syncPermissionsFromGAS`（**新**）：讀 GAS permissions → 寫 Firestore `permissions/{email}`（`role + classes`），令老師 Firestore 寫點名過到 rules
+- `js/data.js`：export `syncPermissionsFromGAS`
+- `admin_sessions.html`：新掣「**同步權限 → Firestore**」（admin only；teacher 隱藏）
+- `main-sessions.js handlePermSync`：撳掣同步
+
+### 兩層權限要兩步
+1. **GAS permissions 表**（login 必用）→ 行 `RUN_ImportTeachersToPermissions`
+2. **Firestore `permissions/{email}`**（Firestore rules 讀）→ admin 撳「同步權限 → Firestore」掣
+3. 兩者都有老師先可以登入 + 寫點名
+
+## 9. 學生名單 ID 更新
+- 主名單試算表由 `1vTb--…` 改為 **`1FSvlNvzY-bk63z_OGtGZ_216Gs-mQfiQ`**（`STUDENT_SPREADSHEET_ID`）
+- 改咗 `apps-script-backup\portal-integrated\config.js:36` + `apps-script-backup\config.gs:4`
+- 部署 GAS 要更新 config 先生效；然後 `admin_sessions.html` 撳「同步 Sheets → Firestore」
+
+## 10. `db.js syncAllFromGAS` 全量取代
+- 新 helper `replaceCollection_`：寫新 + 刪唔喺名單嘅 doc（roster 用呢個，學生刪咗會自動從 Firestore 消失）
+- Removed-class cleanup：刪 `classes/{cls}` + 連帶 `roster/{cls}/members` + `studentDetails/{cls}/students` + `classLinks/{cls}`
+
+## 11. Portal 顯示學生名單
+- `class_portal.html` 加「**學生名單**」卡片（`rosterCard`）
+- `main-portal.js renderRoster(p)`：每班學生名 + 類別 chip + 人數
+
+## 12. 每班檔案來源（重要，對照）
+| 資料 | 來源試算表位置 |
+|---|---|
+| 表單連結 (`formLink`) | 營運試算表 `1Uwa0Tis…` → **`class_links` sheet**（`班別/表單連結/備註`） |
+| 名單 / 收據 / 出席表 links | **Mapping Summary 表** `1eTUXnI4CFct…`（`Summary` tab）`listFileId/receiptFileId/attendanceFileId` |
+| Firestore | `classLinks/{className}` doc（sync 後 portal 讀） |
+
+`portal.gs getClassLinksFromMapping_` 由 Mapping Summary 攞 file IDs 變成 URL。
+
+## 13. 已做嘅檔案清單（本日）
+- `js/db.js`：mass 欄、replaceCollection_、getRollCallYear 改用 sessions、syncPermissionsFromGAS
+- `js/data.js`：export syncPermissionsFromGAS
+- `js/api.js`：getPermissions
+- `js/main-rollcall.js`：兩欄、假期規則、移除點名紙、補 onRoleLoaded boot
+- `js/main-portal.js`：renderRoster、上堂日曆 → calendar.html
+- `js/main-sessions.js`：teacher 唯讀、admin 假期掣、permSync 掣
+- `js/main-calendar.js`（**新**）
+- `calendar.html`（**新**）
+- `rollcall.html`：上堂/彌撒欄、移除點名紙、每班Portal nav
+- `class_portal.html`：學生名單卡片
+- `admin_sessions.html`：每班Portal nav、syncCard 掣、permSync 掣
+- `form.html`：每班Portal nav
+- `apps-script-backup\portal-integrated\config.js`：STUDENT_SPREADSHEET_ID
+- `apps-script-backup\config.gs`：STUDENT_SPREADSHEET_ID
+- `apps-script-backup\portal-integrated\web_main.gs`：getPermissions、getUserRoles 多班
+- `apps-script-backup\portal-integrated\importTeachers.gs`（**新**）
+
+## 14. 待辦（人/部署）
+- [ ] GAS Redeploy 新版本（`getPermissions` + `getUserRoles` 多班要先生效）
+- [ ] 行 `RUN_ImportTeachersToPermissions`（喺 GAS 編輯器）
+- [ ] admin 撳「同步權限 → Firestore」撳掣
+- [ ] 部署後老師測試：登入 + 日曆唯讀 + rollcall save
+- [ ] 投票系統分離仍按舊計劃
+- [ ] Budget alert

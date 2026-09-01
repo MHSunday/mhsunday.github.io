@@ -166,7 +166,7 @@ auth.onAuthStateChanged(async (user) => {
 
         // 安全跳轉：使用 replace 避免回退鍵循環
         if (currentPage === 'index.html' || currentPage === '') {
-          window.location.replace('./form.html');
+          window.location.replace('./hub.html');
         }
       } else {
         const detail = roleData && roleData.error ? `｜後端回覆：${roleData.error}` : `｜回傳：${JSON.stringify(roleData)}`;
