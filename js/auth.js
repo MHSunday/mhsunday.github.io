@@ -167,16 +167,34 @@ auth.onAuthStateChanged(async (user) => {
       // 以 ID Token 取代 email，讓後端 server-side 驗證身份
       // 用 getIdToken()（唔強制 refresh）以節省手機網絡時間；token 過期時 SDK 會自動 refresh
       const idToken = await user.getIdToken();
-      const response = await fetch(
-        `${APP_CONFIG.appsScriptUrl}?action=getUserRoles&idToken=${encodeURIComponent(idToken)}&t=${Date.now()}`,
-        {
-          method: 'GET',
-          mode: 'cors',
-          headers: { 'Accept': 'application/json' }
-        }
-      );
+      const url = `${APP_CONFIG.appsScriptUrl}?action=getUserRoles&idToken=${encodeURIComponent(idToken)}&t=${Date.now()}`;
 
-      if (!response.ok) throw new Error(`權限服務錯誤: ${response.status}`);
+      // GAS cold start 第一次請求可能 503：自動 retry 最多 3 次（隔 1.5s / 3s）
+      let response;
+      let lastErr;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          response = await fetch(url, {
+            method: 'GET',
+            mode: 'cors',
+            headers: { 'Accept': 'application/json' }
+          });
+          // 5xx 視為 transient（cold start / temporary），retry；4xx 視為永久錯誤
+          if (response.status >= 500) {
+            lastErr = new Error(`權限服務錯誤: ${response.status}`);
+            console.warn(`[auth] getUserRoles 第 ${attempt + 1} 次收到 ${response.status}，將 retry`);
+            await new Promise(r => setTimeout(r, attempt === 0 ? 1500 : 3000));
+            continue;
+          }
+          break; // 2xx / 4xx 跳出 loop
+        } catch (netErr) {
+          lastErr = netErr;
+          console.warn(`[auth] getUserRoles 第 ${attempt + 1} 次網絡錯誤:`, netErr.message);
+          await new Promise(r => setTimeout(r, attempt === 0 ? 1500 : 3000));
+        }
+      }
+
+      if (!response || !response.ok) throw lastErr || new Error('權限服務錯誤');
 
       const roleData = await response.json();
       console.log("[auth] 登入 email:", user.email);
@@ -221,6 +239,10 @@ auth.onAuthStateChanged(async (user) => {
       // 網路錯誤時不立即登出，給予重試機會
       if (!navigator.onLine) {
         alert("網路連線中斷，請檢查網路設定");
+      } else if (/503|502|504|500/.test(String(err && err.message))) {
+        // GAS cold start 連 retry 都失敗：唔好踢走用戶，叫佢 reload
+        alert("系統正在啟動中（GAS cold start），請稍後再試或重新整理頁面");
+        // 唔 logout，留喺 index.html 等用戶 reload
       } else {
         alert("系統權限驗證失敗");
         await logout();
