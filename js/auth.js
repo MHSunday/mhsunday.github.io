@@ -23,8 +23,8 @@ export function getUserRole() { return userRole; }
 
 // 取得目前登入使用者的 Firebase ID Token（後端需要驗證身份用）
 export function getAuthToken() {
-  // forceRefresh=true：手機時鐘偏差可能令 SDK 誤判 token 未過期，強制 refresh 攞新 token
-  return auth.currentUser ? auth.currentUser.getIdToken(true) : Promise.resolve(null);
+  // 用預設（唔強制 refresh）以節省手機網絡時間；token 過期時 SDK 會自動 refresh
+  return auth.currentUser ? auth.currentUser.getIdToken() : Promise.resolve(null);
 }
 
 /**
@@ -93,6 +93,7 @@ export async function logout() {
     toggleLoading(true);
     await auth.signOut();
     sessionStorage.clear(); // 清除快取的權限資訊
+    try { localStorage.removeItem('userRoleCache'); } catch (_) {}
     window.location.replace('./index.html');
   } catch (error) {
     toggleLoading(false);
@@ -111,11 +112,14 @@ export function onRoleLoaded(callback) {
 // 檢查初始狀態的輔助函數
 function checkInitialState() {
   const currentPage = window.location.pathname.split('/').pop() || 'index.html';
-  if (!auth.currentUser && !isProcessingRedirect) {
-    if (currentPage !== 'index.html' && currentPage !== '') {
+  if (currentPage === 'index.html' || currentPage === '') return;
+  // 等 Firebase 還原持久化 session 先決定係咪踢返去登入頁，
+  // 避免手機 IndexedDB 還原較慢時（auth.currentUser 仲係 null）誤判為未登入。
+  setTimeout(() => {
+    if (!auth.currentUser && !isProcessingRedirect) {
       window.location.replace('./index.html');
     }
-  }
+  }, 800);
 }
 
 // --- 登入狀態監聽 ---
@@ -123,12 +127,34 @@ auth.onAuthStateChanged(async (user) => {
   console.log("User state changed:", user ? "LOGGED_IN" : "LOGGED_OUT");
 
   const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+  const CACHE_TTL_MS = 60 * 60 * 1000; // 1 小時
 
   if (user) {
     currentUser = user;
     toggleLoading(true); // 確保在 fetch 前顯示 Loading
 
-    // 如果已經有快取的 Role，先通知 UI 減少閃爍
+    // 如果已經有新鮮嘅 localStorage cache（< 1 小時），直接用，唔打 GAS
+    try {
+      const cached = localStorage.getItem('userRoleCache');
+      if (cached) {
+        const { role, ts, email } = JSON.parse(cached);
+        // 確認係同一個用戶嘅 cache（避免舊用戶殘留）
+        if (email === user.email && (Date.now() - ts) < CACHE_TTL_MS) {
+          userRole = role;
+          roleLoaded = true;
+          sessionStorage.setItem('userRole', JSON.stringify(role));
+          roleLoadedCallbacks.forEach(cb => cb(role));
+          toggleLoading(false);
+          console.log("[auth] 用 localStorage cache 跳過 GAS fetch");
+          if (currentPage === 'index.html' || currentPage === '') {
+            window.location.replace('./hub.html');
+          }
+          return;
+        }
+      }
+    } catch (_) { /* localStorage 可能壞咗，照常 fetch */ }
+
+    // 如果已經有 sessionStorage 快取（跨頁導航），先通知 UI 減少閃爍
     const cachedRole = sessionStorage.getItem('userRole');
     if (cachedRole) {
       userRole = JSON.parse(cachedRole);
@@ -139,8 +165,8 @@ auth.onAuthStateChanged(async (user) => {
     try {
       // 修正 CORS：加入 timestamp 避免 GAS 緩存，並明確設定 mode: 'cors'
       // 以 ID Token 取代 email，讓後端 server-side 驗證身份
-      // 用 getIdToken(true) 強制 refresh：手機時鐘偏差/長開頁面會令舊 token 過期 → 被誤判無權限
-      const idToken = await user.getIdToken(true);
+      // 用 getIdToken()（唔強制 refresh）以節省手機網絡時間；token 過期時 SDK 會自動 refresh
+      const idToken = await user.getIdToken();
       const response = await fetch(
         `${APP_CONFIG.appsScriptUrl}?action=getUserRoles&idToken=${encodeURIComponent(idToken)}&t=${Date.now()}`,
         {
@@ -160,11 +186,20 @@ auth.onAuthStateChanged(async (user) => {
         userRole = roleData;
         roleLoaded = true;
 
-        // 存入 sessionStorage 供跨頁面使用
+        // 存入 sessionStorage（跨頁）+ localStorage（跨 session，1 小時 TTL）
         sessionStorage.setItem('userRole', JSON.stringify(roleData));
+        try {
+          localStorage.setItem('userRoleCache', JSON.stringify({
+            role: roleData,
+            ts: Date.now(),
+            email: user.email
+          }));
+        } catch (_) { /* localStorage 滿咗唔影響運作 */ }
 
         roleLoadedCallbacks.forEach(cb => cb(roleData));
         roleLoadedCallbacks.length = 0;
+
+        toggleLoading(false);
 
         // 安全跳轉：使用 replace 避免回退鍵循環
         if (currentPage === 'index.html' || currentPage === '') {
@@ -178,6 +213,11 @@ auth.onAuthStateChanged(async (user) => {
     } catch (err) {
       console.error("獲取權限失敗", err);
       toggleLoading(false);
+      // 已經有快取 role（跨頁導航）→ 唔好因為 refresh 失敗就登出
+      if (roleLoaded && userRole) {
+        console.warn("[auth] getUserRoles fetch 失敗，繼續用快取 role");
+        return;
+      }
       // 網路錯誤時不立即登出，給予重試機會
       if (!navigator.onLine) {
         alert("網路連線中斷，請檢查網路設定");
@@ -189,14 +229,22 @@ auth.onAuthStateChanged(async (user) => {
   } else {
     // 如果不是正在處理 Redirect，且確實沒有 user，才踢回首頁
     if (!isProcessingRedirect) {
-      currentUser = null;
-      userRole = null;
-      roleLoaded = false;
-      sessionStorage.removeItem('userRole');
-      toggleLoading(false);
-      if (currentPage !== 'index.html' && currentPage !== '') {
-        window.location.replace('./index.html');
-      }
+      // 手機 Firebase 持久化還原可能慢，auth state 短暫係 null
+      // 延遲再確認避免誤踢已登入用戶（亦避免清空 sessionStorage 嘅 cached role）
+      setTimeout(() => {
+        if (!auth.currentUser && !isProcessingRedirect) {
+          currentUser = null;
+          userRole = null;
+          roleLoaded = false;
+          sessionStorage.removeItem('userRole');
+          try { localStorage.removeItem('userRoleCache'); } catch (_) {}
+          toggleLoading(false);
+          const page = window.location.pathname.split('/').pop() || 'index.html';
+          if (page !== 'index.html' && page !== '') {
+            window.location.replace('./index.html');
+          }
+        }
+      }, 800);
     }
   }
 });
