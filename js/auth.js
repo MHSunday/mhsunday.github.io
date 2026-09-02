@@ -121,9 +121,12 @@ function checkInitialState() {
   // 避免手機還原較慢時（auth.currentUser 仲係 null）誤判為未登入。
   const unsubscribe = auth.onAuthStateChanged((user) => {
     unsubscribe();
-    if (!user) {
-      window.location.replace('./index.html');
-    }
+    // 延遲再確認，確保 Firebase 持久化已完全還原（手機 Safari 特別慢）
+    setTimeout(() => {
+      if (!auth.currentUser) {
+        window.location.replace('./index.html');
+      }
+    }, 800);
   });
 }
 
@@ -215,7 +218,12 @@ auth.onAuthStateChanged(async (user) => {
       sessionStorage.removeItem('userRole');
       toggleLoading(false);
       if (currentPage !== 'index.html' && currentPage !== '') {
-        window.location.replace('./index.html');
+        // 手機 Firebase 持久化還原可能慢，延遲確認避免誤踢已登入用戶
+        setTimeout(() => {
+          if (!auth.currentUser && !isProcessingRedirect) {
+            window.location.replace('./index.html');
+          }
+        }, 800);
       }
     }
   }
