@@ -165,7 +165,7 @@ function renderDayRows(dayIsHoliday) {
     numTd.textContent = s.serial || (idx + 1);
 
     const nameTd = document.createElement('td');
-    nameTd.className = 'border px-3 py-2.5';
+    nameTd.className = 'border px-3 py-3 text-xl font-medium';
     nameTd.textContent = s.name;
 
     const mkChk = (kind, checked, tdClass, disabled) => {
