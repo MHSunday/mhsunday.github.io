@@ -25,15 +25,23 @@ function init(role) {
   if (isAdmin) {
     $('portalBtn').classList.add('ring-4', 'ring-blue-200');
     $('portalDesc').textContent = '點名 / 學生名單 / 班級檔案　（建議）';
+    $('adminTodosBtn').classList.remove('hidden');
   } else {
     $('formBtn').style.display = 'none';
+    $('rollcallBtn').classList.add('ring-4', 'ring-blue-200');
   }
 
   $('portalBtn').addEventListener('click', () => {
     window.location.href = 'class_portal.html';
   });
+  $('rollcallBtn').addEventListener('click', () => {
+    window.location.href = 'rollcall.html';
+  });
   $('formBtn').addEventListener('click', () => {
     window.location.href = 'form.html';
+  });
+  $('adminTodosBtn').addEventListener('click', () => {
+    window.location.href = 'admin_todos.html';
   });
 }
 

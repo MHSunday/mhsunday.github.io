@@ -46,6 +46,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // === 班級待辦（登入可讀；admin 寫） ===
+    match /classTodos/{className}/todos/{id} {
+      allow read: if isAuthed();
+      allow write: if isAdmin();
+    }
+
     // === 權限（只可讀自己；admin 寫） ===
     match /permissions/{email} {
       allow read: if isAuthed() && request.auth.token.email == email;

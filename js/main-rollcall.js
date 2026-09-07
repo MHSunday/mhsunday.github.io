@@ -2,6 +2,7 @@
 // 每日記兩種出席：上堂（present）+ 彌撒（mass）
 import { getAllClasses, getSessions, getRollCall, saveRollCall, getClassRoster, getRollCallYear } from './data.js';
 import { onRoleLoaded, logout } from './auth.js';
+import { sortClasses } from './classOrder.js';
 
 const CATEGORY_LABEL = { '學生': '學生', '小導師': '小導師', '老師': '導師' };
 
@@ -56,6 +57,7 @@ async function init(role) {
   $('logoutBtn').addEventListener('click', () => logout());
   $('tabDayBtn').addEventListener('click', () => switchTab('day'));
   $('tabMatrixBtn').addEventListener('click', () => switchTab('matrix'));
+  $('tabMassBtn').addEventListener('click', () => switchTab('mass'));
   $('allPresentBtn').addEventListener('click', () => setByKind('present', true));
   $('clearAllBtn').addEventListener('click', () => renderDay());
   $('saveDayBtn').addEventListener('click', saveDay);
@@ -63,6 +65,7 @@ async function init(role) {
 
   try {
     [classes, sessions] = await Promise.all([getAllClasses(), getSessions()]);
+    classes = sortClasses(classes);
   } catch (err) {
     setMessage(`載入失敗：${err.message}`, true);
     return;
@@ -80,7 +83,8 @@ async function init(role) {
 
   $('dateSelect').value = currentDate;
 
-  switchTab('day');
+  const initialTab = urlParam('tab') === 'mass' ? 'mass' : urlParam('tab') === 'matrix' ? 'matrix' : 'day';
+  switchTab(initialTab);
 }
 
 function fillDateSelect() {
@@ -108,12 +112,15 @@ function switchTab(tab) {
   const isDay = tab === 'day';
   $('dayView').classList.toggle('hidden', !isDay);
   $('matrixView').classList.toggle('hidden', tab !== 'matrix');
+  $('massView').classList.toggle('hidden', tab !== 'mass');
 
   $('tabDayBtn').className = `px-3 py-1.5 rounded-md text-sm font-bold ${isDay ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`;
   $('tabMatrixBtn').className = `px-3 py-1.5 rounded-md text-sm font-bold ${tab === 'matrix' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`;
+  $('tabMassBtn').className = `px-3 py-1.5 rounded-md text-sm font-bold ${tab === 'mass' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`;
 
   if (tab === 'day') renderDay();
   else if (tab === 'matrix') renderMatrix();
+  else if (tab === 'mass') renderMass();
 }
 
 // ---------- 當日點名 ----------
@@ -330,6 +337,87 @@ function buildMatrixTable() {
       if (m && m.mass === true) td2.textContent = '✓';
       tr.appendChild(td2);
     });
+    body.appendChild(tr);
+  });
+}
+
+// ---------- 彌撒統計 ----------
+
+async function renderMass() {
+  if (!currentClass) return;
+  setMessage('載入中...');
+  const body = $('massBody');
+  body.innerHTML = '<tr><td colspan="4" class="border p-4 text-center text-gray-400">載入中...</td></tr>';
+
+  try {
+    const [r, ym] = await Promise.all([
+      getClassRoster(currentClass),
+      getRollCallYear(currentClass)
+    ]);
+    const eligible = sessions.filter(s => isClassDay(s)).length;
+
+    const rows = r.map(s => {
+      let mass = 0;
+      let present = 0;
+      for (const sess of sessions) {
+        const m = ym[sess.date] && ym[sess.date][s.name];
+        if (m && m.mass === true) mass++;
+        if (m && m.present === true) present++;
+      }
+      return {
+        name: s.name,
+        category: s.category,
+        mass,
+        present,
+        rate: eligible ? Math.round((present / eligible) * 100) : 0
+      };
+    }).sort((a, b) => b.mass - a.mass || b.present - a.present);
+
+    const total = rows.reduce((sum, r) => sum + r.mass, 0);
+    setMessage(`共 ${rows.length} 人 · 彌撒總次數 ${total} · ${sessions.length} 個星期日`);
+    renderMassRows(rows);
+  } catch (err) {
+    setMessage(`載入失敗：${err.message}`, true);
+    body.innerHTML = '';
+  }
+}
+
+function renderMassRows(rows) {
+  const body = $('massBody');
+  body.innerHTML = '';
+
+  let lastCat = '';
+  rows.forEach((s) => {
+    if (s.category !== lastCat) {
+      lastCat = s.category;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="4" class="bg-gray-100 border px-3 py-1.5 text-sm font-bold text-gray-600">${CATEGORY_LABEL[s.category] || s.category}</td>`;
+      body.appendChild(tr);
+    }
+
+    const tr = document.createElement('tr');
+    tr.className = 'hover:bg-blue-50';
+
+    const nameTd = document.createElement('td');
+    nameTd.className = 'border px-3 py-2.5 text-lg font-medium';
+    nameTd.textContent = s.name;
+
+    const massTd = document.createElement('td');
+    massTd.className = 'border px-2 py-2.5 text-center text-xl font-bold text-orange-600';
+    massTd.textContent = `${s.mass} 次`;
+
+    const presentTd = document.createElement('td');
+    presentTd.className = 'border px-2 py-2.5 text-center text-gray-700';
+    presentTd.textContent = `${s.present} 次`;
+
+    const rateTd = document.createElement('td');
+    rateTd.className = 'border px-2 py-2.5 text-center font-bold text-blue-700';
+    rateTd.textContent = `${s.rate}%`;
+
+    tr.appendChild(nameTd);
+    tr.appendChild(massTd);
+    tr.appendChild(presentTd);
+    tr.appendChild(rateTd);
     body.appendChild(tr);
   });
 }

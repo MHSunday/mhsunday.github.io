@@ -37,6 +37,7 @@
       <div class="flex-1"></div>
       <button id="tabDayBtn" class="px-3 py-1.5 rounded-md text-sm font-bold bg-blue-600 text-white">當日</button>
       <button id="tabMatrixBtn" class="px-3 py-1.5 rounded-md text-sm font-bold bg-gray-200 text-gray-700">全年</button>
+      <button id="tabMassBtn" class="px-3 py-1.5 rounded-md text-sm font-bold bg-gray-200 text-gray-700">彌撒</button>
     </div>
     <div class="flex flex-wrap items-center gap-2 mt-2">
       <button id="allPresentBtn" class="text-sm bg-green-100 text-green-700 px-3 py-1.5 rounded">全部課堂</button>
@@ -72,6 +73,25 @@
     <div class="matrix-scroll overflow-x-auto">
       <table class="text-sm border-collapse" id="matrixTable">
         <tbody id="matrixBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 彌撒統計 -->
+  <section id="massView" class="bg-white hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-base border-collapse">
+        <thead>
+          <tr>
+            <th class="border p-2 text-left text-base">姓名</th>
+            <th class="border p-2 text-center w-24 text-base">彌撒次數</th>
+            <th class="border p-2 text-center w-24 text-base">出席次數</th>
+            <th class="border p-2 text-center w-24 text-base">出席率</th>
+          </tr>
+        </thead>
+        <tbody id="massBody">
+          <tr><td colspan="4" class="border p-4 text-center text-gray-400">載入中...</td></tr>
+        </tbody>
       </table>
     </div>
   </section>

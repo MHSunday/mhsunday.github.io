@@ -14,6 +14,7 @@
 
 import { APP_CONFIG } from './config.js';
 import * as gas from './api.js';
+import { sortClasses } from './classOrder.js';
 
 if (!firebase.apps.length) {
   firebase.initializeApp(APP_CONFIG.firebase);
@@ -38,7 +39,7 @@ function recorderEmail() {
 
 export async function getAllClasses() {
   const snap = await db.collection('classes').get();
-  return snap.docs.map(d => d.id).sort();
+  return sortClasses(snap.docs.map(d => d.id));
 }
 
 export async function getRoster(className) {
@@ -274,6 +275,47 @@ export async function getAttendanceStats(className) {
     totalCount,
     rate: totalCount ? Math.round((presentCount / totalCount) * 100) : 0
   };
+}
+
+// ==========================================
+// 班級待辦（classTodos）+ 彌撒統計
+// ==========================================
+
+export async function getClassTodos(className) {
+  if (!className) return [];
+  const snap = await db.collection('classTodos').doc(className).collection('todos').get();
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => {
+      if (!!a.done !== !!b.done) return a.done ? 1 : -1;
+      return String(a.date || '9999').localeCompare(String(b.date || '9999'));
+    });
+}
+
+export async function saveClassTodo(className, todo) {
+  if (!className || !todo || !todo.title) throw new Error('缺少必要參數');
+  const id = todo.id || `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  await db.collection('classTodos').doc(className).collection('todos').doc(id).set({
+    title: String(todo.title).trim(),
+    date: todo.date || '',
+    done: todo.done === true,
+    link: String(todo.link || '').trim(),
+    createdAt: new Date().toISOString(),
+    createdBy: recorderEmail()
+  }, { merge: true });
+  return { id };
+}
+
+export async function deleteClassTodo(className, id) {
+  if (!className || !id) throw new Error('缺少必要參數');
+  await db.collection('classTodos').doc(className).collection('todos').doc(id).delete();
+  return { success: true };
+}
+
+export async function setClassTodoDone(className, id, done) {
+  if (!className || !id) throw new Error('缺少必要參數');
+  await db.collection('classTodos').doc(className).collection('todos').doc(id).update({ done: done === true });
+  return { success: true };
 }
 
 // ==========================================

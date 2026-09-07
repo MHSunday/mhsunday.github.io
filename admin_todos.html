@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>待辦設定（管理員）</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Noto Sans TC', sans-serif; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <nav class="bg-blue-700 text-white shadow">
+    <div class="px-3 py-2 flex justify-between items-center">
+      <div class="flex items-center gap-2">
+        <a href="hub.html" class="text-sm hover:underline">‹ 返回</a>
+        <h1 class="text-lg font-bold">待辦設定</h1>
+      </div>
+      <button id="logoutBtn" class="text-xs bg-blue-800 px-2.5 py-1 rounded hover:bg-blue-900">登出</button>
+    </div>
+  </nav>
+
+  <main class="w-full max-w-2xl mx-auto p-4">
+
+    <!-- 班級選擇 -->
+    <div class="bg-white rounded-xl shadow-md p-4 mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">班級</label>
+      <select id="classSelect" class="border border-gray-300 rounded-md p-2 min-w-[10rem]"></select>
+      <div id="message" class="text-center text-sm font-medium min-h-[1.25rem] mt-2"></div>
+    </div>
+
+    <!-- 新增待辦 -->
+    <div class="bg-white rounded-xl shadow-md p-4 mb-4">
+      <h2 class="text-lg font-bold mb-3">新增待辦</h2>
+      <div class="flex flex-wrap gap-2">
+        <input id="todoTitle" class="flex-1 min-w-[12rem] border border-gray-300 rounded-md px-2 py-1.5 text-sm" placeholder="提醒內容（如：提家長開group / Google Form 要報名）…">
+        <input id="todoDate" type="date" class="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+        <input id="todoLink" class="flex-1 min-w-[12rem] border border-gray-300 rounded-md px-2 py-1.5 text-sm" placeholder="連結（可選）…">
+      </div>
+      <label class="flex items-center gap-2 mt-3 text-sm text-gray-700">
+        <input id="applyAll" type="checkbox" class="h-4 w-4">
+        套用到全部班級
+      </label>
+      <button id="addTodoBtn" class="mt-3 px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-bold">新增待辦</button>
+    </div>
+
+    <!-- 自動待辦（未做） -->
+    <div class="bg-white rounded-xl shadow-md p-4 mb-4">
+      <h2 class="text-lg font-bold mb-3">自動待辦（未做）</h2>
+      <div id="autoBody" class="space-y-2"></div>
+    </div>
+
+    <!-- 自訂待辦 -->
+    <div class="bg-white rounded-xl shadow-md p-4 mb-4">
+      <h2 class="text-lg font-bold mb-3">自訂待辦</h2>
+      <div id="todoBody" class="space-y-2"></div>
+    </div>
+
+  </main>
+
+  <script type="module" src="js/main-admin-todos.js"></script>
+</body>
+</html>

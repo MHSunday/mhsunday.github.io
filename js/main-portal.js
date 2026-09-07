@@ -1,6 +1,9 @@
 // js/main-portal.js — 每班 Portal 頁
-import { getAllClasses, getClassPortal, getAttendanceStats } from './data.js';
+import {
+  getAllClasses, getClassPortal, getRollCallYear, getClassTodos
+} from './data.js';
 import { onRoleLoaded, logout } from './auth.js';
+import { sortClasses, massAppliesTo, oneMonthLaterStr } from './classOrder.js';
 
 const CATEGORY_LABEL = { '學生': '學生', '小導師': '小導師', '老師': '導師' };
 
@@ -17,6 +20,15 @@ function setMessage(text, isError = false) {
 
 function urlParam(name) {
   return new URLSearchParams(window.location.search).get(name);
+}
+
+function fmt(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function todayStr() { return fmt(new Date()); }
+function shortDate(dateStr) {
+  const [, m, d] = String(dateStr || '').split('-');
+  return m && d ? `${Number(m)}/${Number(d)}` : dateStr;
 }
 
 async function init(role) {
@@ -45,7 +57,7 @@ async function init(role) {
     setMessage('您沒有可用的班級權限', true);
     return;
   }
-  classes = myClasses;
+  classes = sortClasses(myClasses);
 
   const sel = $('classSelect');
   sel.innerHTML = '';
@@ -67,31 +79,46 @@ async function loadPortal() {
   if (!currentClass) return;
   setMessage('載入中...');
   try {
-    const p = await getClassPortal(currentClass);
+    const [p, yearMarks, todos] = await Promise.all([
+      getClassPortal(currentClass),
+      getRollCallYear(currentClass),
+      getClassTodos(currentClass)
+    ]);
     renderToday(p);
     renderActions(p);
+    renderTodos(p, yearMarks, todos);
     renderRoster(p);
     renderLinks(p);
     renderDetails(p);
-    await renderAttendance(p);
+    renderAttendance(p, yearMarks);
     setMessage(`${currentClass}：共 ${p.rosterCount} 人`);
   } catch (err) {
     setMessage(`載入失敗：${err.message}`, true);
   }
 }
 
-async function renderAttendance(p) {
+function renderAttendance(p, yearMarks) {
   const card = $('attendanceCard');
   if (!card) return;
-  try {
-    const s = await getAttendanceStats(currentClass);
-    const attended = s.eligibleDays ? `${s.presentCount}/${s.totalCount}` : '—';
-    $('attendanceInfo').textContent = `${attended} 人次（${s.eligibleDays} 個上堂日）`;
-    $('attendancePct').textContent = `${s.rate}%`;
-    card.classList.remove('hidden');
-  } catch (err) {
-    card.classList.add('hidden');
+  const today = todayStr();
+  const roster = p.roster || [];
+  const classDays = (p.sessions || [])
+    .filter(s => !(s.event || '').startsWith('假期') && s.date <= today)
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+
+  let presentCount = 0;
+  let totalCount = 0;
+  for (const s of classDays) {
+    const marks = yearMarks[s.date] || {};
+    roster.forEach(m => {
+      if (marks[m.name] && marks[m.name].present === true) presentCount++;
+      totalCount++;
+    });
   }
+  const attended = totalCount ? `${presentCount}/${totalCount}` : '—';
+  $('attendanceInfo').textContent = `${attended} 人次（${classDays.length} 個上堂日）`;
+  $('attendancePct').textContent = `${totalCount ? Math.round((presentCount / totalCount) * 100) : 0}%`;
+  card.classList.remove('hidden');
 }
 
 function renderToday(p) {
@@ -112,8 +139,7 @@ function renderActions(p) {
   const buttons = [
     { label: '今日點名', desc: today || '揀日期', href: `rollcall.html?class=${encodeURIComponent(p.className)}&date=${today}` },
     { label: '全年矩陣', desc: '睇全年出席', href: `rollcall.html?class=${encodeURIComponent(p.className)}` },
-    { label: '列印點名紙', desc: 'A4 硬copies', href: `rollcall.html?class=${encodeURIComponent(p.className)}` },
-    { label: '彌撒登記', desc: '彌撒出席 + 獎勵', href: 'form.html' },
+    { label: '彌撒統計', desc: '每位學生彌撒次數', href: `rollcall.html?class=${encodeURIComponent(p.className)}&tab=mass` },
     { label: '上堂日曆', desc: '睇全年日曆', href: 'calendar.html' },
     { label: '學生名單', desc: `${p.rosterCount} 人`, href: '#details' }
   ];
@@ -129,6 +155,159 @@ function renderActions(p) {
     `;
     grid.appendChild(a);
   });
+}
+
+// ---------- 待辦事項 ----------
+
+function isClassDay(s) {
+  return !(s.event || '').startsWith('假期');
+}
+
+/** 自動計算待辦：未點名 / 彌撒未填 / 黎緊彌撒日 */
+function computeAutoTodos(p, yearMarks, today) {
+  const todos = [];
+  const sessions = p.sessions || [];
+  const className = p.className;
+
+  const classDays = sessions
+    .filter(s => isClassDay(s) && s.date <= today)
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  const latest = classDays[0];
+  if (latest) {
+    const marks = yearMarks[latest.date] || {};
+    const hasRollCall = Object.keys(marks).length > 0;
+    if (!hasRollCall) {
+      todos.push({
+        key: 'auto-rollcall', type: 'rollcall', severity: 'high',
+        title: '尚未點名',
+        desc: `${shortDate(latest.date)} 未做點名`,
+        date: latest.date,
+        href: `rollcall.html?class=${encodeURIComponent(className)}&date=${latest.date}`
+      });
+    } else {
+      const hasMass = Object.values(marks).some(m => m && m.mass === true);
+      if (!hasMass) {
+        todos.push({
+          key: 'auto-mass', type: 'mass', severity: 'medium',
+          title: '彌撒未填',
+          desc: `${shortDate(latest.date)} 彌撒出席未填`,
+          date: latest.date,
+          href: `rollcall.html?class=${encodeURIComponent(className)}&date=${latest.date}`
+        });
+      }
+    }
+  }
+
+  const maxDate = oneMonthLaterStr(today);
+  sessions
+    .filter(s => /彌撒/.test(s.event || '') && s.date >= today && s.date <= maxDate && massAppliesTo(s.event, className))
+    .sort((a, b) => (a.date < b.date ? -1 : 1))
+    .slice(0, 3)
+    .forEach(s => {
+      todos.push({
+        key: `auto-up-${s.date}`, type: 'upcoming', severity: 'info',
+        title: '黎緊彌撒日',
+        desc: `${shortDate(s.date)} ${s.event}`,
+        date: s.date
+      });
+    });
+
+  return todos;
+}
+
+function renderTodos(p, yearMarks, todos) {
+  const card = $('todosCard');
+  const body = $('todosBody');
+  if (!card || !body) return;
+
+  const today = todayStr();
+
+  const auto = computeAutoTodos(p, yearMarks, today);
+  const manual = (todos || []).map(t => ({
+    key: t.id,
+    type: 'manual',
+    severity: t.done === true ? 'done' : (t.date && t.date < today ? 'due' : 'future'),
+    title: t.title,
+    desc: [t.date ? shortDate(t.date) : '', t.link ? '有連結' : ''].filter(Boolean).join(' · '),
+    date: t.date,
+    link: t.link || '',
+    done: t.done === true,
+    id: t.id
+  }));
+
+  const items = [...auto, ...manual];
+  if (!items.length) {
+    card.classList.add('hidden');
+    return;
+  }
+  card.classList.remove('hidden');
+
+  body.innerHTML = '';
+  items.forEach(t => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2 rounded-lg px-3 py-2 ' + severityClass(t.severity);
+
+    const text = document.createElement('div');
+    text.className = 'flex-1 min-w-0';
+    const title = document.createElement('div');
+    title.className = `font-bold text-sm ${t.severity === 'done' ? 'line-through text-gray-400' : ''}`;
+    title.textContent = t.title;
+    const desc = document.createElement('div');
+    desc.className = 'text-xs opacity-80';
+    desc.textContent = t.desc;
+    text.appendChild(title);
+    if (desc.textContent) text.appendChild(desc);
+
+    if (t.type !== 'manual') {
+      const badge = document.createElement('span');
+      badge.className = 'shrink-0 text-xs font-bold ' + badgeClass(t.severity);
+      badge.textContent = t.type === 'upcoming' ? '未來' : '⚠';
+      row.appendChild(badge);
+    } else if (t.done) {
+      const badge = document.createElement('span');
+      badge.className = 'shrink-0 text-xs font-bold text-green-600';
+      badge.textContent = '✓';
+      row.appendChild(badge);
+    }
+
+    if (t.link && t.type === 'manual') {
+      const a = document.createElement('a');
+      a.href = t.link;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.className = 'shrink-0 text-xs text-blue-700 font-bold';
+      a.textContent = '連結 ↗';
+      row.appendChild(a);
+    }
+
+    if (t.href && t.type !== 'manual') {
+      const a = document.createElement('a');
+      a.href = t.href;
+      a.className = 'shrink-0 text-xs text-blue-700 font-bold';
+      a.textContent = '去處理 →';
+      row.appendChild(a);
+    }
+
+    body.appendChild(row);
+  });
+}
+
+function severityClass(severity) {
+  switch (severity) {
+    case 'high': return 'bg-red-50 border border-red-200 text-red-700';
+    case 'medium': return 'bg-orange-50 border border-orange-200 text-orange-700';
+    case 'done': return 'bg-gray-50 border border-gray-100 text-gray-500';
+    case 'due': return 'bg-orange-50 border border-orange-200 text-orange-700';
+    default: return 'bg-blue-50 border border-blue-100 text-blue-700';
+  }
+}
+function badgeClass(severity) {
+  switch (severity) {
+    case 'high': return 'text-red-600';
+    case 'medium': return 'text-orange-600';
+    default: return 'text-blue-600';
+  }
 }
 
 function renderRoster(p) {
