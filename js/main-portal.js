@@ -258,6 +258,7 @@ function renderTodos(p, yearMarks, todos) {
     desc.textContent = t.desc;
     text.appendChild(title);
     if (desc.textContent) text.appendChild(desc);
+    row.appendChild(text);
 
     if (t.type !== 'manual') {
       const badge = document.createElement('span');

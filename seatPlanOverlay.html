@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>禮堂座位表 - 學生名單分派 (A-T)</title>
+<style>
+    :root {
+        --seat-size: 52px;
+        --gap-size: 6px;
+        --aisle-width: 90px;
+    }
+
+    @media (max-width: 768px) {
+        :root {
+            --seat-size: 42px;
+            --gap-size: 4px;
+            --aisle-width: 55px;
+        }
+        .container { padding: 15px; max-width: 100%; margin: 0; }
+        .stage-screen { font-size: 18px; padding: 8px 20px; }
+        .row-number { width: 22px; font-size: 11px; }
+        body { padding: 10px; }
+        .seat { font-size: 15px; }
+    }
+
+    @media (max-width: 480px) {
+        :root {
+            --seat-size: 36px;
+            --gap-size: 3px;
+            --aisle-width: 38px;
+        }
+        .seat { font-size: 13px; }
+        .stage-screen { font-size: 15px; padding: 6px 12px; }
+        .row-number { font-size: 10px; }
+        table.lookup { font-size: 10px; }
+    }
+
+    body {
+        font-family: "Microsoft JhengHei", "Heiti TC", sans-serif;
+        background-color: #f0f2f5;
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+        -webkit-text-size-adjust: 100%;
+    }
+
+    .container {
+        background: white;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        max-width: 1050px;
+        width: 100%;
+        margin: 0 auto;
+        box-sizing: border-box;
+    }
+
+    h1 { text-align: center; color: #2c3e50; margin: 0 0 5px 0; font-size: 22px; }
+    .subtitle { text-align: center; color: #95a5a6; font-size: 13px; margin: 0 0 15px 0; }
+
+    .legend {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 5px;
+        padding-bottom: 15px;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        font-size: 12px;
+        font-weight: bold;
+        color: #333;
+        background: #f9f9f9;
+        padding: 4px 9px;
+        border-radius: 20px;
+        white-space: nowrap;
+    }
+
+    .legend-color {
+        width: 18px;
+        height: 18px;
+        border-radius: 4px;
+        margin-right: 6px;
+        background-color: #C0392B;
+    }
+
+    .stage-area {
+        width: 100%;
+        background: #2c3e50;
+        color: white;
+        text-align: center;
+        padding: 18px 0;
+        border-radius: 8px;
+        margin-bottom: 25px;
+    }
+
+    .stage-screen {
+        border: 4px solid #ecf0f1;
+        display: inline-block;
+        padding: 8px 40px;
+        font-size: 22px;
+        font-weight: bold;
+        background: #34495e;
+        border-radius: 4px;
+    }
+
+    .row {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .row-number {
+        width: 26px;
+        text-align: right;
+        margin-right: 12px;
+        font-weight: bold;
+        color: #7f8c8d;
+        font-size: 13px;
+    }
+
+    .block { display: flex; gap: var(--gap-size); }
+
+    .aisle {
+        width: var(--aisle-width);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-shrink: 0;
+        gap: 6px;
+    }
+
+    .aisle-arrow { color: #e0e0e0; font-size: 20px; font-weight: bold; }
+
+    .seat {
+        width: var(--seat-size);
+        height: var(--seat-size);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        font-weight: 900;
+        font-size: 18px;
+        border-radius: 6px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        position: relative;
+        user-select: none;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        box-sizing: border-box;
+    }
+
+    .seat.empty {
+        background: #ecf0f1;
+        box-shadow: none;
+        border: 2px dashed #bdc3c7;
+        color: transparent;
+    }
+
+    .seat.teacher { border: 3px solid #F1C40F; }
+    .seat.junior { border: 3px solid #1ABC9C; }
+
+    .c-early  { background-color: #e84393; }
+    .c-eu1    { background-color: #F39C12; }
+    .c-eu2    { background-color: #27AE60; }
+    .c-eu3    { background-color: #2980B9; }
+    .c-post   { background-color: #8E44AD; }
+    .c-conf1  { background-color: #16A085; }
+    .c-conf2a { background-color: #2C3E50; }
+    .c-conf2b { background-color: #5D4037; }
+    .c-conf3  { background-color: #D35400; }
+
+    .c-priest {
+        background-color: #F1C40F;
+        color: #2c3e50;
+        border: 3px solid #F39C12;
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        font-size: 16px;
+        font-weight: 900;
+    }
+
+    .role-teacher { background: #fff; border: 3px solid #F1C40F; }
+    .role-junior  { background: #fff; border: 3px solid #1ABC9C; }
+    .legend-color.c-priest { background-color: #F1C40F; border-radius: 50%; }
+
+    .section-title {
+        text-align: center;
+        color: #7f8c8d;
+        font-size: 13px;
+        margin: 12px 0 0 0;
+        font-weight: bold;
+        letter-spacing: 1px;
+    }
+
+    .lookup-wrap { margin-top: 25px; padding-top: 15px; border-top: 2px solid #eee; }
+    .lookup-wrap h2 { text-align: center; color: #2c3e50; font-size: 16px; margin: 0 0 6px 0; }
+    .lookup-hint { text-align: center; color: #95a5a6; font-size: 12px; margin: 0 0 10px 0; }
+    table.lookup {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+    table.lookup th, table.lookup td {
+        border: 1px solid #dfe6e9;
+        padding: 8px 10px;
+        text-align: left;
+    }
+    table.lookup th { background: #f8f9fa; color: #2c3e50; }
+    tr.classrow { cursor: pointer; }
+    tr.classrow:active td { background: #fdf3d7; }
+    tr.classrow.active td { background: #fdf3d7; }
+    .ch-name { font-size: 17px; font-weight: 900; color: #2c3e50; }
+    .lv { display: block; font-size: 12px; color: #95a5a6; font-weight: 600; }
+    .dot {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border-radius: 4px;
+        margin-right: 8px;
+        vertical-align: middle;
+    }
+
+    /* seat highlight */
+    .seat { cursor: pointer; transition: transform .15s, box-shadow .15s; }
+    .seat.hl { box-shadow: 0 0 0 4px #fff, 0 0 18px 6px rgba(0,0,0,.45); transform: scale(1.08); z-index: 3; }
+
+    /* bottom sheet overlay */
+    .scrim {
+        position: fixed; inset: 0; background: rgba(0,0,0,.45);
+        opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 90;
+    }
+    .scrim.open { opacity: 1; pointer-events: auto; }
+    .sheet {
+        position: fixed; left: 0; right: 0; bottom: 0; background: #fff;
+        border-radius: 18px 18px 0 0; box-shadow: 0 -6px 30px rgba(0,0,0,.25);
+        transform: translateY(105%); transition: transform .25s ease;
+        z-index: 100; padding: 10px 22px calc(18px + env(safe-area-inset-bottom));
+        max-width: 100%;
+    }
+    .sheet.open { transform: translateY(0); }
+    .sheet-bar { width: 44px; height: 5px; background: #dfe6e9; border-radius: 3px; margin: 4px auto 12px; }
+    .sheet-head { display: flex; align-items: center; gap: 14px; }
+    .swatch { width: 46px; height: 46px; border-radius: 10px; flex-shrink: 0; }
+    .sheet-titles { min-width: 0; }
+    .sheet-title { font-size: 26px; font-weight: 900; color: #2c3e50; line-height: 1.15; }
+    .sheet-sub { font-size: 16px; color: #7f8c8d; font-weight: 700; }
+    .sheet-close {
+        margin-left: auto; width: 42px; height: 42px; border: none;
+        background: #f0f2f5; border-radius: 50%; font-size: 18px; color: #555;
+        cursor: pointer; flex-shrink: 0;
+    }
+    .sheet-body { margin-top: 8px; }
+    .ov-row {
+        display: flex; justify-content: space-between; align-items: flex-start;
+        gap: 16px; padding: 12px 0; border-top: 1px solid #eee;
+    }
+    .ov-row span { color: #7f8c8d; font-size: 16px; font-weight: 700; flex-shrink: 0; }
+    .ov-row b { font-size: 17px; color: #2c3e50; text-align: right; line-height: 1.4; }
+    .sheet-foot { text-align: center; color: #bdc3c7; font-size: 12px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>禮堂座位表</h1>
+    <p class="subtitle">按班級由小至大 · 每班同側 · 共 131 人 + 2 神父</p>
+
+    <div class="legend">
+        <div class="legend-item"><div class="legend-color c-early"></div>幼兒班</div>
+        <div class="legend-item"><div class="legend-color c-eu1"></div>聖體一班</div>
+        <div class="legend-item"><div class="legend-color c-eu2"></div>聖體二班</div>
+        <div class="legend-item"><div class="legend-color c-eu3"></div>聖體三班</div>
+        <div class="legend-item"><div class="legend-color c-post"></div>聖體後班</div>
+        <div class="legend-item"><div class="legend-color c-conf1"></div>堅振一班</div>
+        <div class="legend-item"><div class="legend-color c-conf2a"></div>堅振二班A</div>
+        <div class="legend-item"><div class="legend-color c-conf2b"></div>堅振二班B</div>
+        <div class="legend-item"><div class="legend-color c-conf3"></div>堅振三班</div>
+        <div class="legend-item"><div class="legend-color c-priest"></div>神父</div>
+        <div class="legend-item"><div class="legend-color role-teacher"></div>導師</div>
+        <div class="legend-item"><div class="legend-color role-junior"></div>小導師</div>
+    </div>
+
+    <div class="stage-area">
+        <div class="stage-screen">講台 / 投影幕</div>
+    </div>
+
+    <div class="row"><div class="row-number">A</div><div class="block"><div class="seat c-early" data-key="幼兒班">A1</div><div class="seat c-early" data-key="幼兒班">A2</div><div class="seat c-early" data-key="幼兒班">A3</div><div class="seat c-early" data-key="幼兒班">A4</div><div class="seat c-early teacher" data-key="幼兒班">A5</div></div><div class="aisle priest-aisle"><div class="seat c-priest">神</div><div class="seat c-priest">父</div></div><div class="block"><div class="seat c-eu1" data-key="聖體班(1)">A6</div><div class="seat c-eu1" data-key="聖體班(1)">A7</div><div class="seat c-eu1" data-key="聖體班(1)">A8</div><div class="seat c-eu1" data-key="聖體班(1)">A9</div><div class="seat c-eu1 teacher" data-key="聖體班(1)">A10</div></div></div>
+    <div class="row"><div class="row-number">B</div><div class="block"><div class="seat c-early junior" data-key="幼兒班">B1</div><div class="seat c-early junior" data-key="幼兒班">B2</div><div class="seat c-eu3" data-key="聖體班 (3)">B3</div><div class="seat c-eu3" data-key="聖體班 (3)">B4</div><div class="seat c-eu3" data-key="聖體班 (3)">B5</div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat c-eu1 junior" data-key="聖體班(1)">B6</div><div class="seat c-eu1 junior" data-key="聖體班(1)">B7</div><div class="seat c-eu2" data-key="聖體班(2)">B8</div><div class="seat c-eu2" data-key="聖體班(2)">B9</div><div class="seat c-eu2" data-key="聖體班(2)">B10</div></div></div>
+    <div class="row"><div class="row-number">C</div><div class="block"><div class="seat c-eu3" data-key="聖體班 (3)">C1</div><div class="seat c-eu3" data-key="聖體班 (3)">C2</div><div class="seat c-eu3" data-key="聖體班 (3)">C3</div><div class="seat c-eu3" data-key="聖體班 (3)">C4</div><div class="seat c-eu3" data-key="聖體班 (3)">C5</div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat c-eu2" data-key="聖體班(2)">C6</div><div class="seat c-eu2" data-key="聖體班(2)">C7</div><div class="seat c-eu2" data-key="聖體班(2)">C8</div><div class="seat c-eu2" data-key="聖體班(2)">C9</div><div class="seat c-eu2" data-key="聖體班(2)">C10</div></div></div>
+    <div class="row"><div class="row-number">D</div><div class="block"><div class="seat c-eu3" data-key="聖體班 (3)">D1</div><div class="seat c-eu3" data-key="聖體班 (3)">D2</div><div class="seat c-eu3 teacher" data-key="聖體班 (3)">D3</div><div class="seat c-eu3 teacher" data-key="聖體班 (3)">D4</div><div class="seat c-eu3 junior" data-key="聖體班 (3)">D5</div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat c-eu2" data-key="聖體班(2)">D6</div><div class="seat c-eu2" data-key="聖體班(2)">D7</div><div class="seat c-eu2 teacher" data-key="聖體班(2)">D8</div><div class="seat c-eu2 junior" data-key="聖體班(2)">D9</div><div class="seat c-eu2 junior" data-key="聖體班(2)">D10</div></div></div>
+    <div class="row"><div class="row-number">E</div><div class="block"><div class="seat c-eu3 junior" data-key="聖體班 (3)">E1</div><div class="seat c-conf1" data-key="堅振班(1)">E2</div><div class="seat c-conf1" data-key="堅振班(1)">E3</div><div class="seat c-conf1" data-key="堅振班(1)">E4</div><div class="seat c-conf1" data-key="堅振班(1)">E5</div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat c-post" data-key="聖體後班">E6</div><div class="seat c-post" data-key="聖體後班">E7</div><div class="seat c-post" data-key="聖體後班">E8</div><div class="seat c-post" data-key="聖體後班">E9</div><div class="seat c-post" data-key="聖體後班">E10</div></div></div>
+    <div class="row"><div class="row-number">F</div><div class="block"><div class="seat c-conf1" data-key="堅振班(1)">F1</div><div class="seat c-conf1" data-key="堅振班(1)">F2</div><div class="seat c-conf1" data-key="堅振班(1)">F3</div><div class="seat c-conf1" data-key="堅振班(1)">F4</div><div class="seat c-conf1" data-key="堅振班(1)">F5</div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat c-post" data-key="聖體後班">F6</div><div class="seat c-post" data-key="聖體後班">F7</div><div class="seat c-post" data-key="聖體後班">F8</div><div class="seat c-post" data-key="聖體後班">F9</div><div class="seat c-post" data-key="聖體後班">F10</div></div></div>
+    <div class="row"><div class="row-number">G</div><div class="block"><div class="seat c-conf1" data-key="堅振班(1)">G1</div><div class="seat c-conf1" data-key="堅振班(1)">G2</div><div class="seat c-conf1" data-key="堅振班(1)">G3</div><div class="seat c-conf1" data-key="堅振班(1)">G4</div><div class="seat c-conf1 teacher" data-key="堅振班(1)">G5</div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat c-post" data-key="聖體後班">G6</div><div class="seat c-post" data-key="聖體後班">G7</div><div class="seat c-post" data-key="聖體後班">G8</div><div class="seat c-post" data-key="聖體後班">G9</div><div class="seat c-post teacher" data-key="聖體後班">G10</div></div></div>
+    <div class="row"><div class="row-number">H</div><div class="block"><div class="seat c-conf1 teacher" data-key="堅振班(1)">H1</div><div class="seat c-conf1 junior" data-key="堅振班(1)">H2</div><div class="seat c-conf1 junior" data-key="堅振班(1)">H3</div><div class="seat c-conf2a" data-key="堅振班(2a)">H4</div><div class="seat c-conf2a" data-key="堅振班(2a)">H5</div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat c-post junior" data-key="聖體後班">H6</div><div class="seat c-post junior" data-key="聖體後班">H7</div><div class="seat c-conf2b" data-key="堅振班(2b)">H8</div><div class="seat c-conf2b" data-key="堅振班(2b)">H9</div><div class="seat c-conf2b" data-key="堅振班(2b)">H10</div></div></div>
+    <div class="row"><div class="row-number">I</div><div class="block"><div class="seat c-conf2a" data-key="堅振班(2a)">I1</div><div class="seat c-conf2a" data-key="堅振班(2a)">I2</div><div class="seat c-conf2a" data-key="堅振班(2a)">I3</div><div class="seat c-conf2a" data-key="堅振班(2a)">I4</div><div class="seat c-conf2a" data-key="堅振班(2a)">I5</div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat c-conf2b" data-key="堅振班(2b)">I6</div><div class="seat c-conf2b" data-key="堅振班(2b)">I7</div><div class="seat c-conf2b" data-key="堅振班(2b)">I8</div><div class="seat c-conf2b" data-key="堅振班(2b)">I9</div><div class="seat c-conf2b" data-key="堅振班(2b)">I10</div></div></div>
+    <div class="row"><div class="row-number">J</div><div class="block"><div class="seat c-conf2a" data-key="堅振班(2a)">J1</div><div class="seat c-conf2a" data-key="堅振班(2a)">J2</div><div class="seat c-conf2a" data-key="堅振班(2a)">J3</div><div class="seat c-conf2a" data-key="堅振班(2a)">J4</div><div class="seat c-conf2a" data-key="堅振班(2a)">J5</div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat c-conf2b" data-key="堅振班(2b)">J6</div><div class="seat c-conf2b" data-key="堅振班(2b)">J7</div><div class="seat c-conf2b" data-key="堅振班(2b)">J8</div><div class="seat c-conf2b" data-key="堅振班(2b)">J9</div><div class="seat c-conf2b" data-key="堅振班(2b)">J10</div></div></div>
+    <div class="row"><div class="row-number">K</div><div class="block"><div class="seat c-conf2a" data-key="堅振班(2a)">K1</div><div class="seat c-conf2a" data-key="堅振班(2a)">K2</div><div class="seat c-conf2a teacher" data-key="堅振班(2a)">K3</div><div class="seat c-conf2a teacher" data-key="堅振班(2a)">K4</div><div class="seat c-conf2a junior" data-key="堅振班(2a)">K5</div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat c-conf2b teacher" data-key="堅振班(2b)">K6</div><div class="seat c-conf2b junior" data-key="堅振班(2b)">K7</div><div class="seat c-conf2b junior" data-key="堅振班(2b)">K8</div><div class="seat empty"></div><div class="seat empty"></div></div></div>
+    <div class="row"><div class="row-number">L</div><div class="block"><div class="seat c-conf2a junior" data-key="堅振班(2a)">L1</div><div class="seat c-conf3" data-key="堅振班(3)">L2</div><div class="seat c-conf3" data-key="堅振班(3)">L3</div><div class="seat c-conf3" data-key="堅振班(3)">L4</div><div class="seat c-conf3" data-key="堅振班(3)">L5</div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat c-conf3" data-key="堅振班(3)">L6</div><div class="seat c-conf3" data-key="堅振班(3)">L7</div><div class="seat c-conf3" data-key="堅振班(3)">L8</div><div class="seat c-conf3" data-key="堅振班(3)">L9</div><div class="seat c-conf3" data-key="堅振班(3)">L10</div></div></div>
+    <div class="row"><div class="row-number">M</div><div class="block"><div class="seat c-conf3" data-key="堅振班(3)">M1</div><div class="seat c-conf3" data-key="堅振班(3)">M2</div><div class="seat c-conf3" data-key="堅振班(3)">M3</div><div class="seat c-conf3" data-key="堅振班(3)">M4</div><div class="seat c-conf3" data-key="堅振班(3)">M5</div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat c-conf3" data-key="堅振班(3)">M6</div><div class="seat c-conf3" data-key="堅振班(3)">M7</div><div class="seat c-conf3" data-key="堅振班(3)">M8</div><div class="seat c-conf3" data-key="堅振班(3)">M9</div><div class="seat c-conf3" data-key="堅振班(3)">M10</div></div></div>
+    <div class="row"><div class="row-number">N</div><div class="block"><div class="seat c-conf3 teacher" data-key="堅振班(3)">N1</div><div class="seat c-conf3 junior" data-key="堅振班(3)">N2</div><div class="seat c-conf3 junior" data-key="堅振班(3)">N3</div><div class="seat empty"></div><div class="seat empty"></div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div></div></div>
+    <div class="row"><div class="row-number">O</div><div class="block"><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div></div></div>
+    <div class="row"><div class="row-number">P</div><div class="block"><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div></div></div>
+    <div class="row"><div class="row-number">Q</div><div class="block"><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div></div></div>
+    <div class="row"><div class="row-number">R</div><div class="block"><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div></div></div>
+    <div class="row"><div class="row-number">S</div><div class="block"><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div></div></div>
+    <div class="row"><div class="row-number">T</div><div class="block"><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div></div><div class="aisle"><span class="aisle-arrow">↑</span></div><div class="block"><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div><div class="seat empty"></div></div></div>
+
+    <div class="section-title">A - T 共 20 行 · 每行10座 (左1-5, 右6-10) · 點擊座位或班別查看詳情</div>
+
+    <div class="lookup-wrap">
+        <h2>各班位置 + 導師座位查詢</h2>
+        <p class="lookup-hint">點擊班別即高亮該班全部座位，並顯示導師座位</p>
+        <table class="lookup">
+            <tr><th>班級 (班代表)</th><th>側 / 座位號</th><th>範圍</th></tr>
+            <tr class="classrow" data-key="幼兒班"><td><span class="dot c-early"></span><span class="ch-name">聖安多尼堂</span><span class="lv">幼兒班</span></td><td>左 1-5</td><td>A1 - B2</td></tr>
+<tr class="classrow" data-key="聖體班(1)"><td><span class="dot c-eu1"></span><span class="ch-name">嘉模聖母堂</span><span class="lv">聖體一班</span></td><td>右 6-10</td><td>A6 - B7</td></tr>
+<tr class="classrow" data-key="聖體班(2)"><td><span class="dot c-eu2"></span><span class="ch-name">聖老楞佐堂</span><span class="lv">聖體二班</span></td><td>右 6-10</td><td>B8 - D10</td></tr>
+<tr class="classrow" data-key="聖體班 (3)"><td><span class="dot c-eu3"></span><span class="ch-name">望德聖母堂</span><span class="lv">聖體三班</span></td><td>左 1-5</td><td>B3 - E1</td></tr>
+<tr class="classrow" data-key="聖體後班"><td><span class="dot c-post"></span><span class="ch-name">花地瑪聖母堂</span><span class="lv">聖體後班</span></td><td>右 6-10</td><td>E6 - H7</td></tr>
+<tr class="classrow" data-key="堅振班(1)"><td><span class="dot c-conf1"></span><span class="ch-name">聖若瑟勞工主保堂</span><span class="lv">堅振一班</span></td><td>左 1-5</td><td>E2 - H3</td></tr>
+<tr class="classrow" data-key="堅振班(2a)"><td><span class="dot c-conf2a"></span><span class="ch-name">聖方濟各堂 (A)</span><span class="lv">堅振二班A</span></td><td>左 1-5</td><td>H4 - L1</td></tr>
+<tr class="classrow" data-key="堅振班(2b)"><td><span class="dot c-conf2b"></span><span class="ch-name">聖方濟各堂 (B)</span><span class="lv">堅振二班B</span></td><td>右 6-10</td><td>H8 - K8</td></tr>
+<tr class="classrow" data-key="堅振班(3)"><td><span class="dot c-conf3"></span><span class="ch-name">主教座堂 (聖母誕辰堂)</span><span class="lv">堅振三班</span></td><td>左右 —</td><td>L2 - N3</td></tr>
+        </table>
+    </div>
+</div>
+
+<div id="scrim" class="scrim"></div>
+<div id="sheet" class="sheet">
+    <div class="sheet-bar"></div>
+    <div class="sheet-head">
+        <div id="ov-swatch" class="swatch"></div>
+        <div class="sheet-titles">
+            <div class="sheet-title" id="ov-church"></div>
+            <div class="sheet-sub" id="ov-cname"></div>
+        </div>
+        <button id="ov-close" class="sheet-close">✕</button>
+    </div>
+    <div class="sheet-body">
+        <div class="ov-row"><span>座位範圍</span><b id="ov-range"></b></div>
+        <div class="ov-row"><span>導師</span><b id="ov-teacher"></b></div>
+        <div class="ov-row"><span>小導師</span><b id="ov-junior"></b></div>
+    </div>
+    <div class="sheet-foot">點擊其他位置或 ✕ 關閉</div>
+</div>
+
+<script>
+const CLASS_DATA = {"幼兒班": {"ccls": "c-early", "cname": "幼兒班", "church": "聖安多尼堂", "range": "A1 - B2", "teacher": "關可彤 (導師 @ A5)", "junior": "陳庭萱 (小導師 @ B1)、蔡緻悠 (小導師 @ B2)", "count": 7}, "聖體班(1)": {"ccls": "c-eu1", "cname": "聖體一班", "church": "嘉模聖母堂", "range": "A6 - B7", "teacher": "梁曉薇 (導師 @ A10)", "junior": "李梓彤 (小導師 @ B6)、杜立仁 (小導師 @ B7)", "count": 7}, "聖體班(2)": {"ccls": "c-eu2", "cname": "聖體二班", "church": "聖老楞佐堂", "range": "B8 - D10", "teacher": "蕭美歡 (導師 @ D8)", "junior": "馬康翹 (小導師 @ D9)、何雋予 (小導師 @ D10)", "count": 13}, "聖體班 (3)": {"ccls": "c-eu3", "cname": "聖體三班", "church": "望德聖母堂", "range": "B3 - E1", "teacher": "李淑儀 (導師 @ D3)、蕭麗芳 (導師 @ D4)", "junior": "容汶祺 (小導師 @ D5)、吳加晴 (小導師 @ E1)", "count": 14}, "聖體後班": {"ccls": "c-post", "cname": "聖體後班", "church": "花地瑪聖母堂", "range": "E6 - H7", "teacher": "陳滿雲 (導師 @ G10)", "junior": "唐子游 (小導師 @ H6)、Hugo De Assis (小導師 @ H7)", "count": 17}, "堅振班(1)": {"ccls": "c-conf1", "cname": "堅振一班", "church": "聖若瑟勞工主保堂", "range": "E2 - H3", "teacher": "吳蔚瑩 (導師 @ G5)、岑雪瑩 (導師 @ H1)", "junior": "李梓瑤 (小導師 @ H2)、何浩維 (小導師 @ H3)", "count": 17}, "堅振班(2a)": {"ccls": "c-conf2a", "cname": "堅振二班A", "church": "聖方濟各堂 (A)", "range": "H4 - L1", "teacher": "葉汶欽 (導師 @ K3)、陳嘉寶 (導師 @ K4)", "junior": "古希文 (小導師 @ K5)、胡樂賢 (小導師 @ L1)", "count": 18}, "堅振班(2b)": {"ccls": "c-conf2b", "cname": "堅振二班B", "church": "聖方濟各堂 (B)", "range": "H8 - K8", "teacher": "廖芷珊 (導師 @ K6)", "junior": "唐子墨 (小導師 @ K7)、施晉杰 (小導師 @ K8)", "count": 16}, "堅振班(3)": {"ccls": "c-conf3", "cname": "堅振三班", "church": "主教座堂 (聖母誕辰堂)", "range": "L2 - N3", "teacher": "鍾麗娟 (導師 @ N1)", "junior": "張梓佑 (小導師 @ N2)、施昀霆 (小導師 @ N3)", "count": 22}};
+
+const sheet = document.getElementById('sheet');
+const scrim = document.getElementById('scrim');
+
+function showClass(key) {
+    const d = CLASS_DATA[key];
+    if (!d) return;
+    document.querySelectorAll('.seat.hl').forEach(s => s.classList.remove('hl'));
+    document.querySelectorAll('.classrow.active').forEach(r => r.classList.remove('active'));
+    document.querySelectorAll('.seat[data-key="' + key + '"]').forEach(s => s.classList.add('hl'));
+    document.querySelectorAll('.classrow[data-key="' + key + '"]').forEach(r => r.classList.add('active'));
+    document.getElementById('ov-swatch').className = 'swatch ' + d.ccls;
+    document.getElementById('ov-church').textContent = d.church;
+    document.getElementById('ov-cname').textContent = d.cname;
+    document.getElementById('ov-range').textContent = d.range;
+    document.getElementById('ov-teacher').textContent = d.teacher;
+    document.getElementById('ov-junior').textContent = d.junior;
+    sheet.classList.add('open');
+    scrim.classList.add('open');
+}
+
+function hideClass() {
+    sheet.classList.remove('open');
+    scrim.classList.remove('open');
+    document.querySelectorAll('.seat.hl').forEach(s => s.classList.remove('hl'));
+    document.querySelectorAll('.classrow.active').forEach(r => r.classList.remove('active'));
+}
+
+document.querySelectorAll('.seat[data-key]').forEach(s => {
+    s.addEventListener('click', e => { e.stopPropagation(); showClass(s.dataset.key); });
+});
+
+document.querySelectorAll('.classrow').forEach(r => {
+    r.addEventListener('click', e => {
+        showClass(r.dataset.key);
+        const first = document.querySelector('.seat[data-key="' + r.dataset.key + '"]');
+        if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+});
+
+document.getElementById('ov-close').addEventListener('click', hideClass);
+scrim.addEventListener('click', hideClass);
+</script>
+</body>
+</html>

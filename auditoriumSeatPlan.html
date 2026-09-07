@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>禮堂座位表 - A-T 共20行</title>
+<style>
+    :root {
+        --seat-size: 45px;
+        --gap-size: 8px;
+        --aisle-width: 100px;
+    }
+
+    @media (max-width: 768px) {
+        :root {
+            --seat-size: 35px;
+            --gap-size: 5px;
+            --aisle-width: 60px;
+        }
+        .container { padding: 15px; max-width: 100%; margin: 0; }
+        .stage-screen { font-size: 18px; padding: 8px 20px; }
+        .row-number { width: 25px; font-size: 12px; }
+        .seat { font-size: 12px; width: var(--seat-size); height: var(--seat-size); }
+        body { padding: 10px; }
+    }
+
+    @media (max-width: 480px) {
+        :root {
+            --seat-size: 30px;
+            --gap-size: 3px;
+            --aisle-width: 40px;
+        }
+        .seat { font-size: 10px; }
+        .stage-screen { font-size: 16px; padding: 6px 15px; }
+        .row-number { font-size: 10px; }
+    }
+
+    body {
+        font-family: "Microsoft JhengHei", "Heiti TC", sans-serif;
+        background-color: #f0f2f5;
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+        -webkit-text-size-adjust: 100%;
+    }
+
+    .container {
+        background: white;
+        padding: 40px;
+        border-radius: 15px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        max-width: 1000px;
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    .stage-area {
+        width: 100%;
+        background: #2c3e50;
+        color: white;
+        text-align: center;
+        padding: 20px 0;
+        border-radius: 8px;
+        margin-bottom: 30px;
+    }
+
+    .stage-screen {
+        border: 4px solid #ecf0f1;
+        display: inline-block;
+        padding: 10px 40px;
+        font-size: 24px;
+        font-weight: bold;
+        background: #34495e;
+        border-radius: 4px;
+    }
+
+    .row {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .row-number {
+        width: 30px;
+        text-align: right;
+        margin-right: 15px;
+        font-weight: bold;
+        color: #7f8c8d;
+        font-size: 14px;
+    }
+
+    .block {
+        display: flex;
+        gap: var(--gap-size);
+    }
+
+    .aisle {
+        width: var(--aisle-width);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-shrink: 0;
+        color: #e0e0e0;
+        font-size: 20px;
+        font-weight: bold;
+    }
+
+    .seat {
+        width: var(--seat-size);
+        height: var(--seat-size);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        font-weight: 900;
+        font-size: 16px;
+        border-radius: 6px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        position: relative;
+        user-select: none;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        background-color: #C0392B;
+    }
+
+    .legend {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 5px;
+        padding-bottom: 15px;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        font-size: 14px;
+        font-weight: bold;
+        color: #333;
+        background: #f9f9f9;
+        padding: 5px 10px;
+        border-radius: 20px;
+    }
+
+    .legend-color {
+        width: 20px;
+        height: 20px;
+        border-radius: 4px;
+        margin-right: 8px;
+        background-color: #C0392B;
+    }
+
+    .section-title {
+        text-align: center;
+        color: #7f8c8d;
+        font-size: 14px;
+        margin: 10px 0 15px 0;
+        font-weight: bold;
+        letter-spacing: 1px;
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="legend">
+        <div class="legend-item"><div class="legend-color"></div>座位 (每行10個: 左A1-5, 右A6-10)</div>
+    </div>
+
+    <div class="stage-area">
+        <div class="stage-screen">講台 / 投影幕</div>
+    </div>
+
+    <div id="rows"></div>
+
+    <div class="section-title">共 20 行 (A - T) × 每行10座 = 200 座</div>
+</div>
+
+<script>
+    const letters = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T'];
+    const rowsEl = document.getElementById('rows');
+
+    letters.forEach(letter => {
+        const row = document.createElement('div');
+        row.className = 'row';
+
+        const label = document.createElement('div');
+        label.className = 'row-number';
+        label.textContent = letter;
+        row.appendChild(label);
+
+        const left = document.createElement('div');
+        left.className = 'block';
+        for (let i = 1; i <= 5; i++) {
+            const seat = document.createElement('div');
+            seat.className = 'seat';
+            seat.textContent = letter + i;
+            left.appendChild(seat);
+        }
+        row.appendChild(left);
+
+        const aisle = document.createElement('div');
+        aisle.className = 'aisle';
+        aisle.textContent = '↑';
+        row.appendChild(aisle);
+
+        const right = document.createElement('div');
+        right.className = 'block';
+        for (let i = 6; i <= 10; i++) {
+            const seat = document.createElement('div');
+            seat.className = 'seat';
+            seat.textContent = letter + i;
+            right.appendChild(seat);
+        }
+        row.appendChild(right);
+
+        rowsEl.appendChild(row);
+    });
+</script>
+
+</body>
+</html>
