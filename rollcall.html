@@ -23,7 +23,7 @@
     <div class="px-3 py-2 flex justify-between items-center">
       <div class="flex items-center gap-2">
         <a href="class_portal.html" class="text-sm hover:underline">‹ 返回</a>
-        <h1 class="text-lg font-bold">課堂點名</h1>
+        <h1 id="classNameLabel" class="text-lg font-bold">課堂點名</h1>
       </div>
       <button id="logoutBtn" class="text-xs bg-blue-800 px-2.5 py-1 rounded hover:bg-blue-900">登出</button>
     </div>
@@ -32,17 +32,13 @@
   <!-- 控制列：日期下拉 + 切換 + 動作 -->
   <div class="no-print bg-white border-b border-gray-200 px-3 py-2 sticky top-0 z-10 shadow-sm">
     <div class="flex flex-wrap items-center gap-2">
-      <span id="classNameLabel" class="font-bold text-gray-800"></span>
       <select id="dateSelect" class="border border-gray-300 rounded-md px-2 py-1.5 text-base min-w-[8.5rem]"></select>
-      <div class="flex-1"></div>
       <button id="tabDayBtn" class="px-3 py-1.5 rounded-md text-sm font-bold bg-blue-600 text-white">當日</button>
       <button id="tabMatrixBtn" class="px-3 py-1.5 rounded-md text-sm font-bold bg-gray-200 text-gray-700">全年</button>
       <button id="tabMassBtn" class="px-3 py-1.5 rounded-md text-sm font-bold bg-gray-200 text-gray-700">彌撒</button>
-    </div>
-    <div class="flex flex-wrap items-center gap-2 mt-2">
+      <div class="flex-1"></div>
       <button id="allPresentBtn" class="text-sm bg-green-100 text-green-700 px-3 py-1.5 rounded">全部課堂</button>
       <button id="clearAllBtn" class="text-sm bg-gray-100 text-gray-600 px-3 py-1.5 rounded">取消</button>
-      <div class="flex-1"></div>
       <button id="saveDayBtn" class="text-sm bg-blue-600 text-white px-5 py-1.5 rounded font-bold">儲存</button>
     </div>
     <div id="backfillBadge" class="hidden mt-1 text-xs font-bold text-orange-600">⚠️ 補填模式：日期早於今日</div>

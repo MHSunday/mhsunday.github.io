@@ -72,7 +72,7 @@ async function init(role) {
   }
 
   currentClass = resolveClass(role);
-  $('classNameLabel').textContent = currentClass || '';
+  $('classNameLabel').textContent = currentClass ? `${currentClass} 課堂點名` : '課堂點名';
 
   fillDateSelect();
 
@@ -354,12 +354,13 @@ async function renderMass() {
       getClassRoster(currentClass),
       getRollCallYear(currentClass)
     ]);
-    const eligible = sessions.filter(s => isClassDay(s)).length;
+    const eligible = sessions.filter(s => isClassDay(s) && s.date <= todayStr()).length;
 
     const rows = r.map(s => {
       let mass = 0;
       let present = 0;
       for (const sess of sessions) {
+        if (sess.date > todayStr()) continue;
         const m = ym[sess.date] && ym[sess.date][s.name];
         if (m && m.mass === true) mass++;
         if (m && m.present === true) present++;
