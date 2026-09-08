@@ -343,6 +343,11 @@ function buildMatrixTable() {
 
 // ---------- 彌撒統計 ----------
 
+const CLASS_START = '2026-09-20';
+const CLASS_END = '2027-05-23';
+const MASS_START = '2026-09-01';
+const MASS_END = '2027-05-31';
+
 async function renderMass() {
   if (!currentClass) return;
   setMessage('載入中...');
@@ -354,28 +359,36 @@ async function renderMass() {
       getClassRoster(currentClass),
       getRollCallYear(currentClass)
     ]);
-    const eligible = sessions.filter(s => isClassDay(s) && s.date <= todayStr()).length;
+
+    const classPeriod = sessions.filter(s => s.date >= CLASS_START && s.date <= CLASS_END);
+    const massPeriod = sessions.filter(s => s.date >= MASS_START && s.date <= MASS_END);
+    const classPotential = classPeriod.filter(isClassDay).length;
+    const massPotential = massPeriod.length;
 
     const rows = r.map(s => {
       let mass = 0;
       let present = 0;
-      for (const sess of sessions) {
-        if (sess.date > todayStr()) continue;
+      for (const sess of massPeriod) {
         const m = ym[sess.date] && ym[sess.date][s.name];
-        if (m && m.mass === true) mass++;
-        if (m && m.present === true) present++;
+        if (!m) continue;
+        if (m.mass === true) mass++;
+        if (isClassDay(sess)
+            && sess.date >= CLASS_START
+            && sess.date <= CLASS_END
+            && m.present === true) present++;
       }
       return {
         name: s.name,
         category: s.category,
         mass,
         present,
-        rate: eligible ? Math.round((present / eligible) * 100) : 0
+        rate: classPotential ? Math.round((present / classPotential) * 100) : 0
       };
     }).sort((a, b) => b.mass - a.mass || b.present - a.present);
 
-    const total = rows.reduce((sum, r) => sum + r.mass, 0);
-    setMessage(`共 ${rows.length} 人 · 彌撒總次數 ${total} · ${sessions.length} 個星期日`);
+    const totalMass = rows.reduce((sum, r) => sum + r.mass, 0);
+    const totalPresent = rows.reduce((sum, r) => sum + r.present, 0);
+    setMessage(`共 ${rows.length} 人 · 課堂 ${classPotential} 堂 · 彌撒 ${massPotential} 主日 · 已記彌撒 ${totalMass} · 已記出席 ${totalPresent}`);
     renderMassRows(rows);
   } catch (err) {
     setMessage(`載入失敗：${err.message}`, true);
