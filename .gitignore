@@ -1,0 +1,4 @@
+# Local-only design docs (not for public repo)
+plans/drive_backup_design.md
+plans/rollcall_schema_migration.md
+plans/firestore.rules

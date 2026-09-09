@@ -24,6 +24,7 @@ export const getAttendanceStats = fb.getAttendanceStats;
 export const syncAllFromGAS = fb.syncAllFromGAS;
 export const syncPermissionsFromGAS = fb.syncPermissionsFromGAS;
 export const exportRollcallsToGAS = fb.exportRollcallsToGAS;
+export const invalidateRollcallYearCache = fb.invalidateRollcallYearCache;
 export const getClassTodos = fb.getClassTodos;
 export const saveClassTodo = fb.saveClassTodo;
 export const deleteClassTodo = fb.deleteClassTodo;

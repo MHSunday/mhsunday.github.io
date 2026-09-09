@@ -1,6 +1,6 @@
 // js/main-rollcall.js — 課堂點名（精簡版：只揀日期，全螢幕學生表）
 // 每日記兩種出席：上堂（present）+ 彌撒（mass）
-import { getAllClasses, getSessions, getRollCall, saveRollCall, getClassRoster, getRollCallYear } from './data.js';
+import { getAllClasses, getSessions, getRollCall, saveRollCall, getClassRoster, getRollCallYear, invalidateRollcallYearCache } from './data.js';
 import { onRoleLoaded, logout } from './auth.js';
 import { sortClasses } from './classOrder.js';
 
@@ -223,6 +223,7 @@ async function saveDay() {
   setMessage('儲存中...');
   try {
     const out = await saveRollCall(currentClass, currentDate, records);
+    invalidateRollcallYearCache(currentClass);
     setMessage(`已儲存：更新 ${out.updated} 筆、新增 ${out.added} 筆${currentDate < todayStr() ? '（補填）' : ''}`);
     renderDay();
   } catch (err) {

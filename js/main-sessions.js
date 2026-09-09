@@ -1,5 +1,6 @@
 // js/main-sessions.js — 上堂日曆（admin 可編輯+同步；teacher 唯讀）
 import { getSessions, saveSessions, importDefaultSessions, syncAllFromGAS, syncPermissionsFromGAS, exportRollcallsToGAS } from './data.js';
+import { backupFirestoreToDrive } from './api.js';
 import { onRoleLoaded, logout } from './auth.js';
 
 const $ = (id) => document.getElementById(id);
@@ -164,6 +165,18 @@ async function handleExport() {
   }
 }
 
+async function handleBackup() {
+  if (!confirm('立即將 Firestore 全部資料備份去 Google Drive？\n\n需時 1-2 分鐘，期間請勿關閉頁面。')) return;
+  setMessage('備份中（請耐心等候 1-2 分鐘）...');
+  try {
+    const out = await backupFirestoreToDrive();
+    const mb = (out.gzippedBytes / 1024 / 1024).toFixed(2);
+    setMessage(`✅ 備份完成：${out.docCount} 筆文件，${mb} MB（${out.fileName}）`);
+  } catch (err) {
+    setMessage(`備份失敗：${err.message}`, true);
+  }
+}
+
 function init(role) {
   isAdminView = !!(role && role.role === 'admin');
   $('logoutBtn').addEventListener('click', () => logout());
@@ -173,9 +186,11 @@ function init(role) {
     const syncBtn = $('syncBtn');
     const exportBtn = $('exportBtn');
     const permSyncBtn = $('permSyncBtn');
+    const backupBtn = $('backupBtn');
     if (syncBtn) syncBtn.addEventListener('click', handleSync);
     if (exportBtn) exportBtn.addEventListener('click', handleExport);
     if (permSyncBtn) permSyncBtn.addEventListener('click', handlePermSync);
+    if (backupBtn) backupBtn.addEventListener('click', handleBackup);
   } else {
     // teacher：唯讀，隱藏編輯/import/sync/export 按鈕
     $('saveBtn').style.display = 'none';
