@@ -257,6 +257,24 @@
     .ov-row b { font-size: 17px; color: #2c3e50; text-align: right; line-height: 1.4; }
     .sheet-foot { text-align: center; color: #bdc3c7; font-size: 12px; margin-top: 12px; }
 
+    /* 底部可點選圖示 */
+    .legend-bottom {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 2px solid #eee;
+    }
+    .legend-bottom .legend-item {
+        cursor: pointer;
+        transition: box-shadow .15s, transform .15s;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .legend-bottom .legend-item:active,
+    .legend-bottom .legend-item.active {
+        box-shadow: 0 0 0 3px rgba(44,62,80,.4);
+        transform: scale(1.06);
+    }
+    .legend-bottom .legend-color { pointer-events: none; }
+
     /* ---- 響應式直接覆蓋（放最後確保生效） ---- */
     @media (max-width: 768px) {
         body { padding: 10px; overflow-x: auto; }
@@ -275,6 +293,7 @@
         .row-number { width: 14px; margin-right: 4px; font-size: 9px; }
         .aisle-arrow { font-size: 14px; }
         table.lookup { font-size: 10px; }
+        .legend-bottom .legend-item { font-size: 13px; padding: 6px 10px; }
     }
 </style>
 </head>
@@ -282,21 +301,6 @@
 <div class="container">
     <h1>禮堂座位表</h1>
     <p class="subtitle">按班級由小至大 · 每班同側 · 共 131 人 + 2 神父</p>
-
-    <div class="legend">
-        <div class="legend-item"><div class="legend-color c-early"></div>幼兒班</div>
-        <div class="legend-item"><div class="legend-color c-eu1"></div>聖體一班</div>
-        <div class="legend-item"><div class="legend-color c-eu2"></div>聖體二班</div>
-        <div class="legend-item"><div class="legend-color c-eu3"></div>聖體三班</div>
-        <div class="legend-item"><div class="legend-color c-post"></div>聖體後班</div>
-        <div class="legend-item"><div class="legend-color c-conf1"></div>堅振一班</div>
-        <div class="legend-item"><div class="legend-color c-conf2a"></div>堅振二班A</div>
-        <div class="legend-item"><div class="legend-color c-conf2b"></div>堅振二班B</div>
-        <div class="legend-item"><div class="legend-color c-conf3"></div>堅振三班</div>
-        <div class="legend-item"><div class="legend-color c-priest"></div>神父</div>
-        <div class="legend-item"><div class="legend-color role-teacher"></div>導師</div>
-        <div class="legend-item"><div class="legend-color role-junior"></div>小導師</div>
-    </div>
 
     <div class="stage-area">
         <div class="stage-screen">講台 / 投影幕</div>
@@ -341,6 +345,22 @@
 <tr class="classrow" data-key="堅振班(3)"><td><span class="dot c-conf3"></span><span class="ch-name">主教座堂 (聖母誕辰堂)</span><span class="lv">堅振三班</span></td><td>左右 —</td><td>L2 - N3</td></tr>
         </table>
     </div>
+
+    <!-- 底部可點選圖示 -->
+    <div class="legend legend-bottom">
+        <div class="legend-item" data-key="幼兒班"><div class="legend-color c-early"></div>幼兒班</div>
+        <div class="legend-item" data-key="聖體班(1)"><div class="legend-color c-eu1"></div>聖體一班</div>
+        <div class="legend-item" data-key="聖體班(2)"><div class="legend-color c-eu2"></div>聖體二班</div>
+        <div class="legend-item" data-key="聖體班 (3)"><div class="legend-color c-eu3"></div>聖體三班</div>
+        <div class="legend-item" data-key="聖體後班"><div class="legend-color c-post"></div>聖體後班</div>
+        <div class="legend-item" data-key="堅振班(1)"><div class="legend-color c-conf1"></div>堅振一班</div>
+        <div class="legend-item" data-key="堅振班(2a)"><div class="legend-color c-conf2a"></div>堅振二班A</div>
+        <div class="legend-item" data-key="堅振班(2b)"><div class="legend-color c-conf2b"></div>堅振二班B</div>
+        <div class="legend-item" data-key="堅振班(3)"><div class="legend-color c-conf3"></div>堅振三班</div>
+        <div class="legend-item" data-role="priest"><div class="legend-color c-priest"></div>神父</div>
+        <div class="legend-item" data-role="teacher"><div class="legend-color role-teacher"></div>導師</div>
+        <div class="legend-item" data-role="junior"><div class="legend-color role-junior"></div>小導師</div>
+    </div>
 </div>
 
 <div id="scrim" class="scrim"></div>
@@ -368,13 +388,19 @@ const CLASS_DATA = {"幼兒班": {"ccls": "c-early", "cname": "幼兒班", "chur
 const sheet = document.getElementById('sheet');
 const scrim = document.getElementById('scrim');
 
+function clearHighlight() {
+    document.querySelectorAll('.seat.hl').forEach(s => s.classList.remove('hl'));
+    document.querySelectorAll('.classrow.active').forEach(r => r.classList.remove('active'));
+    document.querySelectorAll('.legend-bottom .legend-item.active').forEach(i => i.classList.remove('active'));
+}
+
 function showClass(key) {
     const d = CLASS_DATA[key];
     if (!d) return;
-    document.querySelectorAll('.seat.hl').forEach(s => s.classList.remove('hl'));
-    document.querySelectorAll('.classrow.active').forEach(r => r.classList.remove('active'));
+    clearHighlight();
     document.querySelectorAll('.seat[data-key="' + key + '"]').forEach(s => s.classList.add('hl'));
     document.querySelectorAll('.classrow[data-key="' + key + '"]').forEach(r => r.classList.add('active'));
+    document.querySelectorAll('.legend-bottom .legend-item[data-key="' + key + '"]').forEach(i => i.classList.add('active'));
     document.getElementById('ov-swatch').className = 'swatch ' + d.ccls;
     document.getElementById('ov-church').textContent = d.church;
     document.getElementById('ov-cname').textContent = d.cname;
@@ -385,11 +411,19 @@ function showClass(key) {
     scrim.classList.add('open');
 }
 
+function showRole(role) {
+    clearHighlight();
+    const sel = role === 'teacher' ? '.seat.teacher'
+        : role === 'junior' ? '.seat.junior'
+        : '.seat.c-priest';
+    document.querySelectorAll(sel).forEach(s => s.classList.add('hl'));
+    document.querySelectorAll('.legend-bottom .legend-item[data-role="' + role + '"]').forEach(i => i.classList.add('active'));
+}
+
 function hideClass() {
     sheet.classList.remove('open');
     scrim.classList.remove('open');
-    document.querySelectorAll('.seat.hl').forEach(s => s.classList.remove('hl'));
-    document.querySelectorAll('.classrow.active').forEach(r => r.classList.remove('active'));
+    clearHighlight();
 }
 
 document.querySelectorAll('.seat[data-key]').forEach(s => {
@@ -402,6 +436,19 @@ document.querySelectorAll('.classrow').forEach(r => {
         const first = document.querySelector('.seat[data-key="' + r.dataset.key + '"]');
         if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
+});
+
+document.querySelectorAll('.legend-bottom .legend-item[data-key]').forEach(item => {
+    item.addEventListener('click', e => {
+        e.stopPropagation();
+        showClass(item.dataset.key);
+        const first = document.querySelector('.seat[data-key="' + item.dataset.key + '"]');
+        if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+});
+
+document.querySelectorAll('.legend-bottom .legend-item[data-role]').forEach(item => {
+    item.addEventListener('click', e => { e.stopPropagation(); showRole(item.dataset.role); });
 });
 
 document.getElementById('ov-close').addEventListener('click', hideClass);
