@@ -17,23 +17,14 @@
             --gap-size: 4px;
             --aisle-width: 55px;
         }
-        .container { padding: 15px; max-width: 100%; margin: 0; }
-        .stage-screen { font-size: 18px; padding: 8px 20px; }
-        .row-number { width: 22px; font-size: 11px; }
-        body { padding: 10px; }
-        .seat { font-size: 15px; }
     }
 
     @media (max-width: 480px) {
         :root {
-            --seat-size: 36px;
-            --gap-size: 3px;
-            --aisle-width: 38px;
+            --seat-size: 25px;
+            --gap-size: 2px;
+            --aisle-width: 26px;
         }
-        .seat { font-size: 13px; }
-        .stage-screen { font-size: 15px; padding: 6px 12px; }
-        .row-number { font-size: 10px; }
-        table.lookup { font-size: 10px; }
     }
 
     body {
@@ -265,6 +256,26 @@
     .ov-row span { color: #7f8c8d; font-size: 16px; font-weight: 700; flex-shrink: 0; }
     .ov-row b { font-size: 17px; color: #2c3e50; text-align: right; line-height: 1.4; }
     .sheet-foot { text-align: center; color: #bdc3c7; font-size: 12px; margin-top: 12px; }
+
+    /* ---- 響應式直接覆蓋（放最後確保生效） ---- */
+    @media (max-width: 768px) {
+        body { padding: 10px; overflow-x: auto; }
+        .container { padding: 15px; max-width: 100%; margin: 0; overflow-x: auto; }
+        .stage-screen { font-size: 18px; padding: 8px 20px; }
+        .row-number { width: 22px; font-size: 11px; }
+        .seat { font-size: 15px; }
+    }
+
+    @media (max-width: 480px) {
+        body { padding: 5px; overflow-x: auto; }
+        .container { padding: 10px; overflow-x: auto; }
+        .seat { font-size: 11px; border-radius: 4px; }
+        .c-priest { width: 28px; height: 28px; font-size: 11px; }
+        .stage-screen { font-size: 15px; padding: 6px 12px; }
+        .row-number { width: 14px; margin-right: 4px; font-size: 9px; }
+        .aisle-arrow { font-size: 14px; }
+        table.lookup { font-size: 10px; }
+    }
 </style>
 </head>
 <body>
