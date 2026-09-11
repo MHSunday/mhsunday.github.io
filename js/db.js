@@ -143,58 +143,121 @@ export async function importDefaultSessions() {
 
 // ==========================================
 // 課堂點名（rollcalls）
+// Schema：rollcalls/{className}/dates/{date}
+//   { date, className, updatedAt, recorder,
+//     marks: { "陳小明": { present, mass, category }, ... } }
+// 好處：1 write/save、1 read/year、可行 collection group query
 // ==========================================
 
 export async function getRollCall(className, date) {
   if (!className || !date) return [];
-  const snap = await db.collection('rollcalls').doc(className).collection(date).get();
-  const marks = {};
-  snap.forEach(d => { marks[d.id] = d.data(); });
+  const snap = await db.collection('rollcalls').doc(className).collection('dates').doc(date).get();
+  const marks = snap.exists ? (snap.data().marks || {}) : {};
   const roster = await getRoster(className);
-  return roster.map(s => ({
-    ...s,
-    present: marks[s.name] ? marks[s.name].present : null,
-    mass: marks[s.name] ? marks[s.name].mass : null
-  }));
+  return roster.map(s => {
+    const m = marks[s.name];
+    return {
+      ...s,
+      present: m ? m.present === true : null,
+      mass: m ? m.mass === true : null
+    };
+  });
 }
 
 export async function saveRollCall(className, date, records) {
   if (!className || !date || !Array.isArray(records)) throw new Error('缺少必要參數');
-  const batch = db.batch();
   const recorder = recorderEmail();
-  const ts = new Date().toISOString();
-  let added = 0;
+  const marks = {};
+  let updated = 0;
   for (const r of records) {
     const name = String(r.name || '').trim();
     if (!name) continue;
-    const ref = db.collection('rollcalls').doc(className).collection(date).doc(name);
-    batch.set(ref, {
+    marks[name] = {
       present: r.present === true,
       mass: r.mass === true,
       category: r.category || '學生',
-      className: r.className || className,
-      recorder: recorder,
-      timestamp: ts
-    }, { merge: true });
-    added++;
+      className: r.className || className
+    };
+    updated++;
   }
-  await batch.commit();
-  return { success: true, updated: added, added: 0 };
+  const ref = db.collection('rollcalls').doc(className).collection('dates').doc(date);
+  await ref.set({
+    date: date,
+    className: className,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    recorder: recorder,
+    marks: marks
+  }, { merge: true });
+
+  // 物化 parent doc（令 collection 可枚舉 + lastDate 方便查詢）
+  await db.collection('rollcalls').doc(className).set({
+    className: className,
+    lastDate: date,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+
+  return { success: true, updated: updated, added: 0 };
+}
+
+const ROLLCALL_YEAR_CACHE_KEY = 'rollcallYearCache';
+const ROLLCALL_YEAR_CACHE_TTL = 5 * 60 * 1000;
+
+function yearCacheGet(className) {
+  try {
+    const raw = sessionStorage.getItem(ROLLCALL_YEAR_CACHE_KEY);
+    if (!raw) return null;
+    const cache = JSON.parse(raw);
+    const entry = cache[className];
+    if (!entry) return null;
+    if (Date.now() - entry.ts > ROLLCALL_YEAR_CACHE_TTL) {
+      delete cache[className];
+      sessionStorage.setItem(ROLLCALL_YEAR_CACHE_KEY, JSON.stringify(cache));
+      return null;
+    }
+    return entry.data;
+  } catch {
+    return null;
+  }
+}
+
+function yearCacheSet(className, data) {
+  try {
+    const raw = sessionStorage.getItem(ROLLCALL_YEAR_CACHE_KEY);
+    const cache = raw ? JSON.parse(raw) : {};
+    cache[className] = { ts: Date.now(), data };
+    sessionStorage.setItem(ROLLCALL_YEAR_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // sessionStorage full or unavailable; fail silently
+  }
+}
+
+export function invalidateRollcallYearCache(className) {
+  try {
+    const raw = sessionStorage.getItem(ROLLCALL_YEAR_CACHE_KEY);
+    if (!raw) return;
+    const cache = JSON.parse(raw);
+    delete cache[className];
+    sessionStorage.setItem(ROLLCALL_YEAR_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // silently ignore
+  }
 }
 
 export async function getRollCallYear(className) {
-  // web SDK 冇 listCollections()，改為對 sessions 嘅每個日期逐日查
-  const sessions = await getSessions();
+  const cached = yearCacheGet(className);
+  if (cached) return cached;
   const result = {};
-  await Promise.all(sessions.map(async (s) => {
-    const snap = await db.collection('rollcalls').doc(className).collection(s.date).get();
-    if (snap.empty) return;
-    result[s.date] = {};
-    snap.forEach(d => {
-      const dt = d.data();
-      result[s.date][d.id] = { present: dt.present === true, mass: dt.mass === true };
+  const snap = await db.collection('rollcalls').doc(className).collection('dates').get();
+  snap.forEach(d => {
+    const dt = d.data();
+    const dayMarks = {};
+    Object.keys(dt.marks || {}).forEach(name => {
+      const m = dt.marks[name];
+      dayMarks[name] = { present: m.present === true, mass: m.mass === true };
     });
-  }));
+    result[d.id] = dayMarks;
+  });
+  yearCacheSet(className, result);
   return result;
 }
 
@@ -252,20 +315,26 @@ function isClassDay(s) {
  * @returns { { eligibleDays, presentCount, totalCount, rate } }
  */
 export async function getAttendanceStats(className) {
-  const [roster, sessions, yearMarks] = await Promise.all([
-    getRoster(className),
-    getSessions(),
-    getRollCallYear(className)
-  ]);
+  const [roster, sessions] = await Promise.all([getRoster(className), getSessions()]);
   const today = todayStr();
   const classDays = sessions.filter(s => isClassDay(s) && s.date <= today).sort((a, b) => a.date < b.date ? -1 : 1);
+
+  const snap = await db.collection('rollcalls').doc(className).collection('dates').get();
+  const allMarks = {};
+  snap.forEach(d => {
+    const dt = d.data();
+    Object.keys(dt.marks || {}).forEach(name => {
+      if (!allMarks[d.id]) allMarks[d.id] = {};
+      allMarks[d.id][name] = dt.marks[name];
+    });
+  });
 
   let presentCount = 0;
   let totalCount = 0;
   for (const s of classDays) {
-    const marks = yearMarks[s.date] || {};
+    const dayMarks = allMarks[s.date] || {};
     roster.forEach(m => {
-      if (marks[m.name] && marks[m.name].present === true) presentCount++;
+      if (dayMarks[m.name] && dayMarks[m.name].present === true) presentCount++;
       totalCount++;
     });
   }

@@ -441,3 +441,16 @@ export async function getClassPortal(className) {
   if (data.error) throw new Error(data.error);
   return data;
 }
+
+/**
+ * 管理員手動觸發 Firestore → Drive 備份（admin only，後端會驗證）
+ * 回傳：{ fileName, fileId, docCount, sizeBytes, gzippedBytes }
+ */
+export async function backupFirestoreToDrive() {
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=backupFirestoreToDrive&${qs}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
