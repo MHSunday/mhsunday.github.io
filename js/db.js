@@ -319,6 +319,49 @@ export async function setClassTodoDone(className, id, done) {
 }
 
 // ==========================================
+// 公告 / 檔案（notices）
+// ==========================================
+
+export async function getNotices() {
+  const snap = await db.collection('notices').get();
+  const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return list.sort((a, b) => {
+    if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+    return String(b.date || '').localeCompare(String(a.date || ''));
+  });
+}
+
+export async function saveNotice(notice) {
+  if (!notice || !notice.title) throw new Error('缺少標題');
+  const id = notice.id || `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  await db.collection('notices').doc(id).set({
+    title: String(notice.title).trim(),
+    body: String(notice.body || '').trim(),
+    category: notice.category || '公告',
+    date: notice.date || todayStr(),
+    link: String(notice.link || '').trim(),
+    fileName: String(notice.fileName || '').trim(),
+    pinned: notice.pinned === true,
+    createdAt: notice.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: recorderEmail()
+  }, { merge: true });
+  return { id };
+}
+
+export async function deleteNotice(id) {
+  if (!id) throw new Error('缺少必要參數');
+  await db.collection('notices').doc(id).delete();
+  return { success: true };
+}
+
+export async function setNoticePinned(id, pinned) {
+  if (!id) throw new Error('缺少必要參數');
+  await db.collection('notices').doc(id).update({ pinned: pinned === true });
+  return { success: true };
+}
+
+// ==========================================
 // 管理員：同步（Sheets ⇄ Firestore）
 // ==========================================
 

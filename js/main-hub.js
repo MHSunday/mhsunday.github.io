@@ -37,6 +37,9 @@ function init(role) {
   $('rollcallBtn').addEventListener('click', () => {
     window.location.href = 'rollcall.html';
   });
+  $('noticesBtn').addEventListener('click', () => {
+    window.location.href = 'notices.html';
+  });
   $('formBtn').addEventListener('click', () => {
     window.location.href = 'form.html';
   });

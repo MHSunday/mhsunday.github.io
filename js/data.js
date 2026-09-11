@@ -28,3 +28,7 @@ export const getClassTodos = fb.getClassTodos;
 export const saveClassTodo = fb.saveClassTodo;
 export const deleteClassTodo = fb.deleteClassTodo;
 export const setClassTodoDone = fb.setClassTodoDone;
+export const getNotices = fb.getNotices;
+export const saveNotice = fb.saveNotice;
+export const deleteNotice = fb.deleteNotice;
+export const setNoticePinned = fb.setNoticePinned;
