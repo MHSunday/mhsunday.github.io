@@ -497,3 +497,88 @@ Commit + push。即時切返舊 GAS + Sheets 架構。Firestore 資料保留，�
 - [ ] 部署後老師測試：登入 + 日曆唯讀 + rollcall save
 - [ ] 投票系統分離仍按舊計劃
 - [ ] Budget alert
+
+---
+
+# 附錄：導航簡化 + 公告板 + 出席統計 + 座位表手機修正（2026-09-11）
+
+> 範圍：登入後單一首頁（每班 Portal）、新增公告/檔案板、出席統計分母邏輯、班級排序、Git merge 衝突解決、座位表手機顯示修正。
+
+## 1. 導航簡化（方案 A：合併為一個工作台）
+
+- **登入後直接入 `class_portal.html`**，唔再經 hub：
+  - `js/auth.js` 兩個登入 redirect（localStorage cache + GAS fetch）由 `./hub.html` → `./class_portal.html`
+- **`hub.html` 已刪除**（`js/main-hub.js` 同步刪），全 repo 無 reference
+- **`class_portal.html` 變成唯一首頁**：標題「每班 Portal」，藍色 bar 統一導航
+  - 所有人：`課堂點名`｜`公告·檔案`｜登出
+  - Admin 先見到：`彌撒獎勵`（`main-portal.js` 按 role 顯示 `#formLink`）
+- 所有「返回」統一指去 `class_portal.html`：notices / admin_todos 返回 link、非 admin 誤入 redirect（main-admin-todos / main-form）
+- `calendar.html` admin「編輯日曆」link 保留（main-calendar.js role gate）
+
+## 2. 公告 / 檔案板（`notices.html` + `js/main-notices.js`）
+
+- Firestore `/notices/{id}`：`{ title, body, category(公告/檔案/活動), date, link, fileName, pinned, createdAt, createdBy }`
+- 列表：置頂排最上 → 按日期倒序；類別 filter（全部/公告/檔案/活動）；檔案 item 顯示「檔名 ↗」
+- Admin console（角色 gate）：＋新增、編輯、刪除、置頂；老師唯讀
+- 檔案分享 = 貼 Google Drive/網頁 link + 檔名（Firestore 唔存檔案；日後可加 Firebase Storage）
+- `js/db.js`：`getNotices` / `saveNotice` / `deleteNotice` / `setNoticePinned`
+- ⚠️ **`plans/firestore.rules` 已喺 merge 中俾 remote 刪除**——如果日後要部署規則，`notices` 需要 `read=isAuthed / write=isAdmin`
+
+## 3. 待辦（classTodos）— 保留 admin 頁，移除 portal 顯示
+
+- Portal「待辦事項」card 已移除（`class_portal.html` + `main-portal.js` renderTodos/computeAutoTodos 刪走）
+- `admin_todos.html` + `js/main-admin-todos.js` **保留**（admin 直接打 URL 用；無任何 link 指住）
+- `js/db.js`：`getClassTodos` / `saveClassTodo` / `deleteClassTodo` / `setClassTodoDone` 保留
+
+## 4. 出席統計（rollcall「彌撒」tab → 改名「出席統計」）
+
+- Portal action「彌撒統計」→「**出席統計**」（`rollcall.html?tab=mass`）
+- 分母按兩個獨立範圍（`main-rollcall.js` `renderMass`）：
+  - **課堂**：`2026-09-20 ~ 2027-05-23`，假期不計 → **31 堂**
+  - **彌撒**：`2026-09-01 ~ 2027-05-31`（所有主日）→ **39 主日**
+- 分母顯示喺 table header（「／31 堂」「／39 主日」），每格只顯示實際次數
+- 修 bug：唔再限 `<= today`，有 mark 嘅日子（含 9-20）都計入
+
+## 5. 班級排序（`js/classOrder.js`）
+
+- `sortClasses()`：幼兒班 → 聖體班(1)(2)(3) → 聖體後班 → 堅振班(1A)(1B)(2)(3)
+- `massAppliesTo()`：青少年彌撒→堅振；兒童彌撒→聖體（含聖體後）
+- `oneMonthLaterStr()`：+30 日
+- 套用：`db.js getAllClasses`、portal / admin_todos / rollcall 班級下拉
+
+## 6. rollcall UI 調整
+
+- 「當日／全年／彌撒」tab 獨立一行（iPhone 唔再掉行）；班名搬上藍色 bar，標題「XX班 課堂點名」
+- 日期＋tab＋動作掣（全部課堂/取消/儲存）同一行 flex-wrap
+- Portal「全年矩陣」link 補 `&tab=matrix`（原本開咗停喺「當日」tab）
+
+## 7. Git merge 衝突解決
+
+- `origin/main` 有 2 commit（`a191e01` update reads、`172f929` 刪 firestore.rules），本地有 `c122bdd`（notices）
+- 衝突：`plans/firestore.rules`「deleted by them」→ **接受 remote 刪除**（`git rm`）
+- Merge commit `ab75290` 完成；**push 未完成**（超時），需要人手 `git push`
+
+## 8. 座位表手機修正（`seatPlanOverlay.html`）
+
+- 根因 1：座位行固定闊度爆出 iPhone 17（~393px）畫面
+- 根因 2：mobile 覆蓋寫喺 stylesheet 頂部，俾後面 base rules 覆蓋（CSS 後到先得）→ 只剩 `:root` 變數有效
+- 修正：`@media` 頂部淨留 `:root` 變數（≤480px 座位 25px、gap 2px、通道 26px）；**直接屬性覆蓋移到 stylesheet 最尾**
+- 加 `overflow-x: auto` 保險
+- 移除頂部 legend；新增**底部可點選圖示**：撳班級 chip → 高亮該班座位 + scroll + 詳情 sheet；撳神父/導師/小導師 → 高亮對應角色座位
+
+## 9. 已做嘅檔案清單（本日）
+- `js/auth.js`：登入 redirect → class_portal
+- `js/main-portal.js`：統一導航 admin link、移除 todos、出席率改用 getRollCallYear、全年矩陣 tab=matrix、出席統計
+- `js/main-rollcall.js`：tab 布局、出席統計兩分母、classOrder import、彌撒tab
+- `js/classOrder.js`（**新**）：排序 + 彌撒對應 + +30日
+- `notices.html` + `js/main-notices.js`（**新**）
+- `admin_todos.html` + `js/main-admin-todos.js`（保留）
+- `js/db.js` / `js/data.js`：notices 函數 + classTodos 函數
+- `hub.html` / `js/main-hub.js`（**刪除**）
+- `seatPlanOverlay.html`：手機 fit + 底部可點選 legend
+- `rollcall.html` / `class_portal.html`：導航 + 布局
+
+## 10. 待辦（人/部署）
+- [ ] **`git push`**（merge 之後未推）
+- [ ] Firestore rules 部署注意：`plans/firestore.rules` 已由 remote 刪除；`notices` collection 喺 Firebase Console 需要 `read=isAuthed / write=isAdmin` 先可以用
+- [ ] 測試：登入直入 Portal、公告/檔案板 admin 發佈、出席統計分母（31/39）、座位表 iPhone 顯示
