@@ -347,7 +347,7 @@ export async function getAttendanceStats(className) {
 }
 
 // ==========================================
-// 班級待辦（classTodos）+ 彌撒統計
+// 班級待辦（classTodos，管理員頁用）
 // ==========================================
 
 export async function getClassTodos(className) {
