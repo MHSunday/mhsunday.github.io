@@ -147,7 +147,7 @@ function initFormPage() {
     // 暫時：老師唔可以入彌撒登記，只有管理員
     if (role.role !== 'admin') {
       messageEl.innerHTML = '<span style="color:red">⚠️ 此頁暫時只限管理員使用</span>';
-      setTimeout(() => window.location.replace('./hub.html'), 1500);
+      setTimeout(() => window.location.replace('./class_portal.html'), 1500);
       return;
     }
 

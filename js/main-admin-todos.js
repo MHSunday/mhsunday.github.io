@@ -81,7 +81,7 @@ function computeAutoTodos(sessions, yearMarks, today, className) {
 async function init(role) {
   if (!role || role.role !== 'admin') {
     setMessage('此頁僅限管理員使用', true);
-    setTimeout(() => window.location.replace('./hub.html'), 1500);
+    setTimeout(() => window.location.replace('./class_portal.html'), 1500);
     return;
   }
 

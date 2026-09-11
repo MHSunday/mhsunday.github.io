@@ -105,13 +105,13 @@ function buildCard(n) {
   card.appendChild(head);
 
   const title = document.createElement('div');
-  title.className = 'font-bold text-base';
+  title.className = 'font-bold text-xl';
   title.textContent = n.title;
   card.appendChild(title);
 
   if (n.body) {
     const body = document.createElement('div');
-    body.className = 'text-sm text-gray-600 mt-1 whitespace-pre-wrap';
+    body.className = 'text-base text-gray-700 mt-1 whitespace-pre-wrap';
     body.textContent = n.body;
     card.appendChild(body);
   }
@@ -121,7 +121,7 @@ function buildCard(n) {
     a.href = n.link;
     a.target = '_blank';
     a.rel = 'noopener';
-    a.className = 'mt-2 inline-flex items-center gap-1 text-sm text-blue-700 font-bold';
+    a.className = 'mt-2 inline-flex items-center gap-1 text-base text-blue-700 font-bold';
     a.textContent = (n.fileName ? n.fileName : '開啟') + ' ↗';
     card.appendChild(a);
   }

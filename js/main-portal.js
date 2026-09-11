@@ -33,6 +33,10 @@ function shortDate(dateStr) {
 
 async function init(role) {
   $('logoutBtn').addEventListener('click', () => logout());
+
+  if (role && role.role === 'admin') {
+    $('formLink').classList.remove('hidden');
+  }
   $('gotoRollcallBtn').addEventListener('click', () => {
     const url = `rollcall.html?class=${encodeURIComponent(currentClass)}`;
     window.location.href = url;
