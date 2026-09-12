@@ -136,7 +136,8 @@ async function handleSync() {
   setMessage('同步中（逐班進行，請耐心等候）...');
   try {
     const out = await syncAllFromGAS();
-    setMessage(`同步完成：${out.classes} 班、${out.sessions} 個上堂日`);
+    const removed = (out.rosterDeleted || 0) + (out.detailsDeleted || 0);
+    setMessage(`同步完成：${out.classes} 班、${out.sessions} 個上堂日${removed ? `、清除 ${removed} 筆舊名單記錄` : ''}`);
     await loadSessions();
   } catch (err) {
     setMessage(`同步失敗：${err.message}`, true);

@@ -443,6 +443,29 @@ async function writeBatchToFirestore_(ref, list, key) {
 }
 
 /**
+ * 全量取代一個 collection：寫入新名單，並刪除唔再存在嘅 doc。
+ * 用於 roster / studentDetails（學生轉班或刪除時，舊 doc 要清走）。
+ */
+async function replaceCollection_(ref, list, key) {
+  const snap = await ref.get();
+  const keep = new Set(list.map(item => String(item[key])));
+  const stale = snap.docs.filter(d => !keep.has(d.id));
+  for (let i = 0; i < list.length; i += 400) {
+    const batch = db.batch();
+    list.slice(i, i + 400).forEach(item => {
+      batch.set(ref.doc(item[key]), item, { merge: true });
+    });
+    await batch.commit();
+  }
+  for (let i = 0; i < stale.length; i += 400) {
+    const batch = db.batch();
+    stale.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  }
+  return { written: list.length, deleted: stale.length };
+}
+
+/**
  * 一次過將 Sheets（經 GAS API）同步去 Firestore：
  * 班級清單、每班名單、上堂日曆、班級連結、補充資料、全年點名。
  * 只限 admin（頁面已 gate）。
@@ -450,17 +473,19 @@ async function writeBatchToFirestore_(ref, list, key) {
 export async function syncAllFromGAS() {
   const classes = await gas.getAllClasses();
   const classSnapshot = await db.collection('classes').get();
-  const existing = new Set(classSnapshot.docs.map(d => d.id));
+  let rosterDeleted = 0;
+  let detailsDeleted = 0;
 
   for (const cls of classes) {
     await db.collection('classes').doc(cls).set({ name: cls, createdAt: new Date().toISOString() }, { merge: true });
 
     const roster = await gas.getClassRoster(cls);
-    await writeBatchToFirestore_(
+    const rosterOut = await replaceCollection_(
       db.collection('roster').doc(cls).collection('members'),
       roster.map((m, i) => ({ name: m.name, serial: m.serial, category: m.category, className: m.className || cls, order: Number(m.serial) || (i + 1) })),
       'name'
     );
+    rosterDeleted += rosterOut.deleted;
 
     const portal = await gas.getClassPortal(cls);
     if (portal && portal.formLink) {
@@ -471,18 +496,23 @@ export async function syncAllFromGAS() {
         attendanceSheet: portal.links.attendanceSheet || ''
       }, { merge: true });
     }
-    if (Array.isArray(portal.details) && portal.details.length) {
-      await writeBatchToFirestore_(db.collection('studentDetails').doc(cls).collection('students'), portal.details.map(d => ({ name: d.name, gender: d.gender || '', school: d.school || '', birthYear: d.birthYear || '', phone: d.phone || '' })), 'name');
-    }
+    const details = Array.isArray(portal.details) ? portal.details : [];
+    const detailsOut = await replaceCollection_(
+      db.collection('studentDetails').doc(cls).collection('students'),
+      details.map(d => ({ name: d.name, gender: d.gender || '', school: d.school || '', birthYear: d.birthYear || '', phone: d.phone || '' })),
+      'name'
+    );
+    detailsDeleted += detailsOut.deleted;
   }
 
   const sessions = await gas.getSessions();
   await writeBatchToFirestore_(db.collection('sessions'), sessions, 'date');
 
-  // 清理已刪班級
-  const batch = db.batch();
-  classSnapshot.docs.forEach(d => { if (!classes.includes(d.id)) batch.delete(d.ref); });
-  if (classSnapshot.docs.length) await batch.commit();
+  // 清理已刪班級（連帶 roster / studentDetails / classLinks / rollcalls）
+  for (const d of classSnapshot.docs) {
+    if (classes.includes(d.id)) continue;
+    await deleteClassData_(d.id);
+  }
 
   // 全年點名（逐班，分批避免一次過太大）
   for (const cls of classes) {
@@ -493,7 +523,27 @@ export async function syncAllFromGAS() {
     }
   }
 
-  return { classes: classes.length, sessions: sessions.length };
+  return { classes: classes.length, sessions: sessions.length, rosterDeleted, detailsDeleted };
+}
+
+/** 遞迴刪除一個 doc 連同其所有 subcollection（Firestore web SDK 冇 recursive delete） */
+async function deleteDocRecursive_(ref) {
+  const collections = await ref.listCollections();
+  for (const col of collections) {
+    const snap = await col.get();
+    for (const d of snap.docs) {
+      await deleteDocRecursive_(d.ref);
+    }
+  }
+  await ref.delete();
+}
+
+async function deleteClassData_(cls) {
+  await deleteDocRecursive_(db.collection('roster').doc(cls));
+  await deleteDocRecursive_(db.collection('studentDetails').doc(cls));
+  await db.collection('classLinks').doc(cls).delete();
+  await deleteDocRecursive_(db.collection('rollcalls').doc(cls));
+  await db.collection('classes').doc(cls).delete();
 }
 
 /**
