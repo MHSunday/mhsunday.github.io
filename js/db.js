@@ -467,10 +467,14 @@ async function replaceCollection_(ref, list, key) {
 
 /**
  * 一次過將 Sheets（經 GAS API）同步去 Firestore：
- * 班級清單、每班名單、上堂日曆、班級連結、補充資料、全年點名。
+ * 班級清單、每班名單、上堂日曆、班級連結、補充資料。
  * 只限 admin（頁面已 gate）。
+ *
+ * ⚠️ 點名（rollcalls）預設**唔會**由 Sheets 拉入 Firestore，
+ *    因為 Firestore 先係點名嘅 source of truth；Sheets 只係單向備份
+ *    （用 exportRollcallsToGAS）。如真要一次性回填，才傳 { includeRollcalls: true }。
  */
-export async function syncAllFromGAS() {
+export async function syncAllFromGAS({ includeRollcalls = false } = {}) {
   const classes = await gas.getAllClasses();
   const classSnapshot = await db.collection('classes').get();
   let rosterDeleted = 0;
@@ -515,11 +519,14 @@ export async function syncAllFromGAS() {
   }
 
   // 全年點名（逐班，分批避免一次過太大）
-  for (const cls of classes) {
-    const year = await gas.getRollCallYear(cls);
-    for (const [date, marks] of Object.entries(year)) {
-      const records = Object.entries(marks).map(([name, present]) => ({ name, present, mass: false }));
-      await writeBatchToFirestore_(db.collection('rollcalls').doc(cls).collection(date), records, 'name');
+  // 只在 includeRollcalls=true 時做（一次性回填）；平時 Firestore 為準。
+  if (includeRollcalls) {
+    for (const cls of classes) {
+      const year = await gas.getRollCallYear(cls);
+      for (const [date, marks] of Object.entries(year)) {
+        const records = Object.entries(marks).map(([name, present]) => ({ name, present, mass: false }));
+        await writeBatchToFirestore_(db.collection('rollcalls').doc(cls).collection(date), records, 'name');
+      }
     }
   }
 

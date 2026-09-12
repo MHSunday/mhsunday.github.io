@@ -132,7 +132,7 @@ async function handleImport() {
 }
 
 async function handleSync() {
-  if (!confirm('將 Sheets 嘅名單/日曆/全年點名同步去 Firestore？\n\n⚠️ 一次性操作，逐班 fetch 需時（可能幾分鐘），期間請勿關閉頁面。')) return;
+  if (!confirm('將 Sheets 嘅名單/日曆同步去 Firestore？\n\n⚠️ 唔會郁 Firestore 點名（點名以 Firestore 為準）。逐班 fetch 需時（可能幾分鐘），期間請勿關閉頁面。')) return;
   setMessage('同步中（逐班進行，請耐心等候）...');
   try {
     const out = await syncAllFromGAS();
