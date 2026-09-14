@@ -26,7 +26,22 @@ async function postJSON(data) {
     headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ ...data, idToken })
   });
-  return response.json();
+  return parseJson(response);
+}
+
+/**
+ * 將 GAS 回應解析為 JSON。GAS 若回 HTML（登入重定向 / 錯誤頁），
+ * 直接 res.json() 會 throw「Unexpected token '<'」，睇唔到真正原因。
+ * 呢度統一轉成清晰錯誤，保留 HTTP code + 回應前段。
+ */
+async function parseJson(res) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    const snippet = text.replace(/\s+/g, ' ').slice(0, 200);
+    throw new Error(`GAS 回應非 JSON（HTTP ${res.status}）：${snippet}`);
+  }
 }
 
 // ==========================================
@@ -36,7 +51,7 @@ async function postJSON(data) {
 export async function getAllClasses() {
   const qs = await getTokenQS();
   const res = await fetch(`${API_URL}?action=getAllClasses&${qs}`);
-  const data = await res.json();
+  const data = await parseJson(res);
   if (data.error) throw new Error(data.error);
   return data;
 }
@@ -48,7 +63,7 @@ export async function getAllClasses() {
 export async function getPermissions() {
   const qs = await getTokenQS();
   const res = await fetch(`${API_URL}?action=getPermissions&${qs}`);
-  const data = await res.json();
+  const data = await parseJson(res);
   if (data.error) throw new Error(data.error);
   return Array.isArray(data) ? data : [];
 }
@@ -58,7 +73,7 @@ export async function getStudentsByClass(className) {
   const qs = await getTokenQS();
   const url = `${API_URL}?action=getStudentsByClass&class=${encodeURIComponent(className)}&${qs}`;
   const res = await fetch(url);
-  const data = await res.json();
+  const data = await parseJson(res);
   if (data.error) throw new Error(data.error);
   
   // If the backend returns objects instead of just names, handle appropriately
@@ -78,7 +93,7 @@ export async function getStats(email, className = '*') {
   const qs = await getTokenQS();
   const url = `${API_URL}?action=getStats&email=${encodeURIComponent(email)}&class=${encodeURIComponent(className)}&${qs}`;
   const res = await fetch(url);
-  const data = await res.json();
+  const data = await parseJson(res);
   if (data.error) throw new Error(data.error);
   return data;
 }
@@ -91,7 +106,7 @@ export async function fetchAttendanceDetails(email, className) {
   const qs = await getTokenQS();
   const url = `${API_URL}?action=getAttendanceDetails&email=${encodeURIComponent(email)}&class=${encodeURIComponent(className)}&${qs}`;
   const res = await fetch(url);
-  const data = await res.json();
+  const data = await parseJson(res);
   if (data.error) throw new Error(data.error);
   return data; 
 }
@@ -123,7 +138,7 @@ export async function getAllStudents(email) {
   const qs = await getTokenQS();
   const url = `${API_URL}?action=getAllStudents&email=${encodeURIComponent(email)}&${qs}`;
   const res = await fetch(url);
-  const data = await res.json();
+  const data = await parseJson(res);
   if (data.error) throw new Error(data.error);
   return data;
 }
@@ -162,7 +177,7 @@ export async function getUnredeemedRecords(email) {
   const qs = await getTokenQS();
   const url = `${API_URL}?action=getUnredeemedRecords&email=${encodeURIComponent(email)}&${qs}`;
   const res = await fetch(url);
-  const data = await res.json();
+  const data = await parseJson(res);
   if (data.error) throw new Error(data.error);
   return data;
 }
@@ -221,7 +236,7 @@ export async function getAchievedStudents(email, className = '*') {
    const qs = await getTokenQS();
    const url = `${API_URL}?action=getAchievedStudents&email=${encodeURIComponent(email)}&class=${encodeURIComponent(className)}&${qs}`;
    const res = await fetch(url);
-   const data = await res.json();
+   const data = await parseJson(res);
    if (data.error) throw new Error(data.error);
    return data;
  }
@@ -236,7 +251,7 @@ export async function getAchievedStudents(email, className = '*') {
    const qs = await getTokenQS();
    const url = `${API_URL}?action=getClassBasedPendingRedemptionReport&email=${encodeURIComponent(email)}&${qs}`;
    const res = await fetch(url);
-   const data = await res.json();
+   const data = await parseJson(res);
    if (data.error) throw new Error(data.error);
    return data;
  }
@@ -251,7 +266,7 @@ export async function getGlobalRedemptionStats(email) {
   const qs = await getTokenQS();
   const url = `${API_URL}?action=getGlobalRedemptionStats&email=${encodeURIComponent(email)}&${qs}`;
   const res = await fetch(url);
-  const data = await res.json();
+  const data = await parseJson(res);
   if (data.error) throw new Error(data.error);
   return data;
 }
@@ -268,7 +283,7 @@ export async function getSessions() {
   const qs = await getTokenQS();
   const url = `${API_URL}?action=getSessions&${qs}`;
   const res = await fetch(url);
-  const data = await res.json();
+  const data = await parseJson(res);
   if (data.error) throw new Error(data.error);
   return Array.isArray(data) ? data : [];
 }
@@ -291,7 +306,7 @@ export async function resetSessions() {
   const qs = await getTokenQS();
   const url = `${API_URL}?action=resetSessions&${qs}`;
   const res = await fetch(url);
-  const data = await res.json();
+  const data = await parseJson(res);
   if (data.error) throw new Error(data.error);
   return data;
 }
@@ -310,7 +325,7 @@ export async function getClassRoster(className) {
   const qs = await getTokenQS();
   const url = `${API_URL}?action=getClassRoster&class=${encodeURIComponent(className)}&${qs}`;
   const res = await fetch(url);
-  const data = await res.json();
+  const data = await parseJson(res);
   if (data.error) throw new Error(data.error);
   return Array.isArray(data) ? data : [];
 }
@@ -326,7 +341,7 @@ export async function getRollCall(className, date) {
   const qs = await getTokenQS();
   const url = `${API_URL}?action=getRollCall&class=${encodeURIComponent(className)}&date=${encodeURIComponent(date)}&${qs}`;
   const res = await fetch(url);
-  const data = await res.json();
+  const data = await parseJson(res);
   if (data.error) throw new Error(data.error);
   return Array.isArray(data) ? data : [];
 }
@@ -361,7 +376,7 @@ export async function getRollCallYear(className, startDate, endDate) {
   const qs = await getTokenQS();
   const url = `${API_URL}?action=getRollCallYear&class=${encodeURIComponent(className)}&startDate=${encodeURIComponent(startDate || '')}&endDate=${encodeURIComponent(endDate || '')}&${qs}`;
   const res = await fetch(url);
-  const data = await res.json();
+  const data = await parseJson(res);
   if (data.error) throw new Error(data.error);
   return data || {};
 }
@@ -375,7 +390,7 @@ export async function getStudentDetails(className) {
   const qs = await getTokenQS();
   const url = `${API_URL}?action=getStudentDetails&class=${encodeURIComponent(className)}&${qs}`;
   const res = await fetch(url);
-  const data = await res.json();
+  const data = await parseJson(res);
   if (data.error) throw new Error(data.error);
   return Array.isArray(data) ? data : [];
 }
@@ -389,7 +404,7 @@ export async function getClassPortal(className) {
   const qs = await getTokenQS();
   const url = `${API_URL}?action=getClassPortal&class=${encodeURIComponent(className)}&${qs}`;
   const res = await fetch(url);
-  const data = await res.json();
+  const data = await parseJson(res);
   if (data.error) throw new Error(data.error);
   return data;
 }
@@ -402,7 +417,7 @@ export async function backupFirestoreToDrive() {
   const qs = await getTokenQS();
   const url = `${API_URL}?action=backupFirestoreToDrive&${qs}`;
   const res = await fetch(url);
-  const data = await res.json();
+  const data = await parseJson(res);
   if (data.error) throw new Error(data.error);
   return data;
 }

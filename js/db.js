@@ -562,23 +562,19 @@ export async function syncSessionsFromGAS() {
   return { sessions: sessions.length, deleted: out.deleted };
 }
 
-/** 遞迴刪除一個 doc 連同其所有 subcollection（Firestore web SDK 冇 recursive delete） */
-async function deleteDocRecursive_(ref) {
-  const collections = await ref.listCollections();
-  for (const col of collections) {
-    const snap = await col.get();
-    for (const d of snap.docs) {
-      await deleteDocRecursive_(d.ref);
-    }
+/** 刪除一個 collection 下全部 docs（Firestore web v8 冇 listCollections，逐個已知 subcollection 刪） */
+async function deleteCollection_(colRef) {
+  const snap = await colRef.get();
+  for (const d of snap.docs) {
+    await d.ref.delete();
   }
-  await ref.delete();
 }
 
 async function deleteClassData_(cls) {
-  await deleteDocRecursive_(db.collection('roster').doc(cls));
-  await deleteDocRecursive_(db.collection('studentDetails').doc(cls));
+  await deleteCollection_(db.collection('roster').doc(cls).collection('members'));
+  await deleteCollection_(db.collection('studentDetails').doc(cls).collection('students'));
   await db.collection('classLinks').doc(cls).delete();
-  await deleteDocRecursive_(db.collection('rollcalls').doc(cls));
+  await deleteCollection_(db.collection('rollcalls').doc(cls).collection('dates'));
   await db.collection('classes').doc(cls).delete();
 }
 
