@@ -89,7 +89,8 @@ async function loadPortal() {
     renderLinks(p);
     renderDetails(p);
     renderAttendance(p, yearMarks);
-    setMessage(`${currentClass}：共 ${p.rosterCount} 人`);
+    const studentCount = (p.roster || []).filter(s => s.category === '學生').length;
+    setMessage(`${currentClass}：班級名單（共 ${p.rosterCount} 人，學生 ${studentCount} 人）`);
   } catch (err) {
     setMessage(`載入失敗：${err.message}`, true);
   }
@@ -167,7 +168,9 @@ function renderRoster(p) {
     return;
   }
   card.classList.remove('hidden');
-  $('rosterCount').textContent = `（${p.roster.length} 人）`;
+  const roster = p.roster || [];
+  const studentCount = roster.filter(s => s.category === '學生').length;
+  $('rosterCount').textContent = `（共 ${roster.length} 人，學生 ${studentCount} 人）`;
   p.roster.forEach(s => {
     const span = document.createElement('span');
     span.className = 'inline-flex items-center gap-1.5 border border-gray-200 rounded-lg px-2.5 py-1 text-sm bg-gray-50';
