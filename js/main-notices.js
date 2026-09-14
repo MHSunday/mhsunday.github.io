@@ -33,6 +33,11 @@ function escapeHtml(s) {
 
 function init(role) {
   isAdmin = role && role.role === 'admin';
+  const backLink = $('backLink');
+  if (backLink && role && role.role === 'staff') {
+    backLink.href = 'staff.html';
+    backLink.textContent = '‹ 返回校務看板';
+  }
 
   $('logoutBtn').addEventListener('click', () => logout());
   $('showFormBtn').addEventListener('click', () => openForm());

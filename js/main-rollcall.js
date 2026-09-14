@@ -437,4 +437,10 @@ function renderMassRows(rows) {
   });
 }
 
-onRoleLoaded((role) => { init(role); });
+onRoleLoaded((role) => {
+  if (role && role.role === 'staff') {
+    window.location.replace('./staff.html');
+    return;
+  }
+  init(role);
+});

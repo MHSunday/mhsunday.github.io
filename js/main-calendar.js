@@ -76,13 +76,18 @@ async function load() {
 function init(role) {
   $('logoutBtn').addEventListener('click', () => logout());
   const isAdmin = role && role.role === 'admin';
-  const editLink = $('editLink');
-  if (isAdmin && editLink) editLink.classList.remove('hidden');
+  const isStaff = role && role.role === 'staff';
+  if (isAdmin && $('editLink')) $('editLink').classList.remove('hidden');
+  if (isStaff) {
+    if ($('portalLink')) $('portalLink').href = 'staff.html';
+    if ($('portalLink')) $('portalLink').textContent = '校務看板';
+    if ($('rollcallLink')) $('rollcallLink').classList.add('hidden');
+  }
   load();
 }
 
 onRoleLoaded((role) => {
-  if (role && (role.role === 'admin' || role.role === 'teacher')) {
+  if (role && (role.role === 'admin' || role.role === 'teacher' || role.role === 'staff')) {
     init(role);
   } else {
     setMessage('此頁僅限教職員使用', true);

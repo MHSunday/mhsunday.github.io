@@ -207,6 +207,6 @@ onRoleLoaded((role) => {
     loadSessions();
   } else {
     setMessage('此頁僅限教職員使用', true);
-    setTimeout(() => window.location.replace('./form.html'), 1500);
+    setTimeout(() => window.location.replace(role && role.role === 'staff' ? './staff.html' : './form.html'), 1500);
   }
 });

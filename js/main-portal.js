@@ -236,4 +236,10 @@ function escapeHtml(s) {
   return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-onRoleLoaded((role) => { init(role); });
+onRoleLoaded((role) => {
+  if (role && role.role === 'staff') {
+    window.location.replace('./staff.html');
+    return;
+  }
+  init(role);
+});

@@ -21,6 +21,11 @@ auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 export function getCurrentUser() { return currentUser; }
 export function getUserRole() { return userRole; }
 
+// 登入後首頁：校務團去校務看板，其餘（admin/teacher）去每班 Portal
+function homePageFor(role) {
+  return (role && role.role === 'staff') ? './staff.html' : './class_portal.html';
+}
+
 // 取得目前登入使用者的 Firebase ID Token（後端需要驗證身份用）
 export function getAuthToken() {
   // 用預設（唔強制 refresh）以節省手機網絡時間；token 過期時 SDK 會自動 refresh
@@ -147,7 +152,7 @@ auth.onAuthStateChanged(async (user) => {
           toggleLoading(false);
           console.log("[auth] 用 localStorage cache 跳過 GAS fetch");
           if (currentPage === 'index.html' || currentPage === '') {
-            window.location.replace('./class_portal.html');
+            window.location.replace(homePageFor(role));
           }
           return;
         }
@@ -200,7 +205,7 @@ auth.onAuthStateChanged(async (user) => {
       console.log("[auth] 登入 email:", user.email);
       console.log("[auth] getUserRoles 回傳:", roleData);
 
-      if (roleData && (roleData.role === 'admin' || roleData.role === 'teacher')) {
+      if (roleData && (roleData.role === 'admin' || roleData.role === 'teacher' || roleData.role === 'staff')) {
         userRole = roleData;
         roleLoaded = true;
 
@@ -221,7 +226,7 @@ auth.onAuthStateChanged(async (user) => {
 
         // 安全跳轉：使用 replace 避免回退鍵循環
         if (currentPage === 'index.html' || currentPage === '') {
-          window.location.replace('./class_portal.html');
+          window.location.replace(homePageFor(roleData));
         }
       } else {
         const detail = roleData && roleData.error ? `｜後端回覆：${roleData.error}` : `｜回傳：${JSON.stringify(roleData)}`;
