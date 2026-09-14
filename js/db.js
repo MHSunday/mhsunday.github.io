@@ -509,8 +509,9 @@ export async function syncAllFromGAS({ includeRollcalls = false } = {}) {
     detailsDeleted += detailsOut.deleted;
   }
 
+  // 上堂日曆（sessions）：以 Sheets 為準 → 全量取代（刪除喺 Sheets 已移除嘅日期）
   const sessions = await gas.getSessions();
-  await writeBatchToFirestore_(db.collection('sessions'), sessions, 'date');
+  const sessionsOut = await replaceCollection_(db.collection('sessions'), sessions, 'date');
 
   // 清理已刪班級（連帶 roster / studentDetails / classLinks / rollcalls）
   for (const d of classSnapshot.docs) {
@@ -520,17 +521,45 @@ export async function syncAllFromGAS({ includeRollcalls = false } = {}) {
 
   // 全年點名（逐班，分批避免一次過太大）
   // 只在 includeRollcalls=true 時做（一次性回填）；平時 Firestore 為準。
+  // 寫入而家實際 schema：rollcalls/{cls}/dates/{date} doc + marks map（同 saveRollCall 一致）。
   if (includeRollcalls) {
     for (const cls of classes) {
       const year = await gas.getRollCallYear(cls);
       for (const [date, marks] of Object.entries(year)) {
-        const records = Object.entries(marks).map(([name, present]) => ({ name, present, mass: false }));
-        await writeBatchToFirestore_(db.collection('rollcalls').doc(cls).collection(date), records, 'name');
+        const map = {};
+        Object.entries(marks).forEach(([name, present]) => {
+          map[name] = { present: present === true, mass: false, category: '學生', className: cls };
+        });
+        if (!Object.keys(map).length) continue;
+        await db.collection('rollcalls').doc(cls).collection('dates').doc(date).set({
+          date: date,
+          className: cls,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          recorder: recorderEmail(),
+          marks: map
+        }, { merge: true });
       }
+      // 物化 parent doc（令 collection 可枚舉）
+      await db.collection('rollcalls').doc(cls).set({
+        className: cls,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
     }
   }
 
-  return { classes: classes.length, sessions: sessions.length, rosterDeleted, detailsDeleted };
+  return { classes: classes.length, sessions: sessions.length, sessionsDeleted: sessionsOut.deleted, rosterDeleted, detailsDeleted };
+}
+
+/**
+ * 淨係同步上堂日曆（sessions）由 Sheets → Firestore。
+ * 以 Sheets 為準：全量取代（刪除喺 Sheets 已移除嘅日期）。
+ * 只限 admin（頁面已 gate）。
+ * @returns { { sessions: number, deleted: number } }
+ */
+export async function syncSessionsFromGAS() {
+  const sessions = await gas.getSessions();
+  const out = await replaceCollection_(db.collection('sessions'), sessions, 'date');
+  return { sessions: sessions.length, deleted: out.deleted };
 }
 
 /** 遞迴刪除一個 doc 連同其所有 subcollection（Firestore web SDK 冇 recursive delete） */
@@ -561,22 +590,19 @@ export async function exportRollcallsToGAS() {
   const classes = await getAllClasses();
   let total = 0;
   for (const cls of classes) {
-    const year = await getRollCallYear(cls);
-    for (const [date, marks] of Object.entries(year)) {
-      const records = [];
-      for (const [name, present] of Object.entries(marks)) {
-        const snap = await db.collection('rollcalls').doc(cls).collection(date).doc(name).get();
-        const data = snap.exists ? snap.data() : {};
-        records.push({
-          name,
-          category: data.category || '學生',
-          className: data.className || cls,
-          present,
-          mass: data.mass === true
-        });
-      }
+    const datesSnap = await db.collection('rollcalls').doc(cls).collection('dates').get();
+    for (const dateDoc of datesSnap.docs) {
+      const dt = dateDoc.data();
+      const marks = dt.marks || {};
+      const records = Object.entries(marks).map(([name, m]) => ({
+        name,
+        category: (m && m.category) || '學生',
+        className: (m && m.className) || cls,
+        present: !!(m && m.present === true),
+        mass: !!(m && m.mass === true)
+      }));
       if (records.length) {
-        const out = await gas.saveRollCall(cls, date, records);
+        const out = await gas.saveRollCall(cls, dateDoc.id, records);
         total += (out.added || 0) + (out.updated || 0);
       }
     }

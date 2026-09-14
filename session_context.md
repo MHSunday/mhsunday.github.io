@@ -582,3 +582,109 @@ Commit + push。即時切返舊 GAS + Sheets 架構。Firestore 資料保留，�
 - [ ] **`git push`**（merge 之後未推）
 - [ ] Firestore rules 部署注意：`plans/firestore.rules` 已由 remote 刪除；`notices` collection 喺 Firebase Console 需要 `read=isAuthed / write=isAdmin` 先可以用
 - [ ] 測試：登入直入 Portal、公告/檔案板 admin 發佈、出席統計分母（31/39）、座位表 iPhone 顯示
+
+---
+
+# 附錄：校務團 Access（staff 角色，2026-09-14）
+
+> 範圍：新增唯讀角色「校務團」（role key = `staff`），睇到 通告 ＋ 每班學生嘅彌撒及出席統計 ＋ 上堂日曆（唯讀）。
+> 設計文件：`plans/staff_access_design.md`（決策已拍板 ✅）
+> Commit：`bae730c`（Add staff dashboard and update role-based navigation links）＋ 前序 commit `4fd5e28`（設計 + 本文件）。
+
+## 1. 角色定義
+
+| 角色 | key | 權限 |
+|---|---|---|
+| 校務團 | `staff` | **唯讀**：通告、每班學生出席統計、上堂日曆 |
+| admin / teacher | — | 照舊 |
+
+## 2. 已做嘅改動（前端，已 commit）
+
+### 新增
+| 檔案 | 內容 |
+|---|---|
+| `staff.html` | 校務看板：通告（最近 5 條 + 「顯示全部」→ notices.html）＋ 出席統計（班級下拉 + 逐學生 彌撒／出席／出席率） |
+| `js/main-staff.js` | 唯讀邏輯：`getNotices` + `getAllClasses`/`getRoster`/`getRollCallYear`/`getSessions` 組合；**只計 `category === '學生'`**；分母同 `rollcall.html?tab=mass`（課堂 31 堂、彌撒 39 主日） |
+| `plans/firestore.rules` | **重新加入**（之前 merge 俾 remote 刪除）；用實際路徑 `rollcalls/{cls}/dates/{date}`，包含 `notices`/`classes`/`classTodos`；讀取一律 `isAuthed()`（staff 自動符合），寫入 admin / teacherOf |
+
+### 修改
+| 檔案 | 內容 |
+|---|---|
+| `js/auth.js` | 接受 `staff` role（原本淨 admin/teacher）；新增 `homePageFor(role)`：staff → `staff.html`，其餘 → `class_portal.html`（兩個 redirect 位都用） |
+| `js/main-calendar.js` + `calendar.html` | 角色 gate 加 `staff`；staff 見「校務看板」link（取代每班Portal）、隱藏課堂點名；`#portalLink` / `#rollcallLink` 加 id |
+| `js/main-notices.js` + `notices.html` | 返回 link 按 role：staff → `staff.html`（「‹ 返回校務看板」）；`#backLink` 加 id |
+| `js/main-portal.js` | staff 手動入 → redirect `staff.html` |
+| `js/main-rollcall.js` | staff 手動入 → redirect `staff.html` |
+| `js/main-form.js` | 非 admin redirect 分流：staff → `staff.html` |
+| `js/main-sessions.js` | 非 admin/teacher redirect 分流：staff → `staff.html` |
+| `js/main-admin-todos.js` | 非 admin redirect 分流：staff → `staff.html` |
+
+### GAS（唔喺 repo，已改 backup）
+| 檔案 | 內容 |
+|---|---|
+| `apps-script-backup\portal-integrated\web_main.js` | `getUserRoles` 加 `staff` 分支：match 到 `role === "staff"` → 返回 `{ role: "staff", classes: [] }`（要人手部署新版先生效） |
+
+## 3. 部署步驟（人手）
+
+1. **GAS**：Apps Script 編輯器更新 `web_main.js` → 部署 › 管理部署作業 › 新版本 › 部署
+2. **permissions sheet**（營運試算表 `1Uwa0Tis…`）：加行 `staff / (class 留空) / <校務團email>`
+3. `admin_sessions.html` → 「同步權限 → Firestore」（寫 staff permissions doc，令 rules 讀到；同步函數已支援任何 role）
+4. **Firebase Console**：Rules → 貼 `plans/firestore.rules` → **發佈**（之前 rules 未部署，`notices` 都要今次補）
+5. 測試：校務團 email 登入 → 直入校務看板 → 通告 + 各班統計 + 上堂日曆唯讀；確認無任何編輯掣、唔見學生電話
+
+## 4. 權限防護重點
+
+- 校務團全程**唯讀**：UI 無 save/編輯掣；rules 層面寫入只限 admin/teacherOf
+- **私隱**：staff 睇唔到 `studentDetails`（電話）、睇唔到 portal 檔案連結；手動入 class_portal/rollcall/form/admin_sessions/admin_todos 都會 redirect 去校務看板
+- Firestore 讀取唔使為 staff 開特權（一律 `isAuthed()`）
+
+## 5. 待辦 / 已提出未做
+
+- [ ] ~~**同步功能分開揀（用戶 2026-09-14 提出）**~~ → **取消**（用戶 2026-09-14 話唔使）
+- [ ] GAS `web_main.js` 部署（staff role 先生效）
+- [ ] `plans/firestore.rules` 發佈（含 notices）
+- [ ] `git push`（本地 main 超前 origin/main 1 commit）
+
+---
+
+# 附錄：誤刪 rollcalls collection + 回填/匯出路徑修正（2026-09-14）
+
+> 事發：管理員喺 Firestore Console **誤刪咗 `rollcalls` collection**（資料可忽略，唔使恢復）。
+> 系統本身冇壞：`saveRollCall`（`js/db.js`）會自動重建 `rollcalls/{班}/dates/{日期}` + parent doc，老師照常點名即可由零重新累積。
+
+## 順手修咗嘅 bug：rollcalls 路徑不一致
+
+發現 `js/db.js` 有兩個地方仍然用**舊 schema** 路徑 `rollcalls/{班}/{日期}/{姓名}`（單 doc per 人），而而家實際 schema 係 `rollcalls/{班}/dates/{日期}`（單 doc + `marks` map，見 `saveRollCall`）。會導致「由 Sheets 回填」同「匯出點名」都失效。
+
+| 函數 | 之前（錯） | 而家（正確） |
+|---|---|---|
+| `syncAllFromGAS({ includeRollcalls: true })` | 寫入舊路徑 `rollcalls/{班}/{日期}/{姓名}` → 讀唔返 | 寫入 `rollcalls/{班}/dates/{日期}` doc + `marks` map（`{ present, mass:false, category:'學生', className }`），同 `saveRollCall` 一致；兼物化 parent doc |
+| `exportRollcallsToGAS()` | 由舊路徑讀 category/mass → 永遠空 → 匯出丟失 mass/類別 | 直接讀 `rollcalls/{班}/dates` subcollection 嘅 `marks` map，保留 `category / className / mass` |
+
+**注意**：`includeRollcalls` 回填時 mass 一律設 `false`（GAS `getRollCallYear` 淨係返 `{ 姓名: 是/否 }`，冇 mass 資料）；要真正連彌撒一齊回填就要另從 Sheets 讀 mass（暫未做，用戶話資料可忽略）。
+
+## 追加：sessions 同步改為「全量取代」（同一日）
+
+- **sessions 來源**：GAS 營運試算表 `1Uwa0Tis…` 嘅 `sessions` sheet（欄位 日期/主日/主日學活動）→ `{ date, title, event }`（`sessions.js getSessions`）
+- 之前 `syncAllFromGAS` 用 `writeBatchToFirestore_` 同步 sessions → **只寫唔刪**，Sheets 移除咗嘅日期 Firestore 仲留住
+- 改為 `replaceCollection_`：寫新 + **刪除 Sheets 已移除嘅日期**（回傳 `sessionsDeleted`，`main-sessions.js` 訊息顯示「清除 N 個舊日期」）
+- ⚠️ 注意：既然 sessions 以 Sheets 為準，admin 喺 `admin_sessions.html` 直接改（寫 Firestore）嘅日期，如果唔喺 Sheets 度，下次 sync 會被清走。
+- **新增獨立「同步日曆 → Firestore」掣**（`#syncSessionsBtn`，天空藍）：`db.js syncSessionsFromGAS()` 淨係 sync sessions（唔連名單）；`data.js` 已 export。admin 先見到。
+
+## 檔位
+- `js/db.js`：`syncAllFromGAS` includeRollcalls 區塊 + `exportRollcallsToGAS` + sessions 改用 `replaceCollection_`（已 syntax check ✅）
+- `js/main-sessions.js`：同步完成訊息加 `sessionsDeleted`（已 syntax check ✅）
+
+## 追加：POST 帶 idToken 改為 text/plain JSON body（同一日）
+
+**問題**：`匯出點名 → 試算表`（以及所有 POST）報 `匯出失敗：缺少 idToken`。
+- GET 正常（登入/讀取 OK，`getTokenQS` 有帶 token），但 POST 用 form-encoded 傳 idToken。
+- 判斷：**已部署嘅 GAS `doPost` 讀唔到 form-encoded body 入面嘅 `idToken`**（舊版冇 `payload.idToken || e.parameter.idToken` fallback，而 `JSON.parse(e.postData.contents)` 對 form 格式會失敗 → 用 form-fallback → payload 冇 idToken）→ `verifyFirebaseIdToken(undefined)` → 「缺少 idToken」。
+
+**修法（前端，`js/api.js`）**：
+- 新增 `postJSON(data)` helper：body 用 **JSON 字串**、`Content-Type: text/plain`（**唔用 application/json** —— 會觸發 CORS preflight OPTIONS，而 Apps Script 唔處理 OPTIONS 會失敗）。
+- 優點：GAS doPost 嘅 `JSON.parse(e.postData.contents)` 直接成功 → `payload.idToken` 讀到 —— 就算已部署 GAS 冇 fallback 都認到；亦保留 records/sessions 為真正 array。
+- 全部 5 個 POST 改行 `postJSON`：`recordAttendance` / `updateRedeemStatus` / `batchUpdateRedeemStatus` / `saveSessions` / `saveRollCall`。
+- 刪除已冇用嘅 `toFormData`。
+
+> ⚠️ 如果改完前端（GitHub Pages 自動發佈）後 POST 仍然「缺少 idToken」，就要連 GAS 一齊更新＋部署新版 `web_main.js`（確保 doPost 有 `payload.idToken || e.parameter.idToken` 雙保險）。

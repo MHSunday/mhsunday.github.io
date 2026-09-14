@@ -14,17 +14,19 @@ async function getTokenQS() {
 }
 
 /**
- * 將物件轉換為 URLSearchParams 格式
+ * POST 到 GAS，body 用 JSON 字串（idToken 放 body 入面）。
+ * Content-Type 用 text/plain：唔觸發 CORS preflight（Apps Script 唔處理 OPTIONS），
+ * 同時 GAS doPost 嘅 JSON.parse(e.postData.contents) 讀到 payload.idToken——
+ * 就算已部署嘅 GAS 冇 `|| e.parameter.idToken` fallback 都認到 token。
  */
-function toFormData(obj) {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(obj)) {
-    if (value !== null && value !== undefined) {
-      // 確保布林值轉為字串 "true"/"false"
-      params.append(key, String(value));
-    }
-  }
-  return params;
+async function postJSON(data) {
+  const idToken = await getAuthToken();
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ ...data, idToken })
+  });
+  return response.json();
 }
 
 // ==========================================
@@ -106,19 +108,7 @@ export async function recordAttendance(data) {
     }
   }
 
-  const formData = toFormData({
-    action: 'recordAttendance',
-    ...data,
-    idToken: await getAuthToken()
-  });
-
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: formData
-  });
-
-  const result = await response.json();
+  const result = await postJSON({ action: 'recordAttendance', ...data });
   if (result.error) throw new Error(result.error);
   return result;
 }
@@ -157,19 +147,7 @@ export async function updateRedeemStatus(data) {
     attendanceDate: formatDateForApi(data.attendanceDate)
   };
   
-  const formData = toFormData({
-    action: 'updateRedeemStatus',
-    ...processedData,
-    idToken: await getAuthToken()
-  });
-
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: formData
-  });
-
-  const result = await response.json();
+  const result = await postJSON({ action: 'updateRedeemStatus', ...processedData });
   if (result.error) throw new Error(result.error);
   return result;
 }
@@ -205,20 +183,11 @@ export async function batchUpdateRedeemStatus(records, email) {
     attendanceDate: formatDateForApi(record.attendanceDate)
   }));
   
-  const formData = toFormData({
+  const result = await postJSON({
     action: 'batchUpdateRedeemStatus',
     email: email,
-    records: JSON.stringify(processedRecords),
-    idToken: await getAuthToken()
+    records: processedRecords
   });
-
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: formData
- });
-
-  const result = await response.json();
   if (result.error) throw new Error(result.error);
   return result;
 }
@@ -310,17 +279,7 @@ export async function getSessions() {
  */
 export async function saveSessions(sessions) {
   if (!Array.isArray(sessions)) throw new Error('sessions 必須是數組');
-  const formData = toFormData({
-    action: 'saveSessions',
-    sessions: JSON.stringify(sessions),
-    idToken: await getAuthToken()
-  });
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: formData
-  });
-  const result = await response.json();
+  const result = await postJSON({ action: 'saveSessions', sessions });
   if (result.error) throw new Error(result.error);
   return result;
 }
@@ -380,19 +339,12 @@ export async function getRollCall(className, date) {
  */
 export async function saveRollCall(className, date, records) {
   if (!className || !date || !Array.isArray(records)) throw new Error('缺少必要參數');
-  const formData = toFormData({
+  const result = await postJSON({
     action: 'saveRollCall',
     className: className,
     date: formatDateForApi(date),
-    records: JSON.stringify(records),
-    idToken: await getAuthToken()
+    records
   });
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: formData
-  });
-  const result = await response.json();
   if (result.error) throw new Error(result.error);
   return result;
 }

@@ -1,5 +1,5 @@
 // js/main-sessions.js — 上堂日曆（admin 可編輯+同步；teacher 唯讀）
-import { getSessions, saveSessions, importDefaultSessions, syncAllFromGAS, syncPermissionsFromGAS, exportRollcallsToGAS } from './data.js';
+import { getSessions, saveSessions, importDefaultSessions, syncAllFromGAS, syncSessionsFromGAS, syncPermissionsFromGAS, exportRollcallsToGAS } from './data.js';
 import { backupFirestoreToDrive } from './api.js';
 import { onRoleLoaded, logout } from './auth.js';
 
@@ -137,7 +137,8 @@ async function handleSync() {
   try {
     const out = await syncAllFromGAS();
     const removed = (out.rosterDeleted || 0) + (out.detailsDeleted || 0);
-    setMessage(`同步完成：${out.classes} 班、${out.sessions} 個上堂日${removed ? `、清除 ${removed} 筆舊名單記錄` : ''}`);
+    const removedSessions = out.sessionsDeleted || 0;
+    setMessage(`同步完成：${out.classes} 班、${out.sessions} 個上堂日${removedSessions ? `、清除 ${removedSessions} 個舊日期` : ''}${removed ? `、清除 ${removed} 筆舊名單記錄` : ''}`);
     await loadSessions();
   } catch (err) {
     setMessage(`同步失敗：${err.message}`, true);
@@ -152,6 +153,18 @@ async function handlePermSync() {
     setMessage(`已同步 ${out.users} 個權限到 Firestore`);
   } catch (err) {
     setMessage(`同步權限失敗：${err.message}`, true);
+  }
+}
+
+async function handleSessionsSync() {
+  if (!confirm('將 Sheets 嘅上堂日曆同步去 Firestore？\n\n以 Sheets 為準：Sheets 冇嘅日期會被刪除。')) return;
+  setMessage('同步日曆中...');
+  try {
+    const out = await syncSessionsFromGAS();
+    setMessage(`已同步 ${out.sessions} 個上堂日${out.deleted ? `、清除 ${out.deleted} 個舊日期` : ''}`);
+    await loadSessions();
+  } catch (err) {
+    setMessage(`同步日曆失敗：${err.message}`, true);
   }
 }
 
@@ -192,6 +205,8 @@ function init(role) {
     if (exportBtn) exportBtn.addEventListener('click', handleExport);
     if (permSyncBtn) permSyncBtn.addEventListener('click', handlePermSync);
     if (backupBtn) backupBtn.addEventListener('click', handleBackup);
+    const syncSessionsBtn = $('syncSessionsBtn');
+    if (syncSessionsBtn) syncSessionsBtn.addEventListener('click', handleSessionsSync);
   } else {
     // teacher：唯讀，隱藏編輯/import/sync/export 按鈕
     $('saveBtn').style.display = 'none';
