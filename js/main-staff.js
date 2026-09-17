@@ -3,14 +3,28 @@
 import { getAllClasses, getRoster, getRollCallYear, getSessions, getNotices } from './data.js';
 import { onRoleLoaded, logout } from './auth.js';
 
-const CATEGORY_LABEL = { '學生': '學生', '小導師': '小導師', '老師': '導師' };
-
 const CLASS_START = '2026-09-20';
 const CLASS_END = '2027-05-23';
 const MASS_START = '2026-09-01';
 const MASS_END = '2027-05-31';
 
 const $ = (id) => document.getElementById(id);
+
+const TAB_IDS = { notices: 'tabNoticesBtn', stats: 'tabStatsBtn' };
+
+function switchTab(name) {
+  $('panelNotices').classList.toggle('hidden', name !== 'notices');
+  $('panelStats').classList.toggle('hidden', name !== 'stats');
+  Object.entries(TAB_IDS).forEach(([tab, btnId]) => {
+    const btn = $(btnId);
+    if (!btn) return;
+    const active = tab === name;
+    btn.classList.toggle('border-blue-600', active);
+    btn.classList.toggle('text-blue-700', active);
+    btn.classList.toggle('border-transparent', !active);
+    btn.classList.toggle('text-gray-500', !active);
+  });
+}
 
 function isClassDay(s) {
   return !(s.event || '').startsWith('假期');
@@ -98,11 +112,11 @@ function renderStats() {
   const stats = classStats[$('classSelect').value];
   body.innerHTML = '';
   if (!stats) {
-    body.innerHTML = '<tr><td colspan="5" class="border p-4 text-center text-gray-400">未有資料</td></tr>';
+    body.innerHTML = '<tr><td colspan="4" class="border p-4 text-center text-gray-400">未有資料</td></tr>';
     return;
   }
   if (!stats.rows.length) {
-    body.innerHTML = '<tr><td colspan="5" class="border p-4 text-center text-gray-400">此班暫無學生資料</td></tr>';
+    body.innerHTML = '<tr><td colspan="4" class="border p-4 text-center text-gray-400">此班暫無學生資料</td></tr>';
     setMessage(`${stats.className}：無學生資料`);
     return;
   }
@@ -112,7 +126,6 @@ function renderStats() {
     tr.className = 'hover:bg-blue-50';
     tr.innerHTML = `
       <td class="border px-3 py-2.5 text-lg font-medium">${escapeHtml(s.name)}</td>
-      <td class="border px-2 py-2.5">${CATEGORY_LABEL[s.category] || escapeHtml(s.category)}</td>
       <td class="border px-2 py-2.5 text-center text-xl font-bold text-orange-600">${s.mass} 次</td>
       <td class="border px-2 py-2.5 text-center text-gray-700">${s.present} 次</td>
       <td class="border px-2 py-2.5 text-center font-bold text-blue-700">${s.rate}%</td>
@@ -181,6 +194,8 @@ async function loadAllStats(sessions) {
 
 function init() {
   $('logoutBtn').addEventListener('click', () => logout());
+  $('tabNoticesBtn').addEventListener('click', () => switchTab('notices'));
+  $('tabStatsBtn').addEventListener('click', () => switchTab('stats'));
   $('classSelect').addEventListener('change', renderStats);
 
   Promise.all([getNotices(), getSessions()])
