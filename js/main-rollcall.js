@@ -45,10 +45,24 @@ function urlParam(name) {
 function resolveClass(role) {
   const urlClass = urlParam('class');
   if (urlClass && classes.includes(urlClass)) return urlClass;
-  if (role && role.role === 'teacher' && role.classes && role.classes[0] && classes.includes(role.classes[0])) {
-    return role.classes[0];
+  if (role && role.role === 'teacher' && Array.isArray(role.classes) && role.classes.length) {
+    const allowed = classes.filter(c => role.classes.includes(c));
+    return allowed[0] || '';
   }
   return classes[0] || '';
+}
+
+function fillClassSelect() {
+  const sel = $('classSelect');
+  sel.innerHTML = '';
+  classes.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c;
+    opt.textContent = c;
+    sel.appendChild(opt);
+  });
+  sel.value = currentClass;
+  sel.classList.toggle('hidden', classes.length <= 1);
 }
 
 // ---------- 初始化 ----------
@@ -62,6 +76,11 @@ async function init(role) {
   $('clearAllBtn').addEventListener('click', () => renderDay());
   $('saveDayBtn').addEventListener('click', saveDay);
   $('dateSelect').addEventListener('change', (e) => { currentDate = e.target.value; renderDay(); });
+  $('classSelect').addEventListener('change', async (e) => {
+    currentClass = e.target.value;
+    $('classNameLabel').textContent = `${currentClass} 課堂點名`;
+    await switchTab(currentTab);
+  });
 
   try {
     [classes, sessions] = await Promise.all([getAllClasses(), getSessions()]);
@@ -72,7 +91,13 @@ async function init(role) {
   }
 
   currentClass = resolveClass(role);
-  $('classNameLabel').textContent = currentClass ? `${currentClass} 課堂點名` : '課堂點名';
+  if (!currentClass) {
+    setMessage('您沒有可用的班級權限', true);
+    $('classSelect').classList.add('hidden');
+    return;
+  }
+  fillClassSelect();
+  $('classNameLabel').textContent = `${currentClass} 課堂點名`;
 
   fillDateSelect();
 
