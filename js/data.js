@@ -42,3 +42,11 @@ export const saveCalendarConfig = fb.saveCalendarConfig;
 export const getClassCalendar = fb.getClassCalendar;
 export const saveClassCalendar = fb.saveClassCalendar;
 export const markClassCalendarPushed = fb.markClassCalendarPushed;
+
+// 彌撒獎勵（每 5 次）— 只存在於 Firestore 版
+export const getRewardConfig = fb.getRewardConfig;
+export const saveRewardConfig = fb.saveRewardConfig;
+export const getRewardClaims = fb.getRewardClaims;
+export const saveRewardClaim = fb.saveRewardClaim;
+export const saveRewardClaims = fb.saveRewardClaims;
+export const voidRewardClaim = fb.voidRewardClaim;

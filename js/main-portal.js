@@ -143,6 +143,7 @@ function renderActions(p) {
     { label: '今日點名', desc: today || '揀日期', href: `rollcall.html?class=${encodeURIComponent(p.className)}&date=${today}` },
     { label: '全年矩陣', desc: '睇全年出席', href: `rollcall.html?class=${encodeURIComponent(p.className)}&tab=matrix` },
     { label: '出席統計', desc: '每位學生出席／彌撒次數', href: `rollcall.html?class=${encodeURIComponent(p.className)}&tab=mass` },
+    { label: '彌撒獎勵', desc: '每 5 次彌撒 1 個獎勵', href: `reward.html?class=${encodeURIComponent(p.className)}` },
     { label: '上堂日曆', desc: '睇全年日曆', href: 'calendar.html' },
     { label: '學生名單', desc: `${p.rosterCount} 人`, href: '#details' }
   ];

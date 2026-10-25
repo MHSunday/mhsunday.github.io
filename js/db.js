@@ -15,6 +15,7 @@
 import { APP_CONFIG } from './config.js';
 import * as gas from './api.js';
 import { sortClasses } from './classOrder.js';
+import { getDefaultRewardConfig, normalizeRewardConfig, buildRewardClaimId } from './reward-calc.js';
 
 if (!firebase.apps.length) {
   firebase.initializeApp(APP_CONFIG.firebase);
@@ -723,4 +724,120 @@ export async function syncPermissionsFromGAS() {
   }
   await batch.commit();
   return { users: byEmail.size };
+}
+
+// ==========================================
+// 彌撒獎勵（每 5 次）
+// 路徑：
+//   /rewardConfig/{schoolYear}
+//   /rewardClaims/{schoolYear}/records/{claimId}
+// ==========================================
+
+/** 讀取獎勵設定；未建立文件時用預設值（5 次、9 月至翌年 5 月、只計學生） */
+export async function getRewardConfig(schoolYear) {
+  const fallback = getDefaultRewardConfig(schoolYear);
+  if (!schoolYear) return fallback;
+  const snap = await db.collection('rewardConfig').doc(schoolYear).get();
+  return normalizeRewardConfig(snap.exists ? snap.data() : null, schoolYear);
+}
+
+/** 儲存獎勵設定（管理員用；v1 主要靠 Firestore Console 建立） */
+export async function saveRewardConfig(schoolYear, data) {
+  if (!schoolYear) throw new Error('缺少學年');
+  const payload = normalizeRewardConfig(data, schoolYear);
+  await db.collection('rewardConfig').doc(schoolYear).set({
+    ...payload,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: recorderEmail()
+  }, { merge: true });
+  return payload;
+}
+
+/** 讀取一個學年全部有效領取紀錄 */
+export async function getRewardClaims(schoolYear, { includeVoided = false } = {}) {
+  if (!schoolYear) return [];
+  const snap = await db.collection('rewardClaims').doc(schoolYear).collection('records').get();
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(c => includeVoided || c.voided !== true)
+    .sort((a, b) => {
+      const dateCompare = String(b.claimedAt || '').localeCompare(String(a.claimedAt || ''));
+      if (dateCompare) return dateCompare;
+      return String(a.className || '').localeCompare(String(b.className || ''), 'zh-Hant')
+        || String(a.studentName || '').localeCompare(String(b.studentName || ''), 'zh-Hant');
+    });
+}
+
+/**
+ * 新增 / 更新一筆領取紀錄。
+ * claimId 由班別 + 姓名 + 第幾個組成，同一獎勵唔可以重複。
+ * 如果之前作廢過同一 claimId，會重新啟用。
+ */
+export async function saveRewardClaim(schoolYear, claim) {
+  if (!schoolYear) throw new Error('缺少學年');
+  const className = String((claim && claim.className) || '').trim();
+  const studentName = String((claim && claim.studentName) || '').trim();
+  const claimNo = Number(claim && claim.claimNo);
+  if (!className || !studentName) throw new Error('缺少班別或學生姓名');
+  if (!Number.isInteger(claimNo) || claimNo < 1) throw new Error('獎勵序號不正確');
+
+  const id = buildRewardClaimId(className, studentName, claimNo);
+  const ref = db.collection('rewardClaims').doc(schoolYear).collection('records').doc(id);
+  const existing = await ref.get();
+  if (existing.exists && existing.data().voided !== true) {
+    throw new Error(`第 ${claimNo} 個獎勵已經領取`);
+  }
+
+  const payload = {
+    className,
+    studentName,
+    claimNo,
+    claimedAt: String((claim && claim.claimedAt) || todayStr()),
+    massCountAtClaim: Number(claim && claim.massCountAtClaim) || 0,
+    rewardLabel: String((claim && claim.rewardLabel) || '').trim(),
+    note: String((claim && claim.note) || '').trim(),
+    source: claim && claim.source === 'import' ? 'import' : 'app',
+    recordedBy: recorderEmail(),
+    voided: false,
+    voidedAt: null,
+    voidedBy: '',
+    voidReason: '',
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  if (existing.exists) {
+    await ref.set(payload, { merge: true });
+  } else {
+    await ref.set({
+      ...payload,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+  return { id, ...payload };
+}
+
+/** 批次新增（給「補錄 N 個」用；逐筆寫入，遇到錯誤會停止並 throw，已寫入的紀錄保留） */
+export async function saveRewardClaims(schoolYear, claims) {
+  const list = Array.isArray(claims) ? claims : [];
+  const saved = [];
+  for (const claim of list) {
+    saved.push(await saveRewardClaim(schoolYear, claim));
+  }
+  return saved;
+}
+
+/** 作廢一筆領取紀錄（保留紀錄，不直接刪除） */
+export async function voidRewardClaim(schoolYear, claimId, reason = '') {
+  if (!schoolYear || !claimId) throw new Error('缺少必要參數');
+  const ref = db.collection('rewardClaims').doc(schoolYear).collection('records').doc(claimId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('找不到這筆領取紀錄');
+  await ref.update({
+    voided: true,
+    voidedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    voidedBy: recorderEmail(),
+    voidReason: String(reason || '').trim(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  return { success: true };
 }
