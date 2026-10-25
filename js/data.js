@@ -34,3 +34,11 @@ export const getNotices = fb.getNotices;
 export const saveNotice = fb.saveNotice;
 export const deleteNotice = fb.deleteNotice;
 export const setNoticePinned = fb.setNoticePinned;
+
+// 班級 2026/27 行事曆文件（config + 草稿；實際 .docx 由 GAS 寫入）
+export const getCalendarConfigs = fb.getCalendarConfigs;
+export const getCalendarConfig = fb.getCalendarConfig;
+export const saveCalendarConfig = fb.saveCalendarConfig;
+export const getClassCalendar = fb.getClassCalendar;
+export const saveClassCalendar = fb.saveClassCalendar;
+export const markClassCalendarPushed = fb.markClassCalendarPushed;

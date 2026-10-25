@@ -32,6 +32,10 @@ async function init(role) {
 
   if (role && role.role === 'admin') {
     $('formLink').classList.remove('hidden');
+    const s = document.getElementById('adminSessionsLink');
+    if (s) s.classList.remove('hidden');
+    const c = document.getElementById('adminCalendarLink');
+    if (c) c.classList.remove('hidden');
   }
   $('gotoRollcallBtn').addEventListener('click', () => {
     const url = `rollcall.html?class=${encodeURIComponent(currentClass)}`;

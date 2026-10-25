@@ -421,3 +421,48 @@ export async function backupFirestoreToDrive() {
   if (data.error) throw new Error(data.error);
   return data;
 }
+
+// ==========================================
+// 班級 2026/27 行事曆 .docx（admin only）
+// ==========================================
+
+/**
+ * 讀取 Google Drive 上嘅班級 .docx，回傳 { docId, docUrl, docTitle, title, tables, rowCount }
+ */
+export async function importClassCalendarDoc(docUrl) {
+  if (!docUrl) throw new Error('請先填寫 Google Doc 連結');
+  const data = await postJSON({ action: 'importClassCalendarDoc', docUrl });
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+/**
+ * 將草稿寫回同一個 .docx（保留檔案 ID / 分享連結）
+ * @param {string} docUrl
+ * @param {{title:string,tables:Array}} calendar
+ */
+export async function publishClassCalendarDoc(docUrl, calendar) {
+  if (!docUrl) throw new Error('請先填寫 Google Doc 連結');
+  if (!calendar || !calendar.title) throw new Error('標題不可空白');
+  const data = await postJSON({ action: 'publishClassCalendarDoc', docUrl, calendar });
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+/** 檢查 .docx 是否可讀（admin debug 用） */
+export async function checkClassCalendarDoc(docUrl) {
+  if (!docUrl) throw new Error('請先填寫 Google Doc 連結');
+  const data = await postJSON({ action: 'checkClassCalendarDoc', docUrl });
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+/** 將 9 個預設文件連結寫入 Firestore calendarConfig（admin only） */
+export async function seedCalendarConfigs() {
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=seedCalendarConfigs&${qs}`;
+  const res = await fetch(url);
+  const data = await parseJson(res);
+  if (data.error) throw new Error(data.error);
+  return data;
+}

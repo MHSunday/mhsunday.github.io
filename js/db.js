@@ -302,6 +302,100 @@ export async function getClassPortal(className) {
 }
 
 // ==========================================
+// 班級 2026/27 行事曆文件（config + 草稿）
+// 實際 .docx 由 GAS 讀寫；Firestore 只存連結設定同草稿。
+// ==========================================
+
+export async function getCalendarConfigs() {
+  const snap = await db.collection('calendarConfig').get();
+  return snap.docs
+    .map(d => ({ classKey: d.id, ...d.data() }))
+    .sort((a, b) => {
+      const ao = Number(a.order) || 0;
+      const bo = Number(b.order) || 0;
+      if (ao !== bo) return ao - bo;
+      return String(a.classKey || '').localeCompare(String(b.classKey || ''), 'zh-Hant');
+    });
+}
+
+export async function getCalendarConfig(classKey) {
+  if (!classKey) throw new Error('缺少班級');
+  const snap = await db.collection('calendarConfig').doc(classKey).get();
+  return snap.exists ? { classKey, ...snap.data() } : null;
+}
+
+export async function saveCalendarConfig(classKey, data) {
+  if (!classKey) throw new Error('缺少班級');
+  const payload = {
+    classKey,
+    className: String((data && data.className) || classKey),
+    docUrl: String((data && data.docUrl) || '').trim(),
+    docId: String((data && data.docId) || '').trim(),
+    docTitle: String((data && data.docTitle) || '').trim(),
+    order: Number(data && data.order) || 0,
+    enabled: !(data && data.enabled === false),
+    updatedAt: new Date().toISOString(),
+    updatedBy: recorderEmail()
+  };
+  await db.collection('calendarConfig').doc(classKey).set(payload, { merge: true });
+  return payload;
+}
+
+function normalizeCalendarTables_(tables) {
+  if (!Array.isArray(tables)) return [];
+  const clean = (v) => String(v == null ? '' : v).replace(/\r\n?/g, '\n');
+  return tables.map(t => ({
+    rows: (t && Array.isArray(t.rows) ? t.rows : []).map(r => {
+      if (r && r.type === 'section') {
+        return { type: 'section', text: clean(r.text) };
+      }
+      return {
+        type: 'row',
+        date: clean(r && r.date),
+        sunday: clean(r && r.sunday),
+        gospel: clean(r && r.gospel),
+        activity: clean(r && r.activity),
+        lesson: clean(r && r.lesson),
+        note: clean(r && r.note)
+      };
+    })
+  }));
+}
+
+export async function getClassCalendar(classKey) {
+  if (!classKey) throw new Error('缺少班級');
+  const snap = await db.collection('classCalendars').doc(classKey).get();
+  return snap.exists ? { classKey, ...snap.data() } : null;
+}
+
+export async function saveClassCalendar(classKey, calendar) {
+  if (!classKey) throw new Error('缺少班級');
+  if (!calendar || !calendar.title) throw new Error('標題不可空白');
+  const payload = {
+    classKey,
+    className: String(calendar.className || classKey),
+    title: String(calendar.title).trim(),
+    tables: normalizeCalendarTables_(calendar.tables),
+    schemaVersion: 1,
+    updatedAt: new Date().toISOString(),
+    updatedBy: recorderEmail()
+  };
+  await db.collection('classCalendars').doc(classKey).set(payload, { merge: true });
+  return payload;
+}
+
+export async function markClassCalendarPushed(classKey, info) {
+  if (!classKey) throw new Error('缺少班級');
+  await db.collection('classCalendars').doc(classKey).set({
+    lastPushedAt: new Date().toISOString(),
+    lastPushedBy: recorderEmail(),
+    lastPushedDocUrl: String((info && info.docUrl) || '').trim(),
+    lastPushedVerified: !!(info && info.verified)
+  }, { merge: true });
+  return { success: true };
+}
+
+// ==========================================
 // 出席%（點名最後要可以輸出返 GAS spreadsheet）
 // ==========================================
 

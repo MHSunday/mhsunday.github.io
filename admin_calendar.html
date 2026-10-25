@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>班級行事曆文件</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Noto Sans TC', sans-serif; }
+    .cal-input {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 0.375rem;
+      padding: 0.25rem 0.4rem;
+      font-size: 0.8125rem;
+      line-height: 1.35rem;
+      resize: none;
+      overflow: hidden;
+      background: #fff;
+    }
+    .cal-input:focus { outline: 2px solid #93c5fd; outline-offset: 0; border-color: #60a5fa; }
+    .cal-table th, .cal-table td { border: 1px solid #d1d5db; vertical-align: top; }
+    .cal-table th { background: #f3f4f6; font-weight: 700; font-size: 0.75rem; padding: 0.4rem; white-space: nowrap; }
+    .cal-table td { padding: 0.3rem; }
+    .preview-table th, .preview-table td { border: 1px solid #6b7280; padding: 0.35rem 0.45rem; vertical-align: middle; font-size: 0.8rem; }
+    .preview-table th { background: #e5e7eb; font-weight: 700; text-align: center; }
+    .preview-table .section-row td { background: #fef3c7; text-align: center; font-weight: 700; }
+    @media print {
+      body * { visibility: hidden; }
+      #previewPrintArea, #previewPrintArea * { visibility: visible; }
+      #previewPrintArea { position: absolute; left: 0; top: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <nav class="bg-blue-700 text-white shadow-lg">
+    <div class="max-w-[1500px] mx-auto px-4 py-3 flex justify-between items-center gap-3">
+      <h1 class="text-xl font-bold whitespace-nowrap">班級行事曆文件</h1>
+      <div class="space-x-4 flex items-center text-sm">
+        <a href="admin_sessions.html" class="hover:underline whitespace-nowrap">上堂日曆</a>
+        <a href="class_portal.html" class="hover:underline whitespace-nowrap">每班Portal</a>
+        <button id="logoutBtn" class="bg-blue-800 px-3 py-1 rounded hover:bg-blue-900 transition whitespace-nowrap">登出</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-[1500px] mx-auto p-4 mt-2 pb-28">
+
+    <!-- 班級 + 文件連結 -->
+    <section class="bg-white rounded-xl shadow-md p-4 mb-4">
+      <div class="flex flex-wrap items-end gap-3">
+        <div>
+          <label for="classSelect" class="block text-sm font-medium text-gray-700 mb-1">班級</label>
+          <select id="classSelect" class="border border-gray-300 rounded-md p-2 min-w-[10rem] text-sm"></select>
+        </div>
+        <div class="flex-1 min-w-[280px]">
+          <label for="docUrlInput" class="block text-sm font-medium text-gray-700 mb-1">
+            Google Drive .docx 連結
+            <span class="text-xs font-normal text-gray-400">（貼上文件網址或檔案 ID）</span>
+          </label>
+          <input id="docUrlInput" type="text" spellcheck="false"
+                 class="w-full border border-gray-300 rounded-md p-2 text-sm"
+                 placeholder="https://docs.google.com/document/d/.../edit">
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button id="saveConfigBtn" data-busy disabled
+                  class="text-sm bg-slate-600 text-white px-3 py-2 rounded hover:bg-slate-700 disabled:opacity-40 transition">
+            儲存連結
+          </button>
+          <button id="importBtn" data-busy disabled
+                  class="text-sm bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 disabled:opacity-40 transition">
+            從 Google Doc 載入
+          </button>
+          <a id="openDocLink" href="#" target="_blank" rel="noopener"
+             class="hidden text-sm bg-gray-100 border border-gray-300 text-gray-700 px-3 py-2 rounded hover:bg-gray-200 transition">
+            開啟文件 ↗
+          </a>
+        </div>
+      </div>
+
+      <div id="configInfo" class="text-xs text-gray-500 mt-3"></div>
+
+      <div id="setupHint" class="hidden mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+        <div class="font-medium">此班尚未連結行事曆文件。</div>
+        <div class="mt-1">你可以直接在上面貼上該班的 Google Drive .docx 連結，或一次匯入 2026/27 的 9 個預設連結。</div>
+        <button id="seedBtn" data-busy
+                class="mt-2 text-sm bg-amber-600 text-white px-3 py-2 rounded hover:bg-amber-700 disabled:opacity-40 transition">
+          匯入預設 9 個文件連結
+        </button>
+      </div>
+    </section>
+
+    <!-- 訊息 -->
+    <div id="message" class="hidden rounded-lg px-4 py-3 text-sm font-medium mb-4"></div>
+
+    <!-- 未載入 -->
+    <section id="emptyCard" class="bg-white rounded-xl shadow-md p-8 text-center text-gray-500">
+      <div class="text-lg font-medium text-gray-700 mb-1">尚未載入行事曆</div>
+      <div class="text-sm">選擇班級後，按「從 Google Doc 載入」開始編輯。</div>
+    </section>
+
+    <!-- 編輯器 -->
+    <section id="editorCard" class="hidden bg-white rounded-xl shadow-md p-4">
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+        <div>
+          <h2 id="editorTitle" class="text-lg font-bold">—</h2>
+          <p id="editorMeta" class="text-xs text-gray-500 mt-1"></p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button id="reloadBtn" data-busy
+                  class="text-sm bg-gray-100 border border-gray-300 text-gray-700 px-3 py-2 rounded hover:bg-gray-200 disabled:opacity-40 transition">
+            重新載入草稿
+          </button>
+          <button id="previewBtn"
+                  class="text-sm bg-sky-600 text-white px-3 py-2 rounded hover:bg-sky-700 transition">
+            預覽
+          </button>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label for="titleInput" class="block text-sm font-medium text-gray-700 mb-1">文件標題</label>
+        <input id="titleInput" type="text"
+               class="w-full border border-gray-300 rounded-md p-2 text-sm font-medium"
+               placeholder="例：9 聖母誕辰主教座堂班 2026">
+        <p class="text-xs text-gray-400 mt-1">會寫入文件第一個段落（保留原本字體／字級）。</p>
+      </div>
+
+      <div id="tableTabs" class="flex flex-wrap gap-2 mb-3"></div>
+      <div id="tableEditor" class="overflow-x-auto"></div>
+
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button id="addRowBtn"
+                class="text-sm bg-blue-50 border border-blue-300 text-blue-700 px-3 py-2 rounded hover:bg-blue-100 transition">
+          ＋ 新增資料列
+        </button>
+        <button id="addSectionBtn"
+                class="text-sm bg-amber-50 border border-amber-300 text-amber-700 px-3 py-2 rounded hover:bg-amber-100 transition">
+          ＋ 新增分段列
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <!-- 底部固定操作條 -->
+  <div id="actionBar" class="hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] z-30">
+    <div class="max-w-[1500px] mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+      <div id="dirtyStatus" class="text-sm text-gray-500"></div>
+      <div class="flex flex-wrap gap-2">
+        <button id="saveDraftBtn" data-busy
+                class="text-sm bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-40 transition">
+          儲存草稿
+        </button>
+        <button id="publishBtn" data-busy
+                class="text-sm bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 disabled:opacity-40 transition">
+          發佈到 Google Doc
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 預覽 modal -->
+  <div id="previewModal" class="hidden fixed inset-0 z-40 bg-black/50 p-2 sm:p-6 overflow-y-auto">
+    <div class="max-w-[1200px] mx-auto bg-white rounded-xl shadow-2xl">
+      <div class="flex items-center justify-between gap-3 border-b px-4 py-3 sticky top-0 bg-white rounded-t-xl z-10">
+        <h2 class="text-lg font-bold">預覽（未寫入文件）</h2>
+        <div class="flex gap-2">
+          <button id="printBtn" class="text-sm bg-gray-100 border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-200">列印</button>
+          <button id="closePreviewBtn" class="text-sm bg-gray-700 text-white px-3 py-1.5 rounded hover:bg-gray-800">關閉</button>
+        </div>
+      </div>
+      <div id="previewPrintArea" class="p-4 sm:p-6"></div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main-calendar-docs.js"></script>
+</body>
+</html>
