@@ -178,8 +178,7 @@ async function loadAllStats(sessions) {
           present,
           rate: classPotential ? Math.round((present / classPotential) * 100) : 0
         };
-      })
-      .sort((a, b) => b.mass - a.mass || b.present - a.present);
+    });
     classStats[cls] = {
       className: cls,
       rows,

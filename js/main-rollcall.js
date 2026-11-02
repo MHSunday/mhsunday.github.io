@@ -410,7 +410,7 @@ async function renderMass() {
         present,
         rate: classPotential ? Math.round((present / classPotential) * 100) : 0
       };
-    }).sort((a, b) => b.mass - a.mass || b.present - a.present);
+    });
 
     const totalMass = rows.reduce((sum, r) => sum + r.mass, 0);
     const totalPresent = rows.reduce((sum, r) => sum + r.present, 0);
