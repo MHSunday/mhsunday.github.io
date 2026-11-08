@@ -62,10 +62,19 @@ export function normalizeRewardConfig(raw, schoolYear = getCurrentSchoolYear()) 
   };
 }
 
-/** 固定 claimId：同一班、同一學生、同一獎勵序號只會有一份 */
-export function buildRewardClaimId(className, studentName, claimNo) {
+/** 固定 claimId：同一班、同一學生、同一類型、同一獎勵序號只會有一份 */
+export function buildRewardClaimId(className, studentName, typeOrClaimNo, claimNoMaybe) {
   const safe = (s) => encodeURIComponent(String(s == null ? '' : s).trim());
-  return `${safe(className)}~${safe(studentName)}~${Number(claimNo) || 0}`;
+  let type = 'mass';
+  let claimNo = 0;
+  if (claimNoMaybe === undefined) {
+    // backward compatible: (className, studentName, claimNo)
+    claimNo = Number(typeOrClaimNo);
+  } else {
+    type = typeOrClaimNo === 'prayer' ? 'prayer' : 'mass';
+    claimNo = Number(claimNoMaybe);
+  }
+  return `${safe(className)}~${safe(studentName)}~${type}~${Number(claimNo) || 0}`;
 }
 
 /** 將全部有效 claim 按班別／學生分組 */
@@ -82,6 +91,22 @@ export function groupClaims(claims) {
     byStudent.get(studentName).push(c);
   }
   return byClass;
+}
+
+/** 取得有 mass=true 的主日日期清單（只限學年範圍內） */
+export function getMassTickDates({ sessions, yearMarks, studentName, startDate = '', endDate = '' }) {
+  const dates = [];
+  for (const sess of sessions || []) {
+    if (!sess || !sess.date) continue;
+    if (startDate && sess.date < startDate) continue;
+    if (endDate && sess.date > endDate) continue;
+    const mark = yearMarks && yearMarks[sess.date] && yearMarks[sess.date][studentName];
+    if (mark && mark.mass === true) {
+      dates.push(sess.date);
+    }
+  }
+  dates.sort((a, b) => a.localeCompare(b));
+  return dates;
 }
 
 /**
@@ -116,16 +141,32 @@ export function computeStudentReward({ student, className, sessions, yearMarks, 
 
   const usedClaimNos = new Set();
   const studentClaims = [];
+  const prayerClaims = [];
+  const usedPrayerNos = new Set();
+
   for (const c of claims || []) {
     if (!c || c.voided === true) continue;
     if (String(c.className || '').trim() !== cls) continue;
     if (String(c.studentName || '').trim() !== name) continue;
+
     const n = Number(c.claimNo);
-    if (!Number.isInteger(n) || n < 1 || usedClaimNos.has(n)) continue;
+    if (!Number.isInteger(n) || n < 1) continue;
+
+    // 祈禱獎勵同彌撒獎勵分開計，避免互相影響
+    if (c.type === 'prayer') {
+      if (usedPrayerNos.has(n)) continue;
+      usedPrayerNos.add(n);
+      prayerClaims.push(c);
+      continue;
+    }
+
+    if (usedClaimNos.has(n)) continue;
     usedClaimNos.add(n);
     studentClaims.push(c);
   }
+
   studentClaims.sort((a, b) => Number(a.claimNo) - Number(b.claimNo));
+  prayerClaims.sort((a, b) => Number(a.claimNo) - Number(b.claimNo));
 
   const claimed = usedClaimNos.size;
   const earned = Math.floor(massCount / threshold);
@@ -137,9 +178,16 @@ export function computeStudentReward({ student, className, sessions, yearMarks, 
     (max, c) => (String(c.claimedAt || '') > max ? String(c.claimedAt || '') : max),
     ''
   );
+  const lastPrayerClaimedAt = prayerClaims.reduce(
+    (max, c) => (String(c.claimedAt || '') > max ? String(c.claimedAt || '') : max),
+    ''
+  );
 
   let nextClaimNo = 1;
   while (usedClaimNos.has(nextClaimNo)) nextClaimNo++;
+
+  let nextPrayerClaimNo = 1;
+  while (usedPrayerNos.has(nextPrayerClaimNo)) nextPrayerClaimNo++;
 
   return {
     className: cls,
@@ -157,7 +205,11 @@ export function computeStudentReward({ student, className, sessions, yearMarks, 
     nextMilestone: massCount + toNext,
     nextClaimNo,
     lastClaimedAt,
-    claims: studentClaims
+    claims: studentClaims,
+    prayerClaims,
+    prayerClaimed: prayerClaims.length,
+    lastPrayerClaimedAt,
+    nextPrayerClaimNo
   };
 }
 
@@ -165,8 +217,8 @@ export function computeStudentReward({ student, className, sessions, yearMarks, 
 export function buildClassRewardRows({ className, roster, sessions, yearMarks, claims, config }) {
   const allowed = new Set((config && config.categories) || REWARD_CATEGORIES);
   const rows = (roster || [])
-    .filter(s => s && s.name && allowed.has(s.category))
-    .map(s => computeStudentReward({ student: s, className, sessions, yearMarks, claims, config }));
+    .filter(s => s && s.name && allowed.has(s.category || '學生'))
+    .map(s => computeStudentReward({ student: { ...s, category: s.category || '學生' }, className, sessions, yearMarks, claims, config }));
   rows.sort((a, b) =>
     b.pending - a.pending ||
     b.massCount - a.massCount ||
@@ -187,6 +239,7 @@ export function summarizeRewardRows(rows, threshold = REWARD_THRESHOLD) {
   let pendingStudents = 0;
   let fullyClaimedStudents = 0;
   let noMassStudents = 0;
+  let prayerTotal = 0;
 
   for (const r of list) {
     massTotal += r.massCount;
@@ -194,6 +247,7 @@ export function summarizeRewardRows(rows, threshold = REWARD_THRESHOLD) {
     claimedTotal += r.claimed;
     pendingTotal += r.pending;
     overClaimedTotal += r.overClaimed;
+    prayerTotal += Number(r.prayerClaimed) || 0;
     if (r.pending > 0) pendingStudents++;
     if (r.earned > 0 && r.pending === 0 && r.overClaimed === 0) fullyClaimedStudents++;
     if (r.massCount === 0) noMassStudents++;
@@ -208,6 +262,7 @@ export function summarizeRewardRows(rows, threshold = REWARD_THRESHOLD) {
     claimedTotal,
     pendingTotal,
     overClaimedTotal,
+    prayerTotal,
     pendingStudents,
     fullyClaimedStudents,
     noMassStudents,

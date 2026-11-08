@@ -191,11 +191,16 @@ export async function saveRollCall(className, date, records) {
   }, { merge: true });
 
   // 物化 parent doc（令 collection 可枚舉 + lastDate 方便查詢）
-  await db.collection('rollcalls').doc(className).set({
-    className: className,
-    lastDate: date,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  }, { merge: true });
+  // 只限 admin 可寫；teacher 寫入時會權限不足，略過即可，唔應該阻礙點名儲存。
+  try {
+    await db.collection('rollcalls').doc(className).set({
+      className: className,
+      lastDate: date,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  } catch (e) {
+    console.debug('[rollcall] skip parent doc (no permission):', e && (e.code || e.message));
+  }
 
   return { success: true, updated: updated, added: 0 };
 }
@@ -731,7 +736,13 @@ export async function syncPermissionsFromGAS() {
 // 路徑：
 //   /rewardConfig/{schoolYear}
 //   /rewardClaims/{schoolYear}/records/{claimId}
-// ==========================================
+//   /rewardCounts/{schoolYear}/students/{key}  (祈禱次數，手動輸入)
+// ========================================== 
+
+function rewardStudentKey(className, studentName) {
+  const safe = (s) => encodeURIComponent(String(s == null ? '' : s).trim());
+  return `${safe(className)}__${safe(studentName)}`;
+}
 
 /** 讀取獎勵設定；未建立文件時用預設值（5 次、9 月至翌年 5 月、只計學生） */
 export async function getRewardConfig(schoolYear) {
@@ -758,7 +769,11 @@ export async function getRewardClaims(schoolYear, { includeVoided = false } = {}
   if (!schoolYear) return [];
   const snap = await db.collection('rewardClaims').doc(schoolYear).collection('records').get();
   return snap.docs
-    .map(d => ({ id: d.id, ...d.data() }))
+    .map(d => {
+      const data = d.data() || {};
+      const type = data.type === 'prayer' ? 'prayer' : 'mass';
+      return { id: d.id, ...data, type };
+    })
     .filter(c => includeVoided || c.voided !== true)
     .sort((a, b) => {
       const dateCompare = String(b.claimedAt || '').localeCompare(String(a.claimedAt || ''));
@@ -770,7 +785,7 @@ export async function getRewardClaims(schoolYear, { includeVoided = false } = {}
 
 /**
  * 新增 / 更新一筆領取紀錄。
- * claimId 由班別 + 姓名 + 第幾個組成，同一獎勵唔可以重複。
+ * claimId 由班別 + 姓名 + 類型 + 第幾個組成，同一獎勵唔可以重複。
  * 如果之前作廢過同一 claimId，會重新啟用。
  */
 export async function saveRewardClaim(schoolYear, claim) {
@@ -778,10 +793,13 @@ export async function saveRewardClaim(schoolYear, claim) {
   const className = String((claim && claim.className) || '').trim();
   const studentName = String((claim && claim.studentName) || '').trim();
   const claimNo = Number(claim && claim.claimNo);
+  const type = claim && claim.type === 'prayer' ? 'prayer' : 'mass';
   if (!className || !studentName) throw new Error('缺少班別或學生姓名');
   if (!Number.isInteger(claimNo) || claimNo < 1) throw new Error('獎勵序號不正確');
 
-  const id = buildRewardClaimId(className, studentName, claimNo);
+  const id = (typeof buildRewardClaimId === 'function' && buildRewardClaimId.length >= 4)
+    ? buildRewardClaimId(className, studentName, type, claimNo)
+    : `${encodeURIComponent(className)}~${encodeURIComponent(studentName)}~${type}~${claimNo}`;
   const ref = db.collection('rewardClaims').doc(schoolYear).collection('records').doc(id);
   const existing = await ref.get();
   if (existing.exists && existing.data().voided !== true) {
@@ -791,9 +809,11 @@ export async function saveRewardClaim(schoolYear, claim) {
   const payload = {
     className,
     studentName,
+    type,
     claimNo,
     claimedAt: String((claim && claim.claimedAt) || todayStr()),
     massCountAtClaim: Number(claim && claim.massCountAtClaim) || 0,
+    prayerCountAtClaim: Number(claim && claim.prayerCountAtClaim) || 0,
     rewardLabel: String((claim && claim.rewardLabel) || '').trim(),
     note: String((claim && claim.note) || '').trim(),
     source: claim && claim.source === 'import' ? 'import' : 'app',
@@ -840,4 +860,41 @@ export async function voidRewardClaim(schoolYear, claimId, reason = '') {
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   });
   return { success: true };
+}
+
+/** 讀取祈禱次數（手動輸入） */
+export async function getPrayerCount(schoolYear, className, studentName) {
+  if (!schoolYear || !className || !studentName) return 0;
+  const key = rewardStudentKey(className, studentName);
+  const snap = await db.collection('rewardCounts').doc(schoolYear).collection('students').doc(key).get();
+  if (!snap.exists) return 0;
+  const data = snap.data() || {};
+  return Number(data.prayerCount) || 0;
+}
+
+/** 讀取整個學年全部祈禱次數 */
+export async function getAllPrayerCounts(schoolYear) {
+  if (!schoolYear) return new Map();
+  const snap = await db.collection('rewardCounts').doc(schoolYear).collection('students').get();
+  const map = new Map();
+  snap.forEach(doc => {
+    const data = doc.data() || {};
+    map.set(doc.id, Number(data.prayerCount) || 0);
+  });
+  return map;
+}
+
+/** 儲存祈禱次數（管理員用） */
+export async function savePrayerCount(schoolYear, className, studentName, prayerCount) {
+  if (!schoolYear || !className || !studentName) throw new Error('缺少必要參數');
+  const key = rewardStudentKey(className, studentName);
+  const ref = db.collection('rewardCounts').doc(schoolYear).collection('students').doc(key);
+  await ref.set({
+    className,
+    studentName,
+    prayerCount: Math.max(0, Number(prayerCount) || 0),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: recorderEmail()
+  }, { merge: true });
+  return { success: true, prayerCount: Math.max(0, Number(prayerCount) || 0) };
 }

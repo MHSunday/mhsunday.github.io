@@ -46,7 +46,16 @@ function initDetailsPage(className) {
     const user = getCurrentUser();
     if (!user) return;
 
-    if (role.role === 'teacher' && role.classes[0] !== className) {
+    // 校務團（staff）冇班級明細權限
+    if (role.role === 'staff') {
+      messageEl.innerHTML = '<span style="color:red">此頁只限教職員使用</span>';
+      setTimeout(() => window.location.replace('./staff.html'), 1500);
+      return;
+    }
+
+    // 老師只可以睇自己嘅班（role.classes 可能多過一班）
+    const allowedClasses = Array.isArray(role.classes) ? role.classes : [];
+    if (role.role === 'teacher' && !allowedClasses.includes(className)) {
       alert('您無權查看此班級');
       window.location.href = 'stat.html';
       return;

@@ -222,6 +222,16 @@
           showMessage('尚未登入，請回到首頁登入', true);
           return;
         }
+
+        // 未頒發列印只限管理員（後端 API 亦只准 admin）
+        if (!role || role.role !== 'admin') {
+          showMessage('此頁只限管理員使用', true);
+          setTimeout(() => {
+            window.location.replace(role && role.role === 'staff' ? './staff.html' : './stat.html');
+          }, 1500);
+          return;
+        }
+
         try {
           const classes = await getAllClasses();
           classOrder = [...classes];

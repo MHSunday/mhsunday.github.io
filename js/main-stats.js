@@ -22,6 +22,9 @@ function initStatsPage() {
   const achievedTab = document.getElementById('achievedTab');
   const unredeemedTab = document.getElementById('unredeemedTab');
 
+  // 未頒發名單只限管理員（API 亦只准 admin）
+  let canViewUnredeemed = false;
+
   // 登出
   document.getElementById('logoutBtn').onclick = logout;
 
@@ -127,6 +130,7 @@ function initStatsPage() {
 
   // 新增未補領禮物名單頁籤切換功能
   unredeemedTab.addEventListener('click', async () => {
+    if (!canViewUnredeemed) return;
     const user = getCurrentUser();
     if (!user) return;
 
@@ -146,6 +150,21 @@ function initStatsPage() {
   onRoleLoaded(async (role) => {
     const user = getCurrentUser();
     if (!user) return;
+
+    // 校務團（staff）冇統計權限，返校務看板
+    if (role.role === 'staff') {
+      messageEl.innerHTML = '<span style="color:red">此頁只限教職員使用</span>';
+      setTimeout(() => window.location.replace('./staff.html'), 1500);
+      return;
+    }
+
+    // 只有管理員可以睇「未頒發禮物」及登記／頒發入口
+    canViewUnredeemed = role.role === 'admin';
+    if (!canViewUnredeemed) {
+      if (unredeemedTab) unredeemedTab.classList.add('hidden');
+      document.getElementById('formNavBtn')?.classList.add('hidden');
+      document.getElementById('redeemNavBtn')?.classList.add('hidden');
+    }
 
     try {
       const classes = await getAllClasses();

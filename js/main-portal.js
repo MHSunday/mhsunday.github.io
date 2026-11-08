@@ -87,6 +87,11 @@ async function loadPortal() {
       getClassPortal(currentClass),
       getRollCallYear(currentClass)
     ]);
+    // 更新頂部導覽列的「獎勵統計」連結，帶入班級參數
+    const rewardLink = $('rewardLink');
+    if (rewardLink) {
+      rewardLink.href = `reward.html?class=${encodeURIComponent(currentClass)}`;
+    }
     renderToday(p);
     renderActions(p);
     renderRoster(p);

@@ -1,5 +1,6 @@
-// js/main-rewards.js — 彌撒獎勵（每 5 次）統計頁
-// Global View / Input View / Report
+// js/main-rewards.js — 彌撒／祈禱獎勵統計
+// 版面：① 本班獎勵狀況（所有角色） ② 輸入領取（admin） ③ 點名核對（admin）
+
 import {
   getAllClasses, getSessions, getRoster, getRollCallYear,
   getRewardConfig, getRewardClaims, saveRewardClaims, voidRewardClaim,
@@ -23,10 +24,10 @@ let sessions = [];
 let classes = [];
 let allClaims = [];
 let classData = new Map();
-let currentTab = 'global';
 let inputClass = '';
-let reportClass = '*';
+let quickSelected = null; // { className, studentName }
 let claimContext = null;
+let saving = false;
 
 // ---------- helpers ----------
 
@@ -35,12 +36,48 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function setMessage(text, type = 'info') {
+function setMessage(text, type = 'info', action = null) {
   const el = $('message');
   if (!el) return;
-  el.textContent = text || '';
   const color = type === 'error' ? 'text-red-600' : type === 'success' ? 'text-green-600' : 'text-gray-500';
-  el.className = `max-w-7xl mx-auto px-3 pt-2 text-sm font-medium min-h-[1.5rem] ${color}`;
+  el.className = `no-print max-w-7xl mx-auto px-3 pt-2 text-sm font-medium min-h-[1.5rem] flex flex-wrap items-center gap-2 ${color}`;
+  el.textContent = '';
+
+  const span = document.createElement('span');
+  span.textContent = text || '';
+  el.appendChild(span);
+
+  if (action && typeof action.onClick === 'function') {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'text-xs px-2 py-1 rounded bg-white border border-gray-300 text-gray-700 hover:bg-gray-100';
+    btn.textContent = action.label || '撤銷';
+    btn.addEventListener('click', action.onClick);
+    el.appendChild(btn);
+  }
+}
+
+let undoing = false;
+
+/** 即時撤銷剛登記的紀錄（作廢，保留審計） */
+async function undoClaims(claims, doneText = '已撤銷登記') {
+  const list = (claims || []).filter(c => c && c.id);
+  if (!list.length || undoing) return;
+
+  undoing = true;
+  try {
+    for (const c of list) {
+      await voidRewardClaim(schoolYear, c.id, '即時撤銷');
+    }
+    setMessage(doneText, 'success');
+    await reloadClaims();
+  } catch (err) {
+    console.error(err);
+    setMessage(`撤銷失敗：${err.message}`, 'error');
+    try { await reloadClaims(); } catch (_) { /* ignore */ }
+  } finally {
+    undoing = false;
+  }
 }
 
 function urlParam(name) {
@@ -52,10 +89,7 @@ function escapeHtml(s) {
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]));
 }
-
-function escapeAttr(s) {
-  return escapeHtml(s);
-}
+const escapeAttr = escapeHtml;
 
 function lastMarkedDate(yearMarks) {
   const dates = Object.keys(yearMarks || {}).filter(date => {
@@ -65,34 +99,18 @@ function lastMarkedDate(yearMarks) {
   return dates.sort().pop() || '';
 }
 
-function rowsForClass(className) {
+function isAdmin() {
+  return !!role && role.role === 'admin';
+}
+
+function currentClassData() {
+  return classData.get(inputClass) || null;
+}
+
+function findRow(className, studentName) {
   const data = classData.get(className);
-  return data ? data.rows : [];
-}
-
-function rowFor(className, studentName) {
-  return rowsForClass(className).find(r => r.studentName === studentName) || null;
-}
-
-function filterRows(rows, { status = 'all', search = '' } = {}) {
-  const q = String(search || '').trim().toLowerCase();
-  return (rows || []).filter(r => {
-    if (q && !String(r.studentName || '').toLowerCase().includes(q)) return false;
-    if (status === 'pending') return r.pending > 0;
-    if (status === 'claimed') return r.earned > 0 && r.pending === 0 && r.overClaimed === 0;
-    if (status === 'over') return r.overClaimed > 0;
-    if (status === 'nomass') return r.massCount === 0;
-    return true;
-  });
-}
-
-function allRows() {
-  return classes.flatMap(cls => rowsForClass(cls));
-}
-
-function maxDataDate() {
-  const dates = classes.map(cls => (classData.get(cls) || {}).lastRollcallDate || '');
-  return dates.sort().pop() || '';
+  if (!data) return null;
+  return (data.rows || []).find(r => r.studentName === studentName) || null;
 }
 
 // ---------- init ----------
@@ -111,37 +129,31 @@ async function init(loadedRole) {
   $('homeLink').href = role.role === 'staff' ? './staff.html' : './class_portal.html';
   $('logoutBtn').addEventListener('click', logout);
 
-  if (role.role !== 'admin') {
-    $('tabInputBtn').classList.add('hidden');
-  }
-
   setupYearSelect();
-  setupTabs();
-  setupFilters();
-  setupDialogs();
+  setupClassSelect();
+  setupClaimDialog();
   setupActionDelegation();
+  setupQuickStudentSearch();
 
-  $('yearSelect').addEventListener('change', async (e) => {
-    schoolYear = e.target.value;
-    config = getDefaultRewardConfig(schoolYear);
-    await loadAll();
-  });
-  $('refreshBtn').addEventListener('click', refreshData);
+  if ($('refreshBtn')) $('refreshBtn').addEventListener('click', refreshData);
+  if ($('printBtn')) $('printBtn').addEventListener('click', () => window.print());
+  if ($('checkRefresh')) $('checkRefresh').addEventListener('click', () => renderCheck());
 
-  const urlTab = urlParam('tab');
-  if (urlTab && ['global', 'input', 'report'].includes(urlTab)) currentTab = urlTab;
-  if (currentTab === 'input' && role.role !== 'admin') currentTab = 'global';
-
-  const urlStatus = urlParam('status');
-  if (urlStatus && ['pending', 'all', 'claimed', 'over', 'nomass'].includes(urlStatus)) {
-    $('inputStatusFilter').value = urlStatus;
-    $('reportStatusFilter').value = urlStatus;
-  }
+  const dateEl = $('claimDateInput');
+  if (dateEl) dateEl.value = todayStr();
 
   await loadAll();
 
+  // 支援 ?student=姓名：自動選中該學生（跨班亦可）
+  const urlStudent = urlParam('student');
+  if (urlStudent) {
+    const index = buildStudentIndex();
+    const target = index.find(m => m.studentName === urlStudent && m.className === inputClass)
+      || index.find(m => m.studentName === urlStudent);
+    if (target) selectStudent(target.className, target.studentName);
+  }
+
   if (urlParam('print') === '1') {
-    switchTab('report');
     setTimeout(() => window.print(), 400);
   }
 }
@@ -153,85 +165,60 @@ function setupYearSelect() {
   if (!years.includes(schoolYear)) years.unshift(schoolYear);
 
   const sel = $('yearSelect');
-  sel.innerHTML = '';
-  years.forEach(y => {
-    const opt = document.createElement('option');
-    opt.value = y;
-    opt.textContent = y;
-    sel.appendChild(opt);
-  });
-  sel.value = schoolYear;
-  // 未有 Firestore 設定前先用預設值，避免載入期間切換 tab 讀到 null
+  if (sel) {
+    sel.innerHTML = '';
+    years.forEach(y => {
+      const opt = document.createElement('option');
+      opt.value = y;
+      opt.textContent = y;
+      sel.appendChild(opt);
+    });
+    sel.value = schoolYear;
+    sel.addEventListener('change', async (e) => {
+      schoolYear = e.target.value;
+      config = getDefaultRewardConfig(schoolYear);
+      quickSelected = null;
+      await loadAll();
+    });
+  }
   config = getDefaultRewardConfig(schoolYear);
 }
 
-function setupTabs() {
-  document.querySelectorAll('[data-tab]').forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
-  });
-}
-
-function setupFilters() {
-  $('inputClassSelect').addEventListener('change', (e) => {
+function setupClassSelect() {
+  const sel = $('classSelect');
+  if (!sel) return;
+  sel.addEventListener('change', (e) => {
     inputClass = e.target.value;
-    renderInput();
-  });
-  $('inputSearch').addEventListener('input', renderInput);
-  $('inputStatusFilter').addEventListener('change', renderInput);
-
-  $('reportClassSelect').addEventListener('change', (e) => {
-    reportClass = e.target.value;
-    renderReport();
-  });
-  $('reportStatusFilter').addEventListener('change', renderReport);
-  $('reportSearch').addEventListener('input', renderReport);
-  $('reportFrom').addEventListener('change', renderReport);
-  $('reportTo').addEventListener('change', renderReport);
-
-  $('printBtn').addEventListener('click', printReport);
-  $('exportCsvBtn').addEventListener('click', exportStudentCsv);
-  $('exportClaimsCsvBtn').addEventListener('click', exportClaimsCsv);
-}
-
-function setupDialogs() {
-  $('claimCancel').addEventListener('click', closeClaimDialog);
-  $('claimCancelTop').addEventListener('click', closeClaimDialog);
-  $('claimConfirm').addEventListener('click', confirmClaim);
-  $('claimCount').addEventListener('input', updateClaimPreview);
-  $('historyClose').addEventListener('click', () => $('historyDialog').close());
-  $('historyCloseTop').addEventListener('click', () => $('historyDialog').close());
-}
-
-function setupActionDelegation() {
-  document.addEventListener('click', async (e) => {
-    const el = e.target.closest('[data-action]');
-    if (!el) return;
-    const action = el.dataset.action;
-
-    if (action === 'goto-report') {
-      e.preventDefault();
-      const cls = el.dataset.class;
-      if (cls) {
-        reportClass = cls;
-        $('reportClassSelect').value = cls;
-      }
-      switchTab('report');
-      return;
-    }
-
-    if (action === 'claim') {
-      openClaimDialog('single', el.dataset.class, el.dataset.name);
-    } else if (action === 'batch') {
-      openClaimDialog('batch', el.dataset.class, el.dataset.name);
-    } else if (action === 'history') {
-      openHistoryDialog(el.dataset.class, el.dataset.name);
-    } else if (action === 'void') {
-      await handleVoidClaim(el);
-    }
+    quickSelected = null;
+    syncUrlClass();
+    renderAll();
   });
 }
 
-// ---------- load ----------
+function syncUrlClass(studentName) {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (inputClass) params.set('class', inputClass);
+    else params.delete('class');
+    if (studentName) params.set('student', studentName);
+    else params.delete('student');
+    const qs = params.toString();
+    window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+  } catch (_) { /* history API 不可用時忽略 */ }
+}
+
+function fillClassSelect() {
+  const sel = $('classSelect');
+  if (!sel) return;
+  sel.innerHTML = '';
+  classes.forEach(cls => {
+    const opt = document.createElement('option');
+    opt.value = cls;
+    opt.textContent = cls;
+    sel.appendChild(opt);
+  });
+  sel.value = inputClass;
+}
 
 async function loadAll() {
   setMessage(`載入 ${schoolYear} 資料中…`);
@@ -247,10 +234,7 @@ async function loadAll() {
     });
 
     const [loadedConfig, loadedSessions, loadedClasses, loadedClaims] = await Promise.all([
-      configPromise,
-      getSessions(),
-      getAllClasses(),
-      claimsPromise
+      configPromise, getSessions(), getAllClasses(), claimsPromise
     ]);
 
     config = loadedConfig;
@@ -266,16 +250,19 @@ async function loadAll() {
 
     if (!classes.length) {
       setMessage('您沒有可用的班級權限', 'error');
-      renderAll();
       return;
     }
 
-    fillClassSelects();
+    const urlClass = urlParam('class');
+    if (urlClass && classes.includes(urlClass)) inputClass = urlClass;
+    else if (!inputClass || !classes.includes(inputClass)) inputClass = classes[0];
+
+    fillClassSelect();
     await loadClassData();
     renderAll();
-    switchTab(currentTab);
+
     if (rewardAccessError) {
-      setMessage(`已載入班級資料，但獎勵資料讀取失敗：${rewardAccessError.message}。請確認 Firestore rules 已發布。`, 'error');
+      setMessage(`獎勵資料讀取失敗：${rewardAccessError.message}。請確認 Firestore rules 已發布。`, 'error');
     } else {
       setMessage(`已載入 ${classes.length} 班 · ${sessions.length} 個主日 · 資料截至 ${maxDataDate() || '—'}`);
     }
@@ -283,6 +270,11 @@ async function loadAll() {
     console.error(err);
     setMessage(`載入失敗：${err.message}`, 'error');
   }
+}
+
+function maxDataDate() {
+  const dates = classes.map(cls => (classData.get(cls) || {}).lastRollcallDate || '');
+  return dates.sort().pop() || '';
 }
 
 async function loadClassData() {
@@ -310,7 +302,12 @@ function rebuildRows() {
 }
 
 async function reloadClaims() {
-  allClaims = await getRewardClaims(schoolYear);
+  try {
+    allClaims = await getRewardClaims(schoolYear);
+  } catch (err) {
+    console.error(err);
+    setMessage(`重新載入獎勵紀錄失敗：${err.message}`, 'error');
+  }
   rebuildRows();
   renderAll();
 }
@@ -324,425 +321,765 @@ async function refreshData() {
   await loadAll();
 }
 
-function fillClassSelects() {
-  const requested = urlParam('class');
-
-  const inputSel = $('inputClassSelect');
-  inputSel.innerHTML = '';
-  classes.forEach(cls => {
-    const opt = document.createElement('option');
-    opt.value = cls;
-    opt.textContent = cls;
-    inputSel.appendChild(opt);
-  });
-  if (requested && classes.includes(requested)) inputClass = requested;
-  if (!classes.includes(inputClass)) inputClass = classes[0] || '';
-  inputSel.value = inputClass;
-
-  const reportSel = $('reportClassSelect');
-  reportSel.innerHTML = '';
-  const allowAll = role.role !== 'teacher' || classes.length > 1;
-  if (allowAll) {
-    const opt = document.createElement('option');
-    opt.value = '*';
-    opt.textContent = role.role === 'teacher' ? '全部（我的班）' : '全部班別';
-    reportSel.appendChild(opt);
-  }
-  classes.forEach(cls => {
-    const opt = document.createElement('option');
-    opt.value = cls;
-    opt.textContent = cls;
-    reportSel.appendChild(opt);
-  });
-
-  if (requested && classes.includes(requested)) reportClass = requested;
-  if (!allowAll) reportClass = classes[0] || '';
-  if (reportClass !== '*' && !classes.includes(reportClass)) {
-    reportClass = allowAll ? '*' : (classes[0] || '');
-  }
-  if (reportClass === '*' && !allowAll) reportClass = classes[0] || '';
-  reportSel.value = reportClass;
-}
-
-function switchTab(name) {
-  if (name === 'input' && role.role !== 'admin') name = 'global';
-  currentTab = name;
-
-  $('globalView').classList.toggle('hidden', name !== 'global');
-  $('inputView').classList.toggle('hidden', name !== 'input');
-  $('reportView').classList.toggle('hidden', name !== 'report');
-
-  document.querySelectorAll('[data-tab]').forEach(btn => {
-    const active = btn.dataset.tab === name;
-    btn.classList.toggle('border-blue-600', active);
-    btn.classList.toggle('text-blue-700', active);
-    btn.classList.toggle('border-transparent', !active);
-    btn.classList.toggle('text-gray-500', !active);
-  });
-
-  if (name === 'global') renderGlobal();
-  else if (name === 'input') renderInput();
-  else renderReport();
-}
+// ---------- renderAll ----------
 
 function renderAll() {
-  if (!classes.length) {
-    renderEmptyState();
-    return;
-  }
-  renderGlobal();
-  renderInput();
   renderReport();
+  renderInput();
+  renderCheck();
 }
 
-function renderEmptyState() {
-  $('globalStatus').textContent = '沒有可用班級';
-  $('globalKpis').innerHTML = '';
-  $('globalClassBody').innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center text-gray-400">沒有可用班級</td></tr>';
-  $('globalClassFoot').innerHTML = '';
-  $('progressBars').innerHTML = '<p class="text-gray-400">沒有資料</p>';
-  $('topPendingList').innerHTML = '<p class="text-gray-400">沒有資料</p>';
-  $('globalRecentClaims').innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-gray-400">暫無紀錄</td></tr>';
-  $('inputStudentBody').innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center text-gray-400">沒有可用班級</td></tr>';
-  $('inputRecentClaims').innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-gray-400">暫無紀錄</td></tr>';
-  $('reportSummary').innerHTML = '';
-  $('reportContent').innerHTML = '<div class="bg-white rounded-xl border border-gray-200 p-6 text-center text-gray-400">沒有可用班級</div>';
-  $('reportClaimsBody').innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-gray-400">暫無紀錄</td></tr>';
-}
+// ---------- ① 本班獎勵狀況 ----------
 
-// ---------- Global View ----------
-
-function renderGlobal() {
+function renderReport() {
   if (!config) return;
-  const rows = allRows();
-  const summary = summarizeRewardRows(rows, config.threshold);
-  const threshold = config.threshold;
+  const data = currentClassData();
+  const label = $('reportClassLabel');
+  if (label) label.textContent = inputClass || '—';
 
-  $('globalStatus').textContent = `${schoolYear} · 每 ${threshold} 次彌撒 1 個獎勵 · 只計學生 · 資料截至 ${maxDataDate() || '—'}`;
-
-  $('globalKpis').innerHTML = [
-    { label: '學生', value: summary.studentCount, unit: '人', color: 'text-gray-800' },
-    { label: '彌撒人次', value: summary.massTotal, unit: '次', color: 'text-orange-600' },
-    { label: '應得獎勵', value: summary.earnedTotal, unit: '個', color: 'text-blue-700' },
-    { label: '已領取', value: summary.claimedTotal, unit: '個', color: 'text-emerald-700' },
-    { label: '待領取', value: summary.pendingTotal, unit: '個', color: summary.pendingTotal ? 'text-red-600' : 'text-gray-500' },
-    { label: '領取率', value: `${summary.rate}%`, unit: '', color: 'text-purple-700' }
-  ].map(c => `
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 px-3 py-3">
-      <div class="text-xs text-gray-500">${c.label}</div>
-      <div class="kpi-number text-2xl font-bold ${c.color} mt-1">${c.value}<span class="text-xs font-normal text-gray-400 ml-1">${c.unit}</span></div>
-    </div>
-  `).join('');
-
-  renderGlobalWarnings(rows, summary);
-  renderGlobalClassTable(rows);
-  renderProgressBars(summary.progressCounts, threshold);
-  renderTopPending(rows);
-  renderRecentClaims($('globalRecentClaims'), allClaims.slice(0, 10), { showClass: true, showVoid: false });
-}
-
-function renderGlobalWarnings(rows, summary) {
-  const warnings = [];
-  const noMassClasses = classes.filter(cls => {
-    const data = classData.get(cls);
-    return data && data.rows.length > 0 && data.summary.massTotal === 0;
-  });
-  if (noMassClasses.length) {
-    warnings.push(`以下班級未有彌撒點名資料：${noMassClasses.map(escapeHtml).join('、')}`);
-  }
-  const overRows = rows.filter(r => r.overClaimed > 0);
-  if (overRows.length) {
-    warnings.push(`有 ${overRows.length} 位學生已領取多過目前點名應得數，請檢查：${overRows.slice(0, 5).map(r => `${escapeHtml(r.className)} ${escapeHtml(r.studentName)}`).join('、')}${overRows.length > 5 ? '…' : ''}`);
-  }
-  if (summary.studentCount === 0) {
-    warnings.push('目前沒有學生資料。');
+  const printTitle = $('printTitle');
+  if (printTitle) printTitle.textContent = `${inputClass || ''} 彌撒獎勵統計`;
+  const printSubtitle = $('printSubtitle');
+  if (printSubtitle) {
+    printSubtitle.textContent = `${schoolYear} 學年 · 列印日期 ${todayStr()} · 彌撒每 ${config.threshold} 次可領 1 個`;
   }
 
-  const el = $('globalWarnings');
-  if (!warnings.length) {
-    el.classList.add('hidden');
-    el.innerHTML = '';
-    return;
-  }
-  el.classList.remove('hidden');
-  el.innerHTML = warnings.map(w => `<div class="flex gap-2"><span>⚠️</span><span>${w}</span></div>`).join('');
-}
+  const summaryEl = $('reportSummary');
+  const statusEl = $('reportStatusText');
+  const body = $('reportBody');
+  const noData = $('noDataAlert');
 
-function renderGlobalClassTable(rows) {
-  const body = $('globalClassBody');
-  const foot = $('globalClassFoot');
-
-  if (!classes.length) {
-    body.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center text-gray-400">沒有班級</td></tr>';
-    foot.innerHTML = '';
+  if (!data) {
+    if (summaryEl) summaryEl.innerHTML = '';
+    if (statusEl) statusEl.textContent = '沒有班級資料';
+    if (body) body.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center text-gray-400">沒有班級資料</td></tr>';
+    if (noData) noData.classList.add('hidden');
     return;
   }
 
-  body.innerHTML = classes.map(cls => {
-    const data = classData.get(cls);
-    if (!data) return '';
-    const s = data.summary;
-    const massCell = s.massTotal === 0
-      ? '<span class="text-red-600 font-bold">無資料</span>'
-      : String(s.massTotal);
+  const rows = data.rows || [];
+  const summary = data.summary || summarizeRewardRows(rows, config.threshold);
+  const withMass = rows.filter(r => r.massCount > 0).length;
+
+  if (statusEl) {
+    statusEl.textContent = `${rows.length} 位學生 · ${withMass} 位有彌撒紀錄 · 資料截至 ${data.lastRollcallDate || '—'}`;
+  }
+
+  if (summaryEl) {
+    summaryEl.innerHTML = [
+      { label: '學生', value: summary.studentCount, unit: '人', color: 'text-gray-800' },
+      { label: '彌撒', value: summary.massTotal, unit: '次', color: 'text-orange-600' },
+      { label: '應得', value: summary.earnedTotal, unit: '個', color: 'text-blue-700' },
+      { label: '已領', value: summary.claimedTotal, unit: '個', color: 'text-emerald-700' },
+      { label: '待領', value: summary.pendingTotal, unit: '個', color: summary.pendingTotal ? 'text-red-600' : 'text-gray-500' },
+      { label: '祈禱已領', value: summary.prayerTotal || 0, unit: '個', color: 'text-purple-700' }
+    ].map(c => `
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 px-3 py-3">
+        <div class="text-[11px] text-gray-500">${c.label}</div>
+        <div class="kpi-number text-xl font-bold ${c.color} mt-0.5">${c.value}<span class="text-[11px] font-normal text-gray-400 ml-1">${c.unit}</span></div>
+      </div>
+    `).join('');
+  }
+
+  if (noData) {
+    noData.classList.toggle('hidden', !(rows.length === 0 || rows.every(r => r.massCount === 0)));
+  }
+
+  if (!body) return;
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center text-gray-400">沒有學生資料</td></tr>';
+    return;
+  }
+
+  body.innerHTML = rows.map((r, i) => {
+    const pendingColor = r.pending > 0 ? 'text-red-600' : 'text-gray-400';
+    const lastLines = [];
+    if (r.lastClaimedAt) lastLines.push(`<div><span class="text-orange-500">彌</span> ${escapeHtml(r.lastClaimedAt)}</div>`);
+    if (r.lastPrayerClaimedAt) lastLines.push(`<div><span class="text-purple-500">祈</span> ${escapeHtml(r.lastPrayerClaimedAt)}</div>`);
     return `
       <tr class="border-t border-gray-100 hover:bg-blue-50">
-        <td class="px-3 py-2">
-          <a href="#" data-action="goto-report" data-class="${escapeAttr(cls)}" class="font-medium text-blue-700 hover:underline">${escapeHtml(cls)}</a>
+        <td class="px-3 py-2 text-gray-400 text-[11px]">${i + 1}</td>
+        <td class="px-4 py-2 font-medium">
+          ${escapeHtml(r.studentName)}
+          ${r.category && r.category !== '學生' ? `<span class="ml-1 text-[10px] text-gray-400">${escapeHtml(CATEGORY_LABEL[r.category] || r.category)}</span>` : ''}
         </td>
-        <td class="px-2 py-2 text-right">${s.studentCount}</td>
-        <td class="px-2 py-2 text-right">${massCell}</td>
-        <td class="px-2 py-2 text-right">${s.earnedTotal}</td>
-        <td class="px-2 py-2 text-right">${s.claimedTotal}</td>
-        <td class="px-2 py-2 text-right font-bold ${s.pendingTotal ? 'text-red-600' : 'text-gray-400'}">${s.pendingTotal}</td>
-        <td class="px-2 py-2 text-right">${s.rate}%</td>
-        <td class="px-2 py-2 whitespace-nowrap text-gray-500">${data.lastRollcallDate || '—'}</td>
-      </tr>
-    `;
-  }).join('');
-
-  const summary = summarizeRewardRows(rows, config.threshold);
-  foot.innerHTML = `
-    <tr class="border-t-2 border-gray-200">
-      <td class="px-3 py-2">合計</td>
-      <td class="px-2 py-2 text-right">${summary.studentCount}</td>
-      <td class="px-2 py-2 text-right">${summary.massTotal}</td>
-      <td class="px-2 py-2 text-right">${summary.earnedTotal}</td>
-      <td class="px-2 py-2 text-right">${summary.claimedTotal}</td>
-      <td class="px-2 py-2 text-right ${summary.pendingTotal ? 'text-red-600' : 'text-gray-500'}">${summary.pendingTotal}</td>
-      <td class="px-2 py-2 text-right">${summary.rate}%</td>
-      <td class="px-2 py-2"></td>
-    </tr>
-  `;
-}
-
-function renderProgressBars(counts, threshold) {
-  const el = $('progressBars');
-  const max = Math.max(1, ...counts);
-  el.innerHTML = counts.map((count, idx) => {
-    const width = Math.round((count / max) * 100);
-    return `
-      <div class="flex items-center gap-2">
-        <span class="w-12 text-gray-500 text-xs">${idx}/${threshold}</span>
-        <div class="flex-1 h-4 bg-gray-100 rounded overflow-hidden">
-          <div class="h-4 bg-blue-500 rounded" style="width:${width}%"></div>
-        </div>
-        <span class="w-10 text-right font-bold">${count}</span>
-      </div>
-    `;
-  }).join('');
-}
-
-function renderTopPending(rows) {
-  const el = $('topPendingList');
-  const list = rows
-    .filter(r => r.pending > 0)
-    .sort((a, b) => b.pending - a.pending || b.massCount - a.massCount || a.studentName.localeCompare(b.studentName, 'zh-Hant'))
-    .slice(0, 10);
-
-  if (!list.length) {
-    el.innerHTML = '<p class="text-gray-400">沒有待領取學生</p>';
-    return;
-  }
-
-  el.innerHTML = list.map(r => `
-    <div class="flex items-center justify-between gap-2 border border-gray-100 rounded-lg px-3 py-2">
-      <div class="min-w-0">
-        <div class="font-medium truncate">${escapeHtml(r.studentName)}</div>
-        <div class="text-xs text-gray-400 truncate">${escapeHtml(r.className)} · 彌撒 ${r.massCount} 次 · 進度 ${r.progress}/${r.threshold}</div>
-      </div>
-      <div class="text-right shrink-0">
-        <div class="font-bold text-red-600">${r.pending} 個</div>
-        <div class="text-xs text-gray-400">待領</div>
-      </div>
-    </div>
-  `).join('');
-}
-
-function renderRecentClaims(tbody, claims, { showClass = true, showVoid = false } = {}) {
-  const list = (claims || []).slice().sort((a, b) => String(b.claimedAt || '').localeCompare(String(a.claimedAt || '')));
-  if (!list.length) {
-    const cols = showVoid ? 6 : 5;
-    tbody.innerHTML = `<tr><td colspan="${cols}" class="px-4 py-6 text-center text-gray-400">暫無紀錄</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = list.map(c => {
-    const cls = showClass ? `<td class="px-3 py-2">${escapeHtml(c.className)}</td>` : '';
-    const voidCell = showVoid
-      ? `<td class="px-2 py-2 text-center">
-           <button data-action="void" data-id="${escapeAttr(c.id)}" data-class="${escapeAttr(c.className)}" data-name="${escapeAttr(c.studentName)}" data-no="${escapeAttr(c.claimNo)}" class="text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100">作廢</button>
-         </td>`
-      : '';
-    return `
-      <tr class="border-t border-gray-100 hover:bg-gray-50">
-        <td class="px-3 py-2 whitespace-nowrap">${escapeHtml(c.claimedAt || '—')}</td>
-        ${cls}
-        <td class="px-3 py-2">${escapeHtml(c.studentName)}</td>
-        <td class="px-2 py-2 text-center whitespace-nowrap">第 ${escapeHtml(c.claimNo)} 個</td>
-        <td class="px-3 py-2 text-gray-500">${escapeHtml(c.note || '')}</td>
-        ${voidCell}
+        <td class="px-3 py-2 text-right font-bold">${r.massCount}</td>
+        <td class="px-3 py-2 text-right text-blue-700 font-bold">${r.earned}</td>
+        <td class="px-3 py-2 text-right">${r.claimed}</td>
+        <td class="px-3 py-2 text-right font-bold ${pendingColor}">${r.pending}</td>
+        <td class="px-3 py-2 text-right text-purple-700">${r.prayerClaimed || 0}</td>
+        <td class="px-3 py-2 text-gray-500 whitespace-nowrap text-xs">${lastLines.join('') || '—'}</td>
       </tr>
     `;
   }).join('');
 }
 
-// ---------- Input View ----------
+// ---------- ② 輸入領取 ----------
 
 function renderInput() {
-  if (role.role !== 'admin') {
-    $('inputStudentBody').innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center text-gray-400">只限管理員輸入</td></tr>';
+  const section = $('inputSection');
+  if (!section) return;
+
+  if (!isAdmin()) {
+    section.classList.add('hidden');
     return;
   }
+  section.classList.remove('hidden');
 
-  const data = classData.get(inputClass);
+  const data = currentClassData();
+  const body = $('inputStudentBody');
+
   if (!data) {
-    $('inputStudentBody').innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center text-gray-400">請選擇班級</td></tr>';
-    $('inputSummary').textContent = '';
-    $('inputRecentClaims').innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-gray-400">暫無紀錄</td></tr>';
+    if (body) body.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-gray-400">沒有班級資料</td></tr>';
+    renderSelectedPanel();
+    renderPrayerPanel();
+    renderRecentClaims();
     return;
   }
 
-  const status = $('inputStatusFilter').value;
-  const search = $('inputSearch').value;
-  const rows = filterRows(data.rows, { status, search });
-  const s = data.summary;
+  const rows = data.rows || [];
 
-  $('inputSummary').textContent = `${inputClass}：${s.studentCount} 人 · 應得 ${s.earnedTotal} · 已領 ${s.claimedTotal} · 待領 ${s.pendingTotal} · 資料截至 ${data.lastRollcallDate || '—'}`;
-
-  if (!rows.length) {
-    $('inputStudentBody').innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center text-gray-400">沒有符合條件的學生</td></tr>';
-  } else {
-    $('inputStudentBody').innerHTML = rows.map(r => {
-      const claimButtonClass = r.pending > 0
-        ? 'bg-blue-600 text-white hover:bg-blue-700'
-        : 'bg-gray-100 text-gray-500 hover:bg-gray-200';
+  if (body) {
+    body.innerHTML = rows.map(r => {
+      const selected = quickSelected
+        && quickSelected.className === inputClass
+        && quickSelected.studentName === r.studentName;
+      const canClaim = r.pending > 0;
       return `
-        <tr class="border-t border-gray-100 hover:bg-blue-50">
+        <tr class="border-t border-gray-100 hover:bg-blue-50 ${selected ? 'row-selected' : ''}">
           <td class="px-3 py-2">
-            <div class="font-medium">${escapeHtml(r.studentName)}</div>
-            <div class="text-xs text-gray-400">${CATEGORY_LABEL[r.category] || escapeHtml(r.category)}</div>
+            <button type="button" data-action="select-student" data-class="${escapeAttr(inputClass)}" data-name="${escapeAttr(r.studentName)}"
+              class="font-medium text-left hover:text-blue-700 hover:underline">${escapeHtml(r.studentName)}</button>
+            ${r.category && r.category !== '學生' ? `<div class="text-[10px] text-gray-400">${escapeHtml(CATEGORY_LABEL[r.category] || r.category)}</div>` : ''}
           </td>
-          <td class="px-2 py-2 text-right">${r.massCount}</td>
-          <td class="px-2 py-2 text-right">${r.earned}</td>
-          <td class="px-2 py-2 text-right">${r.claimed}</td>
-          <td class="px-2 py-2 text-right font-bold ${r.pending ? 'text-red-600' : 'text-gray-400'}">${r.pending}</td>
-          <td class="px-2 py-2 text-center whitespace-nowrap">
-            <span class="font-bold ${r.progress === r.threshold - 1 ? 'text-orange-600' : 'text-gray-600'}">${r.progress}/${r.threshold}</span>
-            ${r.overClaimed ? `<span class="ml-1 text-xs text-red-600">超額 ${r.overClaimed}</span>` : ''}
-          </td>
-          <td class="px-2 py-2 text-center text-xs text-gray-500 whitespace-nowrap">多 ${r.toNext} 次<br>（第 ${r.nextMilestone} 次）</td>
+          <td class="px-3 py-2 text-right">${r.massCount}</td>
+          <td class="px-3 py-2 text-right">${r.earned}</td>
+          <td class="px-3 py-2 text-right">${r.claimed}</td>
+          <td class="px-3 py-2 text-right font-bold ${r.pending ? 'text-red-600' : 'text-gray-400'}">${r.pending}</td>
+          <td class="px-3 py-2 text-right text-purple-700">${r.prayerClaimed || 0}</td>
           <td class="px-3 py-2 text-center whitespace-nowrap">
-            <button data-action="claim" data-class="${escapeAttr(r.className)}" data-name="${escapeAttr(r.studentName)}" class="text-xs px-2 py-1 rounded font-bold ${claimButtonClass}">領取</button>
-            <button data-action="batch" data-class="${escapeAttr(r.className)}" data-name="${escapeAttr(r.studentName)}" class="text-xs px-2 py-1 rounded bg-orange-100 text-orange-700 hover:bg-orange-200">補錄</button>
-            ${r.claimed ? `<button data-action="history" data-class="${escapeAttr(r.className)}" data-name="${escapeAttr(r.studentName)}" class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200">紀錄</button>` : ''}
+            <button type="button" data-action="claim-mass" data-class="${escapeAttr(inputClass)}" data-name="${escapeAttr(r.studentName)}"
+              class="text-xs px-2.5 py-1 rounded font-bold ${canClaim ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400'}"
+              ${canClaim ? '' : 'disabled'}>領取</button>
+            <button type="button" data-action="history" data-class="${escapeAttr(inputClass)}" data-name="${escapeAttr(r.studentName)}"
+              class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200">紀錄</button>
           </td>
         </tr>
       `;
     }).join('');
   }
 
-  const recent = allClaims.filter(c => c.className === inputClass).slice(0, 20);
-  renderRecentClaims($('inputRecentClaims'), recent, { showClass: false, showVoid: true });
+  const sumEl = $('inputClassSummary');
+  if (sumEl) {
+    const s = data.summary || {};
+    sumEl.textContent = `${s.studentCount || 0} 人 · 待領 ${s.pendingTotal || 0} 個`;
+  }
+
+  renderSelectedPanel();
+  renderPrayerPanel();
+  renderRecentClaims();
 }
 
-// ---------- Claim dialog ----------
+function renderSelectedPanel() {
+  const panel = $('claimPanel');
+  if (!panel) return;
 
-function openClaimDialog(mode, className, studentName) {
-  if (role.role !== 'admin') {
-    setMessage('只限管理員輸入領取紀錄', 'error');
+  if (!quickSelected) {
+    panel.classList.add('hidden');
+    const clearBtn = $('quickStudentClear');
+    if (clearBtn) clearBtn.classList.add('hidden');
     return;
   }
-  const row = rowFor(className, studentName);
+
+  const cls = quickSelected.className;
+  const name = quickSelected.studentName;
+  const row = findRow(cls, name);
+
+  panel.classList.remove('hidden');
+  const clearBtn = $('quickStudentClear');
+  if (clearBtn) clearBtn.classList.remove('hidden');
+
+  const set = (id, val) => { const el = $(id); if (el) el.textContent = val; };
+  set('claimPanelClass', cls);
+  set('claimPanelName', name);
+
+  if (!row) {
+    set('panelMassCount', '—');
+    set('panelEarned', '—');
+    set('panelClaimed', '—');
+    set('panelPending', '—');
+    set('panelPrayer', '—');
+    const hint = $('claimHint');
+    if (hint) hint.textContent = '找不到這位學生的名單資料（可能已轉班）。';
+    const massBtn = $('btnClaimMass');
+    if (massBtn) massBtn.disabled = true;
+    return;
+  }
+
+  set('panelMassCount', row.massCount);
+  set('panelEarned', row.earned);
+  set('panelClaimed', row.claimed);
+  set('panelPending', row.pending);
+  set('panelPrayer', row.prayerClaimed || 0);
+
+  const massBtn = $('btnClaimMass');
+  if (massBtn) massBtn.disabled = row.pending <= 0;
+
+  const hint = $('claimHint');
+  if (hint) {
+    if (row.pending > 0) {
+      hint.textContent = `可領 ${row.pending} 個彌撒獎勵（已完成 ${row.progress}/${row.threshold}，再多 ${row.toNext} 次可再領 1 個）。`;
+    } else if (row.massCount === 0) {
+      hint.textContent = '未有彌撒點名紀錄，不能登記彌撒獎勵。祈禱獎勵仍可手動登記。';
+    } else {
+      hint.textContent = `已領齊（${row.claimed}/${row.earned}）。再多 ${row.toNext} 次彌撒可再領 1 個。`;
+    }
+  }
+
+  // 日期跟隨選取
+  const dateEl = $('claimDateInput');
+  if (dateEl && !dateEl.value) dateEl.value = todayStr();
+}
+
+function selectStudent(className, studentName) {
+  quickSelected = { className, studentName };
+  inputClass = className;
+  const sel = $('classSelect');
+  if (sel) sel.value = className;
+  syncUrlClass(studentName);
+  const input = $('quickStudentInput');
+  if (input) input.value = studentName;
+  const suggest = $('quickStudentSuggest');
+  if (suggest) suggest.classList.add('hidden');
+  renderAll();
+}
+
+function clearSelection() {
+  quickSelected = null;
+  const input = $('quickStudentInput');
+  if (input) input.value = '';
+  const suggest = $('quickStudentSuggest');
+  if (suggest) suggest.classList.add('hidden');
+  renderAll();
+}
+
+// ---------- 祈禱獎勵紀錄 ----------
+
+function renderPrayerPanel() {
+  const body = $('prayerPanelBody');
+  const statusEl = $('prayerPanelStatus');
+  if (!body) return;
+
+  const list = allClaims
+    .filter(c => c.className === inputClass && c.type === 'prayer')
+    .sort((a, b) => String(b.claimedAt || '').localeCompare(String(a.claimedAt || '')));
+
+  if (statusEl) {
+    const people = new Set(list.map(c => c.studentName)).size;
+    statusEl.textContent = list.length
+      ? `${people} 人 · 共 ${list.length} 次`
+      : '暫無紀錄';
+  }
+
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="3" class="px-4 py-6 text-center text-gray-400">暫無祈禱獎勵紀錄</td></tr>';
+    return;
+  }
+
+  body.innerHTML = list.map(c => `
+    <tr class="border-t border-gray-100 hover:bg-purple-50/40">
+      <td class="px-3 py-2 font-medium">${escapeHtml(c.studentName)}</td>
+      <td class="px-3 py-2 whitespace-nowrap">${escapeHtml(c.claimedAt || '—')}</td>
+      <td class="px-3 py-2 text-center whitespace-nowrap no-print">
+        <button type="button" data-action="convert-claim" data-to="mass"
+          data-id="${escapeAttr(c.id)}" data-class="${escapeAttr(c.className)}" data-name="${escapeAttr(c.studentName)}"
+          data-date="${escapeAttr(c.claimedAt || '')}" data-no="${escapeAttr(c.claimNo)}"
+          class="text-xs px-2 py-1 rounded bg-amber-50 text-amber-700 hover:bg-amber-100">更正為彌撒</button>
+        <button type="button" data-action="void" data-id="${escapeAttr(c.id)}" data-class="${escapeAttr(c.className)}"
+          data-name="${escapeAttr(c.studentName)}" data-no="${escapeAttr(c.claimNo)}"
+          class="text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100 ml-1">作廢</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ---------- 最近領取紀錄 ----------
+
+function renderRecentClaims() {
+  const body = $('inputRecentClaims');
+  const statusEl = $('recentClaimsStatus');
+  if (!body) return;
+
+  const list = allClaims
+    .filter(c => c.className === inputClass)
+    .sort((a, b) => {
+      const d = String(b.claimedAt || '').localeCompare(String(a.claimedAt || ''));
+      if (d) return d;
+      return String(a.type || '').localeCompare(String(b.type || ''));
+    });
+
+  if (statusEl) statusEl.textContent = `${list.length} 條 · 最新 20 條`;
+
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-gray-400">暫無紀錄</td></tr>';
+    return;
+  }
+
+  body.innerHTML = list.slice(0, 20).map(c => {
+    const isPrayer = c.type === 'prayer';
+    const otherType = isPrayer ? 'mass' : 'prayer';
+    const otherLabel = isPrayer ? '更正為彌撒' : '更正為祈禱';
+    return `
+      <tr class="border-t border-gray-100 hover:bg-gray-50">
+        <td class="px-3 py-2 whitespace-nowrap text-xs">${escapeHtml(c.claimedAt || '—')}</td>
+        <td class="px-3 py-2">${escapeHtml(c.studentName)}</td>
+        <td class="px-2 py-2 text-center whitespace-nowrap">
+          <span class="text-xs px-1.5 py-0.5 rounded ${isPrayer ? 'bg-purple-50 text-purple-700' : 'bg-orange-50 text-orange-700'}">${isPrayer ? '祈禱' : '彌撒'}</span>
+        </td>
+        <td class="px-2 py-2 text-center whitespace-nowrap text-xs">${isPrayer ? '—' : `第 ${escapeHtml(c.claimNo)} 個`}</td>
+        <td class="px-3 py-2 text-gray-500 text-xs">${escapeHtml(c.note || '')}</td>
+        <td class="px-3 py-2 text-center whitespace-nowrap no-print">
+          <button type="button" data-action="convert-claim" data-to="${otherType}"
+            data-id="${escapeAttr(c.id)}" data-class="${escapeAttr(c.className)}" data-name="${escapeAttr(c.studentName)}"
+            data-date="${escapeAttr(c.claimedAt || '')}" data-no="${escapeAttr(c.claimNo)}"
+            class="text-xs px-2 py-1 rounded bg-amber-50 text-amber-700 hover:bg-amber-100">${otherLabel}</button>
+          <button type="button" data-action="void" data-id="${escapeAttr(c.id)}" data-class="${escapeAttr(c.className)}"
+            data-name="${escapeAttr(c.studentName)}" data-no="${escapeAttr(c.claimNo)}"
+            class="text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100 ml-1">作廢</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ---------- 快速搜尋（跨班） ----------
+
+function buildStudentIndex() {
+  const out = [];
+  const seen = new Set();
+  for (const cls of classes) {
+    const data = classData.get(cls);
+    if (!data) continue;
+    for (const s of (data.roster || [])) {
+      if (!s || !s.name) continue;
+      if ((s.category || '學生') !== '學生') continue;
+      const key = `${cls}~${s.name}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ className: cls, studentName: s.name });
+    }
+  }
+  return out;
+}
+
+let _quickBound = false;
+
+function setupQuickStudentSearch() {
+  const input = $('quickStudentInput');
+  const suggest = $('quickStudentSuggest');
+  if (!input || !suggest) return;
+
+  if (_quickBound) return;
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    suggest.innerHTML = '';
+    if (!q) {
+      suggest.classList.add('hidden');
+      return;
+    }
+
+    const matches = buildStudentIndex()
+      .filter(m => {
+        const n = m.studentName.toLowerCase();
+        return n.includes(q);
+      })
+      .sort((a, b) => {
+        const ai = a.studentName.toLowerCase().indexOf(q);
+        const bi = b.studentName.toLowerCase().indexOf(q);
+        if (ai !== bi) return ai - bi;
+        if (a.studentName.length !== b.studentName.length) return a.studentName.length - b.studentName.length;
+        return a.className.localeCompare(b.className, 'zh-Hant');
+      })
+      .slice(0, 12);
+
+    if (!matches.length) {
+      suggest.innerHTML = '<div class="px-3 py-2 text-sm text-gray-400">找不到學生</div>';
+      suggest.classList.remove('hidden');
+      return;
+    }
+
+    for (const m of matches) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between gap-2';
+      btn.innerHTML = `<span class="font-medium">${escapeHtml(m.studentName)}</span><span class="text-xs text-gray-500">${escapeHtml(m.className)}</span>`;
+      btn.addEventListener('click', () => selectStudent(m.className, m.studentName));
+      suggest.appendChild(btn);
+    }
+    suggest.classList.remove('hidden');
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') suggest.classList.add('hidden');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!suggest.contains(e.target) && e.target !== input) {
+      suggest.classList.add('hidden');
+    }
+  });
+
+  const clearBtn = $('quickStudentClear');
+  if (clearBtn) clearBtn.addEventListener('click', clearSelection);
+
+  _quickBound = true;
+}
+
+// ---------- ③ 點名核對 ----------
+
+function renderCheck() {
+  const section = $('checkSection');
+  if (!section) return;
+
+  if (!isAdmin()) {
+    section.classList.add('hidden');
+    return;
+  }
+  section.classList.remove('hidden');
+
+  const body = $('checkBody');
+  const sumEl = $('checkSummary');
+  const rows = [];
+
+  for (const cls of classes) {
+    const data = classData.get(cls);
+    if (!data) continue;
+    for (const r of (data.rows || [])) {
+      const massTicks = r.massCount;
+      const massEarned = r.earned;
+      const massClaimed = r.claimed;
+      const diff = massClaimed - massEarned;
+
+      if (diff !== 0) {
+        rows.push({
+          className: cls,
+          studentName: r.studentName,
+          massTicks,
+          massEarned,
+          massClaimed,
+          diff,
+          prayerClaimed: r.prayerClaimed || 0
+        });
+      }
+    }
+  }
+
+  rows.sort((a, b) => {
+    const d = Math.abs(b.diff) - Math.abs(a.diff);
+    if (d) return d;
+    return a.className.localeCompare(b.className, 'zh-Hant')
+      || a.studentName.localeCompare(b.studentName, 'zh-Hant');
+  });
+
+  if (sumEl) sumEl.textContent = rows.length ? `${rows.length} 筆不符` : '全部吻合';
+
+  if (!body) return;
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-gray-400">沒有異常，全部吻合</td></tr>';
+    return;
+  }
+
+  body.innerHTML = rows.map(r => `
+    <tr class="border-t border-gray-100 hover:bg-gray-50">
+      <td class="px-3 py-2">${escapeHtml(r.className)}</td>
+      <td class="px-3 py-2 font-medium">${escapeHtml(r.studentName)}</td>
+      <td class="px-3 py-2 text-right">${r.massTicks}</td>
+      <td class="px-3 py-2 text-right">${r.massClaimed}</td>
+      <td class="px-3 py-2 text-right font-bold ${r.diff > 0 ? 'text-red-600' : 'text-orange-600'}">${r.diff > 0 ? `+${r.diff}` : r.diff}</td>
+      <td class="px-3 py-2 text-right text-purple-700">${r.prayerClaimed}</td>
+      <td class="px-3 py-2 text-center">
+        <button type="button" data-action="goto-input" data-class="${escapeAttr(r.className)}" data-name="${escapeAttr(r.studentName)}"
+          class="text-xs px-2.5 py-1 rounded bg-blue-600 text-white hover:bg-blue-700">查看</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ---------- 登記領取 ----------
+
+async function claimMass(className, studentName) {
+  if (!isAdmin() || saving) return;
+  const row = findRow(className, studentName);
   if (!row) {
     setMessage('找不到學生資料，請重新整理', 'error');
     return;
   }
 
-  claimContext = { mode, className, studentName, row };
-  $('claimDialogTitle').textContent = mode === 'batch' ? '批次補錄' : '登記領取';
-  $('claimStudentInfo').textContent = `${className} · ${studentName} · 彌撒 ${row.massCount} 次 · 應得 ${row.earned} · 已領 ${row.claimed} · 待領 ${row.pending}`;
-  $('claimCountWrap').classList.toggle('hidden', mode !== 'batch');
-  $('claimCount').value = mode === 'batch' ? Math.max(1, Math.min(20, row.pending || 1)) : 1;
-  $('claimDate').value = todayStr();
-  $('claimNote').value = '';
-  updateClaimPreview();
+  const claimedAt = ($('claimDateInput') && $('claimDateInput').value) || todayStr();
+  const claimNos = getNextClaimNos(row.claims.map(c => c.claimNo), 1);
+  const warning = claimWarning(row, claimNos);
+  if (warning && !window.confirm(`${warning}\n\n仍然要登記嗎？`)) return;
 
-  if ($('claimDialog').open) $('claimDialog').close();
-  $('claimDialog').showModal();
+  saving = true;
+  try {
+    const saved = await saveRewardClaims(schoolYear, claimNos.map(claimNo => ({
+      className,
+      studentName,
+      claimNo,
+      claimedAt,
+      type: 'mass',
+      massCountAtClaim: row.massCount,
+      note: '',
+      source: 'app'
+    })));
+    await reloadClaims();
+    setMessage(`已登記彌撒獎勵：${className} ${studentName} ${formatClaimNos(claimNos)}（${claimedAt}）`, 'success', {
+      label: '撤銷',
+      onClick: () => undoClaims(saved, `已撤銷：${className} ${studentName} ${formatClaimNos(claimNos)}`)
+    });
+  } catch (err) {
+    console.error(err);
+    setMessage(`登記失敗：${err.message}`, 'error');
+  } finally {
+    saving = false;
+  }
+}
+
+async function claimPrayer(className, studentName) {
+  if (!isAdmin() || saving) return;
+  const row = findRow(className, studentName);
+  if (!row) {
+    setMessage('找不到學生資料，請重新整理', 'error');
+    return;
+  }
+
+  const claimedAt = ($('claimDateInput') && $('claimDateInput').value) || todayStr();
+  const usedNos = (row.prayerClaims || []).map(c => c.claimNo);
+  const claimNos = getNextClaimNos(usedNos, 1);
+
+  if (!window.confirm(`確定登記祈禱獎勵？\n\n${className} ${studentName}\n第 ${claimNos[0]} 個 · ${claimedAt}`)) return;
+
+  saving = true;
+  try {
+    const saved = await saveRewardClaims(schoolYear, claimNos.map(claimNo => ({
+      className,
+      studentName,
+      claimNo,
+      claimedAt,
+      type: 'prayer',
+      prayerCountAtClaim: 0,
+      note: '',
+      source: 'app'
+    })));
+    await reloadClaims();
+    setMessage(`已登記祈禱獎勵：${className} ${studentName} ${formatClaimNos(claimNos)}（${claimedAt}）`, 'success', {
+      label: '撤銷',
+      onClick: () => undoClaims(saved, `已撤銷：${className} ${studentName} ${formatClaimNos(claimNos)}`)
+    });
+  } catch (err) {
+    console.error(err);
+    setMessage(`登記失敗：${err.message}`, 'error');
+  } finally {
+    saving = false;
+  }
+}
+
+// ---------- 補錄 dialog ----------
+
+function setupClaimDialog() {
+  const cancel = $('claimCancel');
+  const cancelTop = $('claimCancelTop');
+  const confirm = $('claimConfirm');
+  const count = $('claimCount');
+  if (cancel) cancel.addEventListener('click', closeClaimDialog);
+  if (cancelTop) cancelTop.addEventListener('click', closeClaimDialog);
+  if (confirm) confirm.addEventListener('click', confirmClaim);
+  if (count) count.addEventListener('input', updateClaimPreview);
+
+  const hc = $('historyClose');
+  const hct = $('historyCloseTop');
+  if (hc) hc.addEventListener('click', closeHistoryDialog);
+  if (hct) hct.addEventListener('click', closeHistoryDialog);
+}
+
+function openClaimDialog(className, studentName) {
+  if (!isAdmin()) return;
+  const row = findRow(className, studentName);
+  if (!row) {
+    setMessage('找不到學生資料，請重新整理', 'error');
+    return;
+  }
+
+  claimContext = { className, studentName, row };
+  const title = $('claimDialogTitle');
+  if (title) title.textContent = '補錄彌撒獎勵';
+  const info = $('claimStudentInfo');
+  if (info) info.textContent = `${className} · ${studentName} · 彌撒 ${row.massCount} 次 · 應得 ${row.earned} · 已領 ${row.claimed} · 待領 ${row.pending}`;
+
+  const cnt = $('claimCount');
+  if (cnt) cnt.value = Math.max(1, Math.min(20, row.pending || 1));
+  const d = $('claimDate');
+  if (d) d.value = ($('claimDateInput') && $('claimDateInput').value) || todayStr();
+  const note = $('claimNote');
+  if (note) note.value = '';
+
+  updateClaimPreview();
+  const dialog = $('claimDialog');
+  if (dialog) {
+    if (dialog.open) dialog.close();
+    dialog.showModal();
+  }
 }
 
 function updateClaimPreview() {
   if (!claimContext) return;
-  const { mode, row } = claimContext;
-  const count = mode === 'batch'
-    ? Math.max(1, Math.min(20, Number($('claimCount').value) || 1))
-    : 1;
+  const { row } = claimContext;
+  const countEl = $('claimCount');
+  const count = Math.max(1, Math.min(20, Number(countEl && countEl.value) || 1));
   const claimNos = getNextClaimNos(row.claims.map(c => c.claimNo), count);
   claimContext.claimNos = claimNos;
 
-  $('claimNosPreview').textContent = formatClaimNos(claimNos);
-  $('claimConfirm').textContent = claimNos.length > 1 ? `確認登記 ${claimNos.length} 個` : '確認';
+  const preview = $('claimNosPreview');
+  if (preview) preview.textContent = formatClaimNos(claimNos);
+
+  const confirmBtn = $('claimConfirm');
+  if (confirmBtn) confirmBtn.textContent = claimNos.length > 1 ? `確認登記 ${claimNos.length} 個` : '確認';
 
   const warning = claimWarning(row, claimNos);
   const el = $('claimWarning');
-  if (warning) {
-    el.textContent = `⚠️ ${warning}`;
-    el.classList.remove('hidden');
-  } else {
-    el.textContent = '';
-    el.classList.add('hidden');
+  if (el) {
+    if (warning) {
+      el.textContent = `⚠️ ${warning}`;
+      el.classList.remove('hidden');
+    } else {
+      el.textContent = '';
+      el.classList.add('hidden');
+    }
   }
 }
 
 function closeClaimDialog() {
   claimContext = null;
-  if ($('claimDialog').open) $('claimDialog').close();
+  const dialog = $('claimDialog');
+  if (dialog && dialog.open) dialog.close();
 }
 
 async function confirmClaim() {
-  if (!claimContext) return;
-  const { className, studentName, row, mode } = claimContext;
-  const count = mode === 'batch'
-    ? Math.max(1, Math.min(20, Number($('claimCount').value) || 1))
-    : 1;
-  const claimNos = getNextClaimNos(row.claims.map(c => c.claimNo), count);
-  const claimedAt = $('claimDate').value || todayStr();
-  const note = $('claimNote').value.trim();
+  if (!claimContext || saving) return;
+  const { className, studentName, row } = claimContext;
+  const countEl = $('claimCount');
+  const count = Math.max(1, Math.min(20, Number(countEl && countEl.value) || 1));
+  const claimNos = claimContext.claimNos || getNextClaimNos(row.claims.map(c => c.claimNo), count);
+  const claimedAt = ($('claimDate') && $('claimDate').value) || todayStr();
+  const note = ($('claimNote') && $('claimNote').value.trim()) || '';
 
   const warning = claimWarning(row, claimNos);
   if (warning && !window.confirm(`${warning}\n\n仍然要登記嗎？`)) return;
 
   const btn = $('claimConfirm');
-  const original = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = '儲存中…';
+  const original = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '儲存中…'; }
 
+  saving = true;
   try {
-    await saveRewardClaims(schoolYear, claimNos.map(claimNo => ({
+    const saved = await saveRewardClaims(schoolYear, claimNos.map(claimNo => ({
       className,
       studentName,
       claimNo,
       claimedAt,
+      type: 'mass',
       massCountAtClaim: row.massCount,
       note,
-      source: mode === 'batch' ? 'import' : 'app'
+      source: 'app'
     })));
     closeClaimDialog();
-    setMessage(`已登記：${className} ${studentName} ${formatClaimNos(claimNos)}`, 'success');
-    try {
-      await reloadClaims();
-    } catch (reloadErr) {
-      console.error(reloadErr);
-      setMessage(`已登記，但重新載入失敗：${reloadErr.message}`, 'error');
-    }
+    await reloadClaims();
+    setMessage(`已補錄：${className} ${studentName} ${formatClaimNos(claimNos)}`, 'success', {
+      label: '撤銷',
+      onClick: () => undoClaims(saved, `已撤銷：${className} ${studentName} ${formatClaimNos(claimNos)}`)
+    });
   } catch (err) {
     console.error(err);
-    setMessage(`登記失敗：${err.message}`, 'error');
-    try { await reloadClaims(); } catch (_) { /* ignore */ }
+    setMessage(`補錄失敗：${err.message}`, 'error');
   } finally {
-    btn.disabled = false;
-    btn.textContent = original;
+    saving = false;
+    if (btn) { btn.disabled = false; btn.textContent = original; }
+  }
+}
+
+// ---------- 動作委派 ----------
+
+function setupActionDelegation() {
+  document.addEventListener('click', async (e) => {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const action = el.dataset.action;
+    const cls = el.dataset.class;
+    const name = el.dataset.name;
+
+    if (action === 'select-student') {
+      e.preventDefault();
+      selectStudent(cls, name);
+      return;
+    }
+    if (action === 'claim-mass') {
+      e.preventDefault();
+      await claimMass(cls, name);
+      return;
+    }
+    if (action === 'history') {
+      e.preventDefault();
+      openHistoryDialog(cls, name);
+      return;
+    }
+    if (action === 'void') {
+      e.preventDefault();
+      await handleVoidClaim(el);
+      return;
+    }
+    if (action === 'convert-claim') {
+      e.preventDefault();
+      await convertClaimType(el);
+      return;
+    }
+    if (action === 'goto-input') {
+      e.preventDefault();
+      selectStudent(cls, name);
+      const section = $('inputSection');
+      if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+  });
+
+  // 已選學生卡的按鈕
+  const massBtn = $('btnClaimMass');
+  if (massBtn) {
+    massBtn.addEventListener('click', () => {
+      if (!quickSelected) return;
+      claimMass(quickSelected.className, quickSelected.studentName);
+    });
+  }
+  const prayerBtn = $('btnClaimPrayer');
+  if (prayerBtn) {
+    prayerBtn.addEventListener('click', () => {
+      if (!quickSelected) return;
+      claimPrayer(quickSelected.className, quickSelected.studentName);
+    });
+  }
+  const batchBtn = $('btnBatch');
+  if (batchBtn) {
+    batchBtn.addEventListener('click', () => {
+      if (!quickSelected) return;
+      openClaimDialog(quickSelected.className, quickSelected.studentName);
+    });
+  }
+  const historyBtn = $('btnHistory');
+  if (historyBtn) {
+    historyBtn.addEventListener('click', () => {
+      if (!quickSelected) return;
+      openHistoryDialog(quickSelected.className, quickSelected.studentName);
+    });
   }
 }
 
@@ -751,53 +1088,115 @@ async function handleVoidClaim(el) {
   const className = el.dataset.class;
   const studentName = el.dataset.name;
   const claimNo = el.dataset.no;
-  if (!id) return;
+  if (!id || saving) return;
   if (!window.confirm(`確定作廢 ${className} ${studentName} 第 ${claimNo} 個獎勵？\n作廢後可以重新登記。`)) return;
 
+  saving = true;
   try {
     await voidRewardClaim(schoolYear, id, '介面作廢');
     setMessage(`已作廢：${className} ${studentName} 第 ${claimNo} 個`, 'success');
-    try {
-      await reloadClaims();
-    } catch (reloadErr) {
-      console.error(reloadErr);
-      setMessage(`已作廢，但重新載入失敗：${reloadErr.message}`, 'error');
-    }
+    await reloadClaims();
   } catch (err) {
     console.error(err);
     setMessage(`作廢失敗：${err.message}`, 'error');
+  } finally {
+    saving = false;
   }
 }
 
+async function convertClaimType(el) {
+  if (!isAdmin() || saving) return;
+  const id = el.dataset.id;
+  const toType = el.dataset.to === 'prayer' ? 'prayer' : 'mass';
+  const className = el.dataset.class;
+  const studentName = el.dataset.name;
+  const claimedAt = el.dataset.date || todayStr();
+  if (!id || !className || !studentName) return;
+
+  const toLabel = toType === 'prayer' ? '祈禱' : '彌撒';
+  if (!window.confirm(
+    `確定將 ${className} ${studentName} 這筆紀錄更正為「${toLabel}」？\n\n`
+    + `系統會先作廢原本紀錄，再按 ${claimedAt} 新增一筆${toLabel}獎勵。`
+  )) return;
+
+  saving = true;
+  try {
+    await voidRewardClaim(schoolYear, id, `更正為${toLabel}（轉換）`);
+
+    const sameType = allClaims.filter(c =>
+      c.className === className
+      && c.studentName === studentName
+      && (c.type === 'prayer' ? 'prayer' : 'mass') === toType
+    );
+    const claimNos = getNextClaimNos(sameType.map(c => c.claimNo), 1);
+    const row = findRow(className, studentName);
+
+    await saveRewardClaims(schoolYear, claimNos.map(claimNo => ({
+      className,
+      studentName,
+      claimNo,
+      claimedAt,
+      type: toType,
+      massCountAtClaim: row ? row.massCount : 0,
+      prayerCountAtClaim: 0,
+      note: `由${toType === 'prayer' ? '彌撒' : '祈禱'}更正`,
+      source: 'app'
+    })));
+
+    setMessage(`已將 ${className} ${studentName} 更正為${toLabel}獎勵（${claimedAt}）`, 'success');
+    await reloadClaims();
+  } catch (err) {
+    console.error(err);
+    setMessage(`更正失敗：${err.message}`, 'error');
+    try { await reloadClaims(); } catch (_) { /* ignore */ }
+  } finally {
+    saving = false;
+  }
+}
+
+// ---------- 紀錄 dialog ----------
+
 function openHistoryDialog(className, studentName) {
-  const row = rowFor(className, studentName);
+  const row = findRow(className, studentName);
   if (!row) return;
 
-  $('historyTitle').textContent = '領取紀錄';
-  $('historySubtitle').textContent = `${className} · ${studentName} · 彌撒 ${row.massCount} 次 · 應得 ${row.earned} · 已領 ${row.claimed}`;
+  const title = $('historyTitle');
+  if (title) title.textContent = '領取紀錄';
+  const sub = $('historySubtitle');
+  if (sub) {
+    sub.textContent = `${className} · ${studentName} · 彌撒 ${row.massCount} 次 · 應得 ${row.earned} · 已領 ${row.claimed} · 祈禱已領 ${row.prayerClaimed || 0}`;
+  }
 
-  if (!row.claims.length) {
-    $('historyBody').innerHTML = '<p class="text-sm text-gray-400 text-center py-6">暫無領取紀錄</p>';
+  const all = [
+    ...(row.claims || []).map(c => ({ ...c, type: 'mass' })),
+    ...(row.prayerClaims || []).map(c => ({ ...c, type: 'prayer' }))
+  ].sort((a, b) => String(b.claimedAt || '').localeCompare(String(a.claimedAt || '')));
+
+  const bodyEl = $('historyBody');
+  if (!bodyEl) return;
+
+  if (!all.length) {
+    bodyEl.innerHTML = '<p class="text-sm text-gray-400 text-center py-6">暫無領取紀錄</p>';
   } else {
-    $('historyBody').innerHTML = `
+    bodyEl.innerHTML = `
       <table class="w-full text-sm border-collapse">
         <thead class="bg-gray-100 text-gray-600">
           <tr>
-            <th class="px-3 py-2 text-left">日期</th>
-            <th class="px-2 py-2 text-center">獎勵</th>
-            <th class="px-2 py-2 text-center">當時彌撒</th>
+            <th class="px-3 py-2 text-left whitespace-nowrap">日期</th>
+            <th class="px-2 py-2 text-center">類型</th>
+            <th class="px-2 py-2 text-center whitespace-nowrap">第幾個</th>
             <th class="px-3 py-2 text-left">備註</th>
-            <th class="px-3 py-2 text-left">輸入者</th>
           </tr>
         </thead>
         <tbody>
-          ${row.claims.map(c => `
+          ${all.map(c => `
             <tr class="border-t border-gray-100">
               <td class="px-3 py-2 whitespace-nowrap">${escapeHtml(c.claimedAt || '—')}</td>
+              <td class="px-2 py-2 text-center whitespace-nowrap">
+                <span class="text-xs px-1.5 py-0.5 rounded ${c.type === 'prayer' ? 'bg-purple-50 text-purple-700' : 'bg-orange-50 text-orange-700'}">${c.type === 'prayer' ? '祈禱' : '彌撒'}</span>
+              </td>
               <td class="px-2 py-2 text-center whitespace-nowrap">第 ${escapeHtml(c.claimNo)} 個</td>
-              <td class="px-2 py-2 text-center">${escapeHtml(c.massCountAtClaim ?? '—')}</td>
               <td class="px-3 py-2 text-gray-500">${escapeHtml(c.note || '')}</td>
-              <td class="px-3 py-2 text-gray-500">${escapeHtml(c.recordedBy || '')}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -805,215 +1204,14 @@ function openHistoryDialog(className, studentName) {
     `;
   }
 
-  if ($('historyDialog').open) $('historyDialog').close();
-  $('historyDialog').showModal();
-}
-
-// ---------- Report ----------
-
-function getFilteredReportRows() {
-  const classFilter = $('reportClassSelect').value || '*';
-  const status = $('reportStatusFilter').value;
-  const search = $('reportSearch').value;
-  const out = [];
-  for (const cls of classes) {
-    if (classFilter !== '*' && cls !== classFilter) continue;
-    const data = classData.get(cls);
-    if (!data) continue;
-    filterRows(data.rows, { status, search }).forEach(row => out.push({ cls, row }));
+  const dialog = $('historyDialog');
+  if (dialog) {
+    if (dialog.open) dialog.close();
+    dialog.showModal();
   }
-  return out;
 }
 
-function getFilteredClaims() {
-  const classFilter = $('reportClassSelect').value || '*';
-  const from = $('reportFrom').value;
-  const to = $('reportTo').value;
-  const search = String($('reportSearch').value || '').trim().toLowerCase();
-
-  return allClaims.filter(c => {
-    if (classFilter !== '*' && c.className !== classFilter) return false;
-    if (from && String(c.claimedAt || '') < from) return false;
-    if (to && String(c.claimedAt || '') > to) return false;
-    if (search && !String(c.studentName || '').toLowerCase().includes(search)) return false;
-    return true;
-  }).sort((a, b) => {
-    const d = String(b.claimedAt || '').localeCompare(String(a.claimedAt || ''));
-    if (d) return d;
-    return String(a.studentName || '').localeCompare(String(b.studentName || ''), 'zh-Hant');
-  });
-}
-
-function renderReport() {
-  if (!config) return;
-  const filtered = getFilteredReportRows();
-  const summary = summarizeRewardRows(filtered.map(x => x.row), config.threshold);
-
-  $('reportSummary').innerHTML = [
-    { label: '學生', value: summary.studentCount, unit: '人', color: 'text-gray-800' },
-    { label: '彌撒人次', value: summary.massTotal, unit: '次', color: 'text-orange-600' },
-    { label: '應得獎勵', value: summary.earnedTotal, unit: '個', color: 'text-blue-700' },
-    { label: '已領取', value: summary.claimedTotal, unit: '個', color: 'text-emerald-700' },
-    { label: '待領取', value: summary.pendingTotal, unit: '個', color: summary.pendingTotal ? 'text-red-600' : 'text-gray-500' },
-    { label: '領取率', value: `${summary.rate}%`, unit: '', color: 'text-purple-700' }
-  ].map(c => `
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 px-3 py-3">
-      <div class="text-xs text-gray-500">${c.label}</div>
-      <div class="kpi-number text-2xl font-bold ${c.color} mt-1">${c.value}<span class="text-xs font-normal text-gray-400 ml-1">${c.unit}</span></div>
-    </div>
-  `).join('');
-
-  const groups = [];
-  for (const cls of classes) {
-    const rows = filtered.filter(x => x.cls === cls).map(x => x.row);
-    if (!rows.length) continue;
-    groups.push({ className: cls, rows, summary: summarizeRewardRows(rows, config.threshold) });
-  }
-
-  $('reportStatusText').textContent = `${groups.length} 班 · ${filtered.length} 人（篩選後）`;
-  $('printMeta').textContent = `${schoolYear} · 每 ${config.threshold} 次彌撒 1 個獎勵 · 計算期間 ${config.startDate} 至 ${config.endDate} · 列印日期 ${todayStr()}`;
-
-  if (!groups.length) {
-    $('reportContent').innerHTML = '<div class="bg-white rounded-xl border border-gray-200 p-6 text-center text-gray-400">沒有符合條件的學生</div>';
-  } else {
-    $('reportContent').innerHTML = groups.map(group => {
-      const s = group.summary;
-      return `
-        <section class="class-block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div class="px-4 py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-1">
-            <h4 class="font-bold text-blue-800">${escapeHtml(group.className)}</h4>
-            <span class="text-xs text-gray-500">${s.studentCount} 人 · 彌撒 ${s.massTotal} · 應得 ${s.earnedTotal} · 已領 ${s.claimedTotal} · 待領 ${s.pendingTotal} · 領取率 ${s.rate}%</span>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm border-collapse">
-              <thead class="bg-gray-50 text-gray-500">
-                <tr>
-                  <th class="px-2 py-2 text-left w-8">#</th>
-                  <th class="px-3 py-2 text-left">姓名</th>
-                  <th class="px-2 py-2 text-right">彌撒</th>
-                  <th class="px-2 py-2 text-right">應得</th>
-                  <th class="px-2 py-2 text-right">已領</th>
-                  <th class="px-2 py-2 text-right">待領</th>
-                  <th class="px-2 py-2 text-center">進度</th>
-                  <th class="px-2 py-2 text-center whitespace-nowrap">下次可領</th>
-                  <th class="px-2 py-2 text-left whitespace-nowrap">最後領取</th>
-                  <th class="px-2 py-2 text-center no-print">紀錄</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${group.rows.map((r, i) => `
-                  <tr class="border-t border-gray-100 hover:bg-blue-50">
-                    <td class="px-2 py-2 text-gray-400">${i + 1}</td>
-                    <td class="px-3 py-2 font-medium">${escapeHtml(r.studentName)}</td>
-                    <td class="px-2 py-2 text-right">${r.massCount}</td>
-                    <td class="px-2 py-2 text-right">${r.earned}</td>
-                    <td class="px-2 py-2 text-right">${r.claimed}</td>
-                    <td class="px-2 py-2 text-right font-bold ${r.pending ? 'text-red-600' : 'text-gray-400'}">${r.pending}${r.overClaimed ? ` <span class="text-xs">(超額 ${r.overClaimed})</span>` : ''}</td>
-                    <td class="px-2 py-2 text-center">${r.progress}/${r.threshold}</td>
-                    <td class="px-2 py-2 text-center text-xs text-gray-500 whitespace-nowrap">多 ${r.toNext} 次<br>（第 ${r.nextMilestone} 次）</td>
-                    <td class="px-2 py-2 text-gray-500 whitespace-nowrap">${escapeHtml(r.lastClaimedAt || '—')}</td>
-                    <td class="px-2 py-2 text-center no-print">
-                      ${r.claims.length ? `<button data-action="history" data-class="${escapeAttr(r.className)}" data-name="${escapeAttr(r.studentName)}" class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200">查看</button>` : ''}
-                    </td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      `;
-    }).join('');
-  }
-
-  renderReportClaims();
-}
-
-function renderReportClaims() {
-  const list = getFilteredClaims();
-  $('reportClaimsStatus').textContent = `${list.length} 條`;
-  const body = $('reportClaimsBody');
-
-  if (!list.length) {
-    body.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-gray-400">暫無紀錄</td></tr>';
-    return;
-  }
-
-  body.innerHTML = list.map(c => `
-    <tr class="border-t border-gray-100 hover:bg-gray-50">
-      <td class="px-3 py-2 whitespace-nowrap">${escapeHtml(c.claimedAt || '—')}</td>
-      <td class="px-3 py-2">${escapeHtml(c.className)}</td>
-      <td class="px-3 py-2">${escapeHtml(c.studentName)}</td>
-      <td class="px-2 py-2 text-center whitespace-nowrap">第 ${escapeHtml(c.claimNo)} 個</td>
-      <td class="px-3 py-2 text-gray-500">${escapeHtml(c.note || '')}</td>
-      <td class="px-3 py-2 text-gray-500">${escapeHtml(c.recordedBy || '')}</td>
-    </tr>
-  `).join('');
-}
-
-function printReport() {
-  switchTab('report');
-  setTimeout(() => window.print(), 120);
-}
-
-function exportStudentCsv() {
-  const list = getFilteredReportRows();
-  if (!list.length) {
-    setMessage('沒有可匯出的學生資料', 'error');
-    return;
-  }
-  const rows = [
-    ['班別', '姓名', '彌撒次數', '應得獎勵', '已領取', '待領取', '進度', '下次獎勵', '最後領取日'],
-    ...list.map(({ cls, row }) => [
-      cls,
-      row.studentName,
-      row.massCount,
-      row.earned,
-      row.claimed,
-      row.pending,
-      `${row.progress}/${row.threshold}`,
-      `多 ${row.toNext} 次（第 ${row.nextMilestone} 次）`,
-      row.lastClaimedAt || ''
-    ])
-  ];
-  downloadCsv(`彌撒獎勵_${schoolYear}_${todayStr()}.csv`, rows);
-}
-
-function exportClaimsCsv() {
-  const list = getFilteredClaims();
-  if (!list.length) {
-    setMessage('沒有可匯出的領取紀錄', 'error');
-    return;
-  }
-  const rows = [
-    ['領取日期', '班別', '姓名', '第幾個獎勵', '當時彌撒次數', '備註', '輸入者'],
-    ...list.map(c => [
-      c.claimedAt || '',
-      c.className || '',
-      c.studentName || '',
-      c.claimNo || '',
-      c.massCountAtClaim ?? '',
-      c.note || '',
-      c.recordedBy || ''
-    ])
-  ];
-  downloadCsv(`彌撒獎勵紀錄_${schoolYear}_${todayStr()}.csv`, rows);
-}
-
-function csvCell(value) {
-  const s = String(value == null ? '' : value);
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-function downloadCsv(filename, rows) {
-  const csv = '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\r\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  setMessage(`已匯出 ${filename}`, 'success');
+function closeHistoryDialog() {
+  const dialog = $('historyDialog');
+  if (dialog && dialog.open) dialog.close();
 }

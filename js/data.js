@@ -50,3 +50,6 @@ export const getRewardClaims = fb.getRewardClaims;
 export const saveRewardClaim = fb.saveRewardClaim;
 export const saveRewardClaims = fb.saveRewardClaims;
 export const voidRewardClaim = fb.voidRewardClaim;
+export const getPrayerCount = fb.getPrayerCount;
+export const getAllPrayerCounts = fb.getAllPrayerCounts;
+export const savePrayerCount = fb.savePrayerCount;

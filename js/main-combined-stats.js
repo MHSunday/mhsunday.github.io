@@ -21,6 +21,9 @@ function initCombinedStatsPage() {
   const statsTab = document.getElementById('statsTab');
   const achievedTab = document.getElementById('achievedTab');
   const unredeemedTab = document.getElementById('unredeemedTab');
+
+  // 未頒發名單只限管理員（API 亦只准 admin）
+  let canViewUnredeemed = false;
   
   // 存儲班級順序，以保持與下拉選擇框一致的排序
   let classOrder = [];
@@ -65,6 +68,7 @@ function initCombinedStatsPage() {
 
   // 載入未補領禮物學生列表的函數
   async function loadUnredeemedStudentsList(showLoading = true) {
+    if (!canViewUnredeemed) return;
     const user = getCurrentUser();
     if (!user) return;
 
@@ -142,6 +146,7 @@ function initCombinedStatsPage() {
 
   // 新增未補領禮物名單頁籤切換功能
   unredeemedTab.addEventListener('click', async () => {
+    if (!canViewUnredeemed) return;
     const user = getCurrentUser();
     if (!user) return;
 
@@ -161,6 +166,26 @@ function initCombinedStatsPage() {
   onRoleLoaded(async (role) => {
     const user = getCurrentUser();
     if (!user) return;
+
+    // 校務團（staff）冇統計權限，返校務看板
+    if (role.role === 'staff') {
+      messageEl.innerHTML = '<span style="color:red">此頁只限教職員使用</span>';
+      setTimeout(() => window.location.replace('./staff.html'), 1500);
+      return;
+    }
+
+    // 只有管理員可以睇「未頒發禮物」及相關入口；老師預設顯示統計摘要
+    canViewUnredeemed = role.role === 'admin';
+    if (!canViewUnredeemed) {
+      unredeemedTab.classList.add('hidden');
+      unredeemedTab.classList.remove('active');
+      statsTab.classList.add('active');
+      unredeemedStudentsContainer.style.display = 'none';
+      statsContainer.style.display = 'block';
+      document.getElementById('formNavBtn')?.classList.add('hidden');
+      document.getElementById('redeemNavBtn')?.classList.add('hidden');
+      document.getElementById('unredeemedPrintNavBtn')?.classList.add('hidden');
+    }
 
     try {
       const classes = await getAllClasses();
@@ -201,8 +226,10 @@ function initCombinedStatsPage() {
         await loadStats(user.email, initialClassName);
       }
 
-      // 首次載入未補領禮物記錄，因為現在默認標籤是未頒發禮物
-      await loadUnredeemedStudentsList();
+      // 首次載入未補領禮物記錄（只限管理員；老師預設係統計摘要）
+      if (canViewUnredeemed) {
+        await loadUnredeemedStudentsList();
+      }
     } catch (err) {
       messageEl.innerHTML = `<span style="color:red">初始化失敗：${err.message}</span>`;
     }
@@ -226,15 +253,17 @@ function initCombinedStatsPage() {
         await loadAchievedStudentsList(false);
       }
       
-      // 同樣處理未補領禮物標籤頁的數據更新
-      if (unredeemedTab.classList.contains('active')) {
-        // 如果當前就在未補領禮物標籤頁，確保容器可見，並顯示加載信息
-        unredeemedStudentsContainer.style.display = 'block';
-        await loadUnredeemedStudentsList(true);
-      } else {
-        // 如果不在未補領禮物標籤頁，也預先載入數據並更新列表內容
-        // 但不顯示加載信息，這樣當用戶切換過去時會立即看到正確結果
-        await loadUnredeemedStudentsList(false);
+      // 同樣處理未補領禮物標籤頁的數據更新（只限管理員）
+      if (canViewUnredeemed) {
+        if (unredeemedTab.classList.contains('active')) {
+          // 如果當前就在未補領禮物標籤頁，確保容器可見，並顯示加載信息
+          unredeemedStudentsContainer.style.display = 'block';
+          await loadUnredeemedStudentsList(true);
+        } else {
+          // 如果不在未補領禮物標籤頁，也預先載入數據並更新列表內容
+          // 但不顯示加載信息，這樣當用戶切換過去時會立即看到正確結果
+          await loadUnredeemedStudentsList(false);
+        }
       }
     }
   });

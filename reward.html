@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>彌撒獎勵統計</title>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -12,18 +12,15 @@
   <style>
     body { font-family: 'Noto Sans TC', sans-serif; }
     dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
-    .tab-btn { border-bottom-width: 2px; }
     .kpi-number { font-variant-numeric: tabular-nums; }
+    .row-selected { background: #eff6ff; }
     @media print {
       @page { size: A4 portrait; margin: 12mm; }
       body { background: #fff !important; }
       .no-print { display: none !important; }
       main { max-width: none !important; padding: 0 !important; }
-      #globalView, #inputView { display: none !important; }
-      #reportView { display: block !important; }
-      #reportContent .class-block { break-inside: avoid; page-break-inside: avoid; }
-      #reportContent table { font-size: 10px; }
-      #reportClaimsSection { break-before: page; }
+      #inputSection, #checkSection { display: none !important; }
+      #reportSection { display: block !important; }
       #printHeader { display: block !important; }
       a { color: inherit; text-decoration: none; }
     }
@@ -31,260 +28,274 @@
 </head>
 <body class="bg-gray-50 min-h-screen text-gray-800">
 
+  <!-- 頂部導航 -->
   <nav class="no-print bg-blue-700 text-white shadow">
     <div class="max-w-7xl mx-auto px-3 py-2 flex flex-wrap items-center gap-2">
       <a id="homeLink" href="class_portal.html" class="text-sm hover:underline">‹ 返回</a>
       <h1 class="text-lg font-bold">彌撒獎勵統計</h1>
       <div class="flex-1"></div>
-      <label class="text-xs text-blue-100">學年</label>
+      <label for="yearSelect" class="text-xs text-blue-100">學年</label>
       <select id="yearSelect" class="text-sm text-gray-800 rounded px-2 py-1"></select>
+      <label for="classSelect" class="text-xs text-blue-100">班別</label>
+      <select id="classSelect" class="text-sm text-gray-800 rounded px-2 py-1 min-w-[7rem]"></select>
       <button id="refreshBtn" class="text-xs bg-blue-800 hover:bg-blue-900 px-2.5 py-1 rounded">重新整理</button>
+      <button id="printBtn" class="text-xs bg-blue-800 hover:bg-blue-900 px-2.5 py-1 rounded">列印 / PDF</button>
       <button id="logoutBtn" class="text-xs bg-blue-800 hover:bg-blue-900 px-2.5 py-1 rounded">登出</button>
     </div>
   </nav>
-
-  <div class="no-print bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
-    <div class="max-w-7xl mx-auto px-3 flex">
-      <button data-tab="global" class="tab-btn px-4 py-2.5 text-sm font-bold border-blue-600 text-blue-700">總覽</button>
-      <button id="tabInputBtn" data-tab="input" class="tab-btn px-4 py-2.5 text-sm font-bold border-transparent text-gray-500 hover:text-gray-700">輸入領取</button>
-      <button data-tab="report" class="tab-btn px-4 py-2.5 text-sm font-bold border-transparent text-gray-500 hover:text-gray-700">報表</button>
-    </div>
-  </div>
 
   <div id="message" class="no-print max-w-7xl mx-auto px-3 pt-2 text-sm font-medium min-h-[1.5rem]"></div>
 
   <main class="max-w-7xl mx-auto p-3 pb-16">
 
-    <!-- ================= Global View ================= -->
-    <section id="globalView">
+    <!-- 列印標題（只於列印時顯示） -->
+    <div id="printHeader" class="hidden pb-3 border-b border-gray-300 mb-4">
+      <h1 id="printTitle" class="text-xl font-bold text-gray-800">彌撒獎勵統計</h1>
+      <p id="printSubtitle" class="text-sm text-gray-600"></p>
+    </div>
+
+    <!-- ================= ① 本班獎勵狀況 ================= -->
+    <section id="reportSection" class="mb-6">
       <div class="flex flex-wrap items-end justify-between gap-2 mb-3">
         <div>
-          <h2 class="text-xl font-bold">總覽</h2>
-          <p id="globalStatus" class="text-sm text-gray-500">載入中…</p>
+          <h2 class="text-xl font-bold text-gray-800">
+            <span id="reportClassLabel">—</span> 獎勵狀況
+          </h2>
+          <p id="reportStatusText" class="text-xs text-gray-500"></p>
         </div>
+        <span class="text-xs text-gray-400">彌撒：每 5 次可領 1 個</span>
       </div>
 
-      <div id="globalKpis" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-4"></div>
+      <div id="reportSummary" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4"></div>
 
-      <div id="globalWarnings" class="hidden mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"></div>
-
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-4">
-        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-2">
-          <h3 class="font-bold">按班別</h3>
-          <span class="text-xs text-gray-400">點班別可跳去報表</span>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm border-collapse">
-            <thead class="bg-gray-100 text-gray-600">
-              <tr>
-                <th class="px-3 py-2 text-left">班別</th>
-                <th class="px-2 py-2 text-right">學生</th>
-                <th class="px-2 py-2 text-right">彌撒</th>
-                <th class="px-2 py-2 text-right">應得</th>
-                <th class="px-2 py-2 text-right">已領</th>
-                <th class="px-2 py-2 text-right">待領</th>
-                <th class="px-2 py-2 text-right">領取率</th>
-                <th class="px-2 py-2 text-left whitespace-nowrap">最後點名</th>
-              </tr>
-            </thead>
-            <tbody id="globalClassBody">
-              <tr><td colspan="8" class="px-4 py-6 text-center text-gray-400">載入中…</td></tr>
-            </tbody>
-            <tfoot id="globalClassFoot" class="bg-gray-50 font-bold"></tfoot>
-          </table>
-        </div>
-      </div>
-
-      <div class="grid lg:grid-cols-2 gap-4 mb-4">
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <h3 class="font-bold mb-3">進度分佈</h3>
-          <div id="progressBars" class="space-y-2 text-sm"></div>
-        </div>
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <h3 class="font-bold mb-3">待領最多</h3>
-          <div id="topPendingList" class="space-y-2 text-sm"></div>
+      <div id="noDataAlert" class="hidden mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <div class="flex items-start gap-3">
+          <span class="text-amber-600">⚠️</span>
+          <div>
+            <p class="text-amber-700 font-medium mb-1">目前未有彌撒點名資料</p>
+            <p class="text-sm text-amber-600">尚未有任何學生記錄彌撒出席，請先至「課堂點名」輸入彌撒記錄。</p>
+          </div>
         </div>
       </div>
 
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <h3 class="font-bold">最近領取</h3>
-          <span class="text-xs text-gray-400">最新 10 條</span>
-        </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm border-collapse">
-            <thead class="bg-gray-100 text-gray-600">
+            <thead class="bg-gray-50 text-gray-500">
               <tr>
-                <th class="px-3 py-2 text-left">日期</th>
-                <th class="px-3 py-2 text-left">班別</th>
-                <th class="px-3 py-2 text-left">學生</th>
-                <th class="px-2 py-2 text-center">獎勵</th>
-                <th class="px-3 py-2 text-left">備註</th>
+                <th class="px-3 py-2 text-left w-8 text-[11px]">#</th>
+                <th class="px-4 py-2 text-left text-[11px]">姓名</th>
+                <th class="px-3 py-2 text-right text-[11px]">彌撒</th>
+                <th class="px-3 py-2 text-right text-[11px]">應得</th>
+                <th class="px-3 py-2 text-right text-[11px]">已領</th>
+                <th class="px-3 py-2 text-right text-[11px]">待領</th>
+                <th class="px-3 py-2 text-right text-[11px]">祈禱已領</th>
+                <th class="px-3 py-2 text-left text-[11px] whitespace-nowrap">最近領取</th>
               </tr>
             </thead>
-            <tbody id="globalRecentClaims">
-              <tr><td colspan="5" class="px-4 py-6 text-center text-gray-400">暫無紀錄</td></tr>
-            </tbody>
+            <tbody id="reportBody"></tbody>
           </table>
         </div>
       </div>
     </section>
 
-    <!-- ================= Input View ================= -->
-    <section id="inputView" class="hidden">
+    <!-- ================= ② 輸入領取（僅管理員）================= -->
+    <section id="inputSection" class="hidden mb-6">
       <div class="flex flex-wrap items-end justify-between gap-2 mb-3">
         <div>
-          <h2 class="text-xl font-bold">輸入領取</h2>
-          <p class="text-sm text-gray-500">每滿 5 次彌撒可領 1 個獎勵；只限管理員輸入。</p>
+          <h2 class="text-xl font-bold text-gray-800">輸入領取</h2>
+          <p class="text-xs text-gray-500">搜尋學生 → 選擇 → 按「彌撒 +1」或「祈禱 +1」即可登記</p>
+        </div>
+        <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">只限管理員</span>
+      </div>
+
+      <!-- 搜尋 + 日期 -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="relative flex-1 min-w-[18rem]">
+            <label for="quickStudentInput" class="block text-xs font-medium text-gray-600 mb-1">搜尋學生姓名（可跨班）</label>
+            <input id="quickStudentInput" type="text" placeholder="輸入姓名，支援部分比對…"
+              class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" autocomplete="off">
+            <div id="quickStudentSuggest"
+              class="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg hidden max-h-72 overflow-auto z-30"></div>
+          </div>
+          <div>
+            <label for="claimDateInput" class="block text-xs font-medium text-gray-600 mb-1">領取日期</label>
+            <input id="claimDateInput" type="date"
+              class="border border-gray-300 rounded-md px-3 py-2 text-sm">
+          </div>
+          <button id="quickStudentClear" type="button"
+            class="hidden text-sm px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700">清除</button>
+        </div>
+
+        <!-- 已選學生操作卡 -->
+        <div id="claimPanel" class="hidden mt-4 border-t border-gray-100 pt-4">
+          <div class="flex flex-wrap items-center gap-2 mb-3">
+            <span class="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-1 rounded" id="claimPanelClass">—</span>
+            <span class="text-lg font-bold" id="claimPanelName">—</span>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4 text-center">
+            <div class="bg-gray-50 rounded-lg py-2">
+              <div class="text-[11px] text-gray-500">彌撒次數</div>
+              <div class="text-lg font-bold" id="panelMassCount">0</div>
+            </div>
+            <div class="bg-gray-50 rounded-lg py-2">
+              <div class="text-[11px] text-gray-500">應得</div>
+              <div class="text-lg font-bold text-blue-700" id="panelEarned">0</div>
+            </div>
+            <div class="bg-gray-50 rounded-lg py-2">
+              <div class="text-[11px] text-gray-500">已領</div>
+              <div class="text-lg font-bold text-emerald-700" id="panelClaimed">0</div>
+            </div>
+            <div class="bg-gray-50 rounded-lg py-2">
+              <div class="text-[11px] text-gray-500">待領</div>
+              <div class="text-lg font-bold text-red-600" id="panelPending">0</div>
+            </div>
+            <div class="bg-gray-50 rounded-lg py-2">
+              <div class="text-[11px] text-gray-500">祈禱已領</div>
+              <div class="text-lg font-bold text-purple-700" id="panelPrayer">0</div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <button id="btnClaimMass" type="button"
+              class="px-5 py-2.5 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed">
+              彌撒 +1
+            </button>
+            <button id="btnClaimPrayer" type="button"
+              class="px-5 py-2.5 rounded-lg text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700">
+              祈禱 +1
+            </button>
+            <button id="btnBatch" type="button"
+              class="px-4 py-2.5 rounded-lg text-sm bg-orange-100 text-orange-700 hover:bg-orange-200">
+              補錄多個
+            </button>
+            <button id="btnHistory" type="button"
+              class="px-4 py-2.5 rounded-lg text-sm bg-gray-100 text-gray-700 hover:bg-gray-200">
+              紀錄
+            </button>
+          </div>
+
+          <p id="claimHint" class="text-xs text-gray-500 mt-2"></p>
         </div>
       </div>
 
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-3 mb-4">
-        <div class="flex flex-wrap items-center gap-2">
-          <label class="text-sm text-gray-600">班別</label>
-          <select id="inputClassSelect" class="border border-gray-300 rounded-md px-2 py-1.5 text-sm min-w-[9rem]"></select>
-          <input id="inputSearch" type="search" placeholder="搜尋學生姓名…" class="border border-gray-300 rounded-md px-3 py-1.5 text-sm min-w-[12rem]">
-          <select id="inputStatusFilter" class="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
-            <option value="pending">待領取</option>
-            <option value="all">全部學生</option>
-            <option value="claimed">已全部領取</option>
-            <option value="over">超額／需檢查</option>
-            <option value="nomass">未有彌撒紀錄</option>
-          </select>
-          <div class="flex-1"></div>
-          <span id="inputSummary" class="text-xs text-gray-500"></span>
-        </div>
-      </div>
-
+      <!-- 全班學生 -->
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-4">
+        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+          <h3 class="font-bold text-gray-800">全班學生</h3>
+          <span id="inputClassSummary" class="text-xs text-gray-500"></span>
+        </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm border-collapse">
             <thead class="bg-gray-100 text-gray-600">
               <tr>
                 <th class="px-3 py-2 text-left">姓名</th>
-                <th class="px-2 py-2 text-right">彌撒</th>
-                <th class="px-2 py-2 text-right">應得</th>
-                <th class="px-2 py-2 text-right">已領</th>
-                <th class="px-2 py-2 text-right">待領</th>
-                <th class="px-2 py-2 text-center">進度</th>
-                <th class="px-2 py-2 text-center whitespace-nowrap">下次可領</th>
+                <th class="px-3 py-2 text-right">彌撒</th>
+                <th class="px-3 py-2 text-right">應得</th>
+                <th class="px-3 py-2 text-right">已領</th>
+                <th class="px-3 py-2 text-right">待領</th>
+                <th class="px-3 py-2 text-right">祈禱已領</th>
                 <th class="px-3 py-2 text-center">動作</th>
               </tr>
             </thead>
-            <tbody id="inputStudentBody">
-              <tr><td colspan="8" class="px-4 py-6 text-center text-gray-400">載入中…</td></tr>
-            </tbody>
+            <tbody id="inputStudentBody"></tbody>
           </table>
         </div>
       </div>
 
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <!-- 祈禱獎勵（只記錄姓名 / 已領日期） -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-4">
         <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <h3 class="font-bold">最近領取紀錄</h3>
-          <span class="text-xs text-gray-400">最新 20 條</span>
+          <div>
+            <h3 class="font-bold text-gray-800">祈禱獎勵</h3>
+            <p class="text-[11px] text-gray-500">只記錄領取日期，不需要輸入祈禱次數</p>
+          </div>
+          <span id="prayerPanelStatus" class="text-xs text-gray-500"></span>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm border-collapse">
             <thead class="bg-gray-100 text-gray-600">
               <tr>
-                <th class="px-3 py-2 text-left">日期</th>
-                <th class="px-3 py-2 text-left">學生</th>
-                <th class="px-2 py-2 text-center">獎勵</th>
-                <th class="px-3 py-2 text-left">備註</th>
-                <th class="px-3 py-2 text-left">輸入者</th>
-                <th class="px-2 py-2 text-center">操作</th>
+                <th class="px-3 py-2 text-left">姓名</th>
+                <th class="px-3 py-2 text-left">已領日期</th>
+                <th class="px-3 py-2 text-center">動作</th>
               </tr>
             </thead>
-            <tbody id="inputRecentClaims">
-              <tr><td colspan="6" class="px-4 py-6 text-center text-gray-400">暫無紀錄</td></tr>
-            </tbody>
+            <tbody id="prayerPanelBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 最近領取紀錄 -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+          <h3 class="font-bold text-gray-800">最近領取紀錄</h3>
+          <span id="recentClaimsStatus" class="text-xs text-gray-500"></span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm border-collapse">
+            <thead class="bg-gray-100 text-gray-600">
+              <tr>
+                <th class="px-3 py-2 text-left whitespace-nowrap">日期</th>
+                <th class="px-3 py-2 text-left">學生</th>
+                <th class="px-2 py-2 text-center">類型</th>
+                <th class="px-2 py-2 text-center whitespace-nowrap">第幾個</th>
+                <th class="px-3 py-2 text-left">備註</th>
+                <th class="px-3 py-2 text-center whitespace-nowrap">操作</th>
+              </tr>
+            </thead>
+            <tbody id="inputRecentClaims"></tbody>
           </table>
         </div>
       </div>
     </section>
 
-    <!-- ================= Report ================= -->
-    <section id="reportView" class="hidden">
-      <div class="flex flex-wrap items-end justify-between gap-2 mb-3 no-print">
+    <!-- ================= ③ 點名核對（僅管理員）================= -->
+    <section id="checkSection" class="hidden mb-6">
+      <div class="flex flex-wrap items-end justify-between gap-2 mb-3">
         <div>
-          <h2 class="text-xl font-bold">報表</h2>
-          <p class="text-sm text-gray-500">逐班逐人獎勵狀況；可列印或匯出 CSV。</p>
+          <h2 class="text-xl font-bold text-gray-800">點名核對</h2>
+          <p class="text-xs text-gray-500">只顯示「點名彌撒紀錄」同「已領彌撒獎勵」數量不符的學生</p>
         </div>
-        <div class="flex flex-wrap gap-2">
-          <button id="printBtn" class="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded">列印 / PDF</button>
-          <button id="exportCsvBtn" class="text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded">匯出學生 CSV</button>
-          <button id="exportClaimsCsvBtn" class="text-sm bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded">匯出領取紀錄 CSV</button>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-3 mb-4 no-print">
-        <div class="flex flex-wrap items-center gap-2">
-          <label class="text-sm text-gray-600">班別</label>
-          <select id="reportClassSelect" class="border border-gray-300 rounded-md px-2 py-1.5 text-sm min-w-[9rem]"></select>
-          <select id="reportStatusFilter" class="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
-            <option value="all">全部狀態</option>
-            <option value="pending">有待領</option>
-            <option value="claimed">已全部領取</option>
-            <option value="over">超額／需檢查</option>
-            <option value="nomass">未有彌撒紀錄</option>
-          </select>
-          <input id="reportSearch" type="search" placeholder="搜尋姓名…" class="border border-gray-300 rounded-md px-3 py-1.5 text-sm min-w-[11rem]">
-          <span class="text-xs text-gray-400 ml-1">領取紀錄日期</span>
-          <input id="reportFrom" type="date" class="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
-          <span class="text-gray-400">–</span>
-          <input id="reportTo" type="date" class="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+        <div class="flex items-center gap-2">
+          <span id="checkSummary" class="text-xs text-gray-500"></span>
+          <button id="checkRefresh" class="text-xs px-2.5 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700">重新核對</button>
         </div>
       </div>
 
-      <div id="printHeader" class="hidden mb-3">
-        <h2 class="text-xl font-bold">彌撒獎勵統計報表</h2>
-        <p id="printMeta" class="text-xs text-gray-500"></p>
-      </div>
-
-      <div id="reportSummary" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-4"></div>
-
-      <div class="flex items-center justify-between mb-2">
-        <h3 class="text-lg font-bold">逐人名單</h3>
-        <span id="reportStatusText" class="text-xs text-gray-400"></span>
-      </div>
-
-      <div id="reportContent" class="space-y-4"></div>
-
-      <div id="reportClaimsSection" class="mt-6">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="text-lg font-bold">領取紀錄</h3>
-          <span id="reportClaimsStatus" class="text-xs text-gray-400"></span>
-        </div>
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm border-collapse">
-              <thead class="bg-gray-100 text-gray-600">
-                <tr>
-                  <th class="px-3 py-2 text-left">領取日期</th>
-                  <th class="px-3 py-2 text-left">班別</th>
-                  <th class="px-3 py-2 text-left">學生</th>
-                  <th class="px-2 py-2 text-center">獎勵</th>
-                  <th class="px-3 py-2 text-left">備註</th>
-                  <th class="px-3 py-2 text-left">輸入者</th>
-                </tr>
-              </thead>
-              <tbody id="reportClaimsBody">
-                <tr><td colspan="6" class="px-4 py-6 text-center text-gray-400">暫無紀錄</td></tr>
-              </tbody>
-            </table>
-          </div>
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm border-collapse">
+            <thead class="bg-gray-100 text-gray-600">
+              <tr>
+                <th class="px-3 py-2 text-left">班別</th>
+                <th class="px-3 py-2 text-left">姓名</th>
+                <th class="px-3 py-2 text-right">彌撒（點名）</th>
+                <th class="px-3 py-2 text-right">彌撒（已領）</th>
+                <th class="px-3 py-2 text-right">差異</th>
+                <th class="px-3 py-2 text-right">祈禱已領</th>
+                <th class="px-3 py-2 text-center">動作</th>
+              </tr>
+            </thead>
+            <tbody id="checkBody"></tbody>
+          </table>
         </div>
       </div>
+      <p class="text-xs text-gray-400 mt-2">
+        差異 = 已領 − 點名應得。正數代表「領多過應得」（可能漏點名），負數代表「未領齊」。
+      </p>
     </section>
 
   </main>
 
-  <!-- 領取 / 補錄 dialog -->
+  <!-- 補錄 dialog -->
   <dialog id="claimDialog" class="rounded-xl shadow-2xl w-[min(92vw,34rem)] p-0">
     <div class="p-5">
       <div class="flex items-start justify-between gap-3 mb-3">
         <div>
-          <h2 id="claimDialogTitle" class="text-lg font-bold">登記領取</h2>
+          <h2 id="claimDialogTitle" class="text-lg font-bold">補錄獎勵</h2>
           <p id="claimStudentInfo" class="text-sm text-gray-500 mt-0.5"></p>
         </div>
         <button id="claimCancelTop" type="button" class="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
@@ -292,9 +303,10 @@
 
       <div id="claimWarning" class="hidden mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"></div>
 
-      <div id="claimCountWrap" class="hidden mb-3">
-        <label class="block text-sm font-medium mb-1">補錄數量</label>
-        <input id="claimCount" type="number" min="1" max="20" value="1" class="w-28 border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+      <div id="claimCountWrap" class="mb-3">
+        <label for="claimCount" class="block text-sm font-medium mb-1">補錄數量</label>
+        <input id="claimCount" type="number" min="1" max="20" value="1"
+          class="w-28 border border-gray-300 rounded-md px-2 py-1.5 text-sm">
         <span class="text-xs text-gray-500 ml-2">一次補錄 N 個獎勵</span>
       </div>
 
@@ -305,12 +317,13 @@
 
       <div class="grid sm:grid-cols-2 gap-3 mb-3">
         <div>
-          <label class="block text-sm font-medium mb-1">領取日期</label>
+          <label for="claimDate" class="block text-sm font-medium mb-1">領取日期</label>
           <input id="claimDate" type="date" class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm">
         </div>
         <div>
-          <label class="block text-sm font-medium mb-1">備註（可選）</label>
-          <input id="claimNote" type="text" maxlength="80" placeholder="例如：補錄開學禮物" class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+          <label for="claimNote" class="block text-sm font-medium mb-1">備註（可選）</label>
+          <input id="claimNote" type="text" maxlength="80" placeholder="例如：補錄開學禮物"
+            class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm">
         </div>
       </div>
 

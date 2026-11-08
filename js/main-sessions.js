@@ -213,6 +213,9 @@ function init(role) {
     $('importBtn').style.display = 'none';
     const syncCard = $('syncCard');
     if (syncCard) syncCard.style.display = 'none';
+    // 班級行事曆管理只限管理員
+    const adminCalendarLink = $('adminCalendarLink');
+    if (adminCalendarLink) adminCalendarLink.classList.add('hidden');
   }
 }
 
