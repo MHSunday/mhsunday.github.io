@@ -2,3 +2,18 @@
 plans/drive_backup_design.md
 plans/rollcall_schema_migration.md
 plans/firestore.rules
+
+# Keep all Markdown docs local only (not synced to GitHub)
+*.md
+
+# Local editor / agent config
+.vscode/
+.kilo/
+
+# Legacy / debug frontend kept locally only
+index2.html
+indexBase.html
+assets/js/
+assets/css/styles.css
+test.html
+test_bingo_storage.html
