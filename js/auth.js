@@ -8,6 +8,28 @@ const roleLoadedCallbacks = [];
 // 狀態鎖：防止在處理重定向結果時觸發自動跳轉
 let isProcessingRedirect = true;
 
+// 只有我哋主動發起 redirect 才處理 getRedirectResult，
+// 避免 Safari / 私密瀏覽 / 跨站追蹤封鎖 sessionStorage 時出現
+// 「Unable to process request due to missing initial state」
+const REDIRECT_PENDING_KEY = 'authRedirectPending';
+
+function hasPendingRedirect_() {
+  try { return localStorage.getItem(REDIRECT_PENDING_KEY) === '1'; } catch (_) { return false; }
+}
+function setPendingRedirect_(on) {
+  try {
+    if (on) localStorage.setItem(REDIRECT_PENDING_KEY, '1');
+    else localStorage.removeItem(REDIRECT_PENDING_KEY);
+  } catch (_) { /* storage 被封鎖 */ }
+}
+function isIOS_() {
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+function looksLikeAuthRedirect_() {
+  return /[?&#](apiKey|oobCode|state|authType|mode)=/.test(window.location.href);
+}
+
 console.log("📦 auth.js loaded");
 
 if (!firebase.apps.length) {
@@ -53,6 +75,15 @@ function toggleLoading(show) {
  * 當頁面從 Google 登入跳轉回來時，必須呼叫此方法來「捕捉」登入資訊
  */
 async function initAuth() {
+  if (!hasPendingRedirect_() && !looksLikeAuthRedirect_()) {
+    // 冇 pending redirect：唔好呼叫 getRedirectResult，
+    // 否則 iOS Safari 有時會 throw "missing initial state"
+    console.log("ℹ️ 無 pending redirect，跳過 getRedirectResult");
+    isProcessingRedirect = false;
+    checkInitialState();
+    return;
+  }
+
   try {
     const result = await auth.getRedirectResult();
     if (result.user) {
@@ -65,10 +96,13 @@ async function initAuth() {
   } catch (error) {
     console.error("❌ 重定向解析錯誤:", error);
     toggleLoading(false);
-    if (error.code === 'auth/cross-origin-auth-not-supported') {
+    if (/missing initial state/i.test(String(error.message || ''))) {
+      alert("iPhone / Safari 阻擋了登入所需的瀏覽器儲存空間。\n請關閉「防止跨網站追蹤」或私密瀏覽，或改用 Chrome 再試。");
+    } else if (error.code === 'auth/cross-origin-auth-not-supported') {
       alert("您的瀏覽器限制了跨站登入，請嘗試關閉「防止跨網站追蹤」或改用彈出視窗登入。");
     }
   } finally {
+    setPendingRedirect_(false);
     isProcessingRedirect = false;
     // 手動觸發一次檢查，確保如果沒有登入動作，也能正確導向
     checkInitialState();
@@ -82,14 +116,42 @@ export async function login() {
   const provider = new firebase.auth.GoogleAuthProvider();
   // 強制要求選擇帳號，避免自動登入舊帳號導致的 Session 混亂
   provider.setCustomParameters({ prompt: 'select_account' });
+  toggleLoading(true);
+
   try {
-    //await auth.signInWithRedirect(provider);
-    toggleLoading(true);
+    await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+    // 先試 popup（桌面／大部分 Android 較順）
     await auth.signInWithPopup(provider);
+    return;
   } catch (error) {
-    console.error("Login error:", error);
-    toggleLoading(false); // 失敗則關閉 Loading
-    alert("登入失敗：" + (error.message || error.code));
+    console.warn("Popup 登入失敗，考慮 redirect：", error && error.code, error && error.message);
+
+    const code = error && error.code;
+    const message = String((error && error.message) || '');
+    const shouldRedirect =
+      isIOS_()
+      || code === 'auth/popup-blocked'
+      || code === 'auth/operation-not-supported-in-this-environment'
+      || /missing initial state/i.test(message);
+
+    if (shouldRedirect) {
+      try {
+        setPendingRedirect_(true);
+        await auth.signInWithRedirect(provider);
+        return; // 頁面會跳去 Google，再返回
+      } catch (redirectError) {
+        console.error("Redirect 登入失敗:", redirectError);
+        setPendingRedirect_(false);
+        toggleLoading(false);
+        alert("iPhone 登入失敗，請關閉私密瀏覽／防止跨網站追蹤，或改用 Chrome。\n\n"
+          + (redirectError.message || redirectError.code || ''));
+        return;
+      }
+    }
+
+    toggleLoading(false);
+    alert("登入失敗：" + (message || code || '未知錯誤'));
   }
 }
 
