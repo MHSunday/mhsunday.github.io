@@ -466,3 +466,126 @@ export async function seedCalendarConfigs() {
   if (data.error) throw new Error(data.error);
   return data;
 }
+
+// ==========================================
+// 膳食／飲品回覆（food_*）
+// ==========================================
+
+/** 活動列表（admin 全部；teacher 只列自己班有份的活動） */
+export async function getFoodEvents(includeArchived = false) {
+  const qs = await getTokenQS();
+  const res = await fetch(`${API_URL}?action=getFoodEvents&includeArchived=${includeArchived ? 1 : 0}&${qs}`);
+  const data = await parseJson(res);
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+/** 單一活動設定 */
+export async function getFoodEvent(eventId) {
+  if (!eventId) throw new Error('缺少 eventId');
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=getFoodEvent&eventId=${encodeURIComponent(eventId)}&${qs}`;
+  const res = await fetch(url);
+  const data = await parseJson(res);
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+/** 學生名單試算表內所有可用分頁（admin，用嚟設定班別別名） */
+export async function getFoodClasses() {
+  const qs = await getTokenQS();
+  const res = await fetch(`${API_URL}?action=getFoodClasses&${qs}`);
+  const data = await parseJson(res);
+  if (data.error) throw new Error(data.error);
+  return Array.isArray(data.classes) ? data.classes : [];
+}
+
+/** 全域統計（admin 全量；teacher 只有自己班；staff 去識別化） */
+export async function getFoodStats(eventId, force = false) {
+  if (!eventId) throw new Error('缺少 eventId');
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=getFoodStats&eventId=${encodeURIComponent(eventId)}&force=${force ? 1 : 0}&${qs}`;
+  const res = await fetch(url);
+  const data = await parseJson(res);
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+/** 指定班別統計（老師只能取自己班） */
+export async function getFoodClassStatus(eventId, className = '', force = false) {
+  if (!eventId) throw new Error('缺少 eventId');
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=getFoodClassStatus&eventId=${encodeURIComponent(eventId)}`
+    + `&class=${encodeURIComponent(className || '')}&force=${force ? 1 : 0}&${qs}`;
+  const res = await fetch(url);
+  const data = await parseJson(res);
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+/** 兩則 WhatsApp 訊息（通告 + 每班連結） */
+export async function getFoodShare(eventId) {
+  if (!eventId) throw new Error('缺少 eventId');
+  const qs = await getTokenQS();
+  const url = `${API_URL}?action=getFoodShare&eventId=${encodeURIComponent(eventId)}&${qs}`;
+  const res = await fetch(url);
+  const data = await parseJson(res);
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+/** 新增／更新活動設定（admin） */
+export async function saveFoodEvent(event) {
+  const data = await postJSON({ action: 'saveFoodEvent', event: event || {} });
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+/** 複製成新活動（admin） */
+export async function cloneFoodEvent(eventId) {
+  const data = await postJSON({ action: 'cloneFoodEvent', eventId });
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+/** 建立 Google Form + 回應 Sheet + 每班連結（admin） */
+export async function buildFoodForm(eventId) {
+  const data = await postJSON({ action: 'buildFoodForm', eventId });
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+/** 封存活動（唔刪資料） */
+export async function archiveFoodEvent(eventId) {
+  const data = await postJSON({ action: 'archiveFoodEvent', eventId });
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+/** 手動補錄一筆（admin；寫入 _manual，成為最後一版） */
+export async function addFoodManual(eventId, record) {
+  const data = await postJSON({ action: 'addFoodManual', eventId, record });
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+/** 一鍵計入某學生的最新回覆（admin；逾期都用） */
+export async function includeFoodStudent(eventId, className, studentName) {
+  const data = await postJSON({ action: 'includeFoodStudent', eventId, className, studentName });
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+/** 將後台儲存的表單文字同步到 9 張現有 Form（admin） */
+export async function syncFoodFormText(eventId) {
+  const data = await postJSON({ action: 'syncFoodFormText', eventId });
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+/** 匯出報表分頁 */
+export async function exportFoodSheet(eventId) {
+  const data = await postJSON({ action: 'exportFoodSheet', eventId });
+  if (data.error) throw new Error(data.error);
+  return data;
+}

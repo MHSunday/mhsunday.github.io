@@ -22,6 +22,7 @@ import {
 } from '../js/reward-calc.js';
 
 import { sortClasses, massAppliesTo, oneMonthLaterStr } from '../js/classOrder.js';
+import { escapeHtml, shortDate, isClassDay, todayStr } from '../js/ui.js';
 
 const C1 = '一年級';
 const C2 = '二年級';
@@ -266,4 +267,31 @@ test('oneMonthLaterStr：跨月 / 跨年 / 閏年', () => {
   assert.equal(oneMonthLaterStr('2026-12-15'), '2027-01-14');
   assert.equal(oneMonthLaterStr('2026-01-31'), '2026-03-02');
   assert.equal(oneMonthLaterStr('2028-02-01'), '2028-03-02');
+});
+
+// ---------- ui ----------
+
+test('escapeHtml：五個 HTML 特殊字元', () => {
+  assert.equal(escapeHtml(`<a href="x">'&'</a>`),
+    '&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;');
+  assert.equal(escapeHtml(null), '');
+});
+
+test('shortDate：YYYY-MM-DD → M/D，失敗時回 fallback', () => {
+  assert.equal(shortDate('2026-12-13'), '12/13');
+  assert.equal(shortDate('2027-01-03'), '1/3');
+  assert.equal(shortDate('bad'), '');
+  assert.equal(shortDate('bad', 'bad'), 'bad');
+});
+
+test('isClassDay：假期不是上課日', () => {
+  assert.equal(isClassDay({ event: '假期' }), false);
+  assert.equal(isClassDay({ event: '主日彌撒' }), true);
+  assert.equal(isClassDay({}), true);
+  assert.equal(isClassDay(null), true);
+});
+
+test('todayStr：本地日期 YYYY-MM-DD', () => {
+  assert.equal(todayStr(new Date(2026, 0, 5)), '2026-01-05');
+  assert.equal(todayStr(new Date(2026, 11, 31)), '2026-12-31');
 });

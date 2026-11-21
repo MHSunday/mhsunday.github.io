@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>活動回覆</title>
+  <script src="js/loading.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Noto Sans TC', sans-serif; }
+    .kpi-number { font-variant-numeric: tabular-nums; }
+    @media print {
+      @page { size: A4 landscape; margin: 10mm; }
+      body { background: #fff !important; }
+      .no-print { display: none !important; }
+      main { max-width: none !important; padding: 0 !important; }
+      .print-only { display: block !important; }
+      a { color: inherit; text-decoration: none; }
+    }
+    .print-only { display: none; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-800">
+
+  <nav class="no-print bg-blue-700 text-white shadow">
+    <div class="max-w-7xl mx-auto px-3 py-2 flex flex-wrap items-center gap-2">
+      <a href="class_portal.html" class="text-sm hover:underline">‹ 返回</a>
+      <h1 class="text-lg font-bold">活動回覆</h1>
+      <div class="flex-1"></div>
+      <select id="eventSelect" class="text-sm text-gray-800 rounded px-2 py-1 max-w-[16rem]"></select>
+      <label id="showArchivedWrap" class="hidden text-xs text-blue-100 flex items-center gap-1">
+        <input id="showArchived" type="checkbox" class="rounded"> 顯示已封存
+      </label>
+      <button id="refreshBtn" class="text-xs bg-blue-800 hover:bg-blue-900 px-2.5 py-1 rounded">重新整理</button>
+      <button id="printBtn" class="text-xs bg-blue-800 hover:bg-blue-900 px-2.5 py-1 rounded">列印</button>
+      <button id="logoutBtn" class="text-xs bg-blue-800 hover:bg-blue-900 px-2.5 py-1 rounded">登出</button>
+    </div>
+  </nav>
+
+  <div id="message" class="no-print max-w-7xl mx-auto px-3 pt-2 text-sm font-medium min-h-[1.5rem]"></div>
+
+  <main class="max-w-7xl mx-auto p-3 pb-16">
+
+    <div id="printHeader" class="print-only pb-3 border-b border-gray-300 mb-4">
+      <h1 id="printTitle" class="text-xl font-bold">活動回覆</h1>
+      <p id="printSubtitle" class="text-sm text-gray-600"></p>
+    </div>
+
+    <div id="emptyState" class="hidden bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-500">
+      <p id="emptyText">未有膳食活動。</p>
+      <button id="emptyCreateBtn" class="hidden mt-4 text-sm px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold">建立第一個活動</button>
+    </div>
+
+    <section id="content" class="hidden">
+      <!-- 標題 + 進度 -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 id="eventTitle" class="text-xl font-bold"></h2>
+            <p id="eventMeta" class="text-sm text-gray-500"></p>
+          </div>
+          <span id="eventStatus" class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600"></span>
+        </div>
+        <div class="mt-4">
+          <div class="flex flex-wrap items-center gap-3 text-sm">
+            <span class="text-gray-500">回覆</span>
+            <span class="kpi-number font-bold text-blue-700"><span id="kpiResponded">0</span>/<span id="kpiRoster">0</span></span>
+            <span id="kpiPercent" class="text-gray-500"></span>
+            <span class="text-gray-300">|</span>
+            <span class="text-gray-500">出席</span><span class="font-bold" id="kpiAttending">0</span>
+            <span class="text-gray-500">家長</span><span class="font-bold" id="kpiParents">0</span>
+            <span class="text-gray-500">分享</span><span class="font-bold" id="kpiUnits">0</span><span class="text-gray-500">單位</span>
+            <span class="font-bold" id="kpiPersons">0</span><span class="text-gray-500">人份</span>
+          </div>
+          <div class="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div id="progressBar" class="h-full bg-blue-500" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div id="tabs" class="no-print flex flex-wrap gap-1 mb-4"></div>
+
+      <!-- 總覽（admin） -->
+      <section id="tab-overview" class="tab-panel hidden">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm border-collapse">
+              <thead class="bg-gray-50 text-gray-500">
+                <tr>
+                  <th class="px-3 py-2 text-left">班別</th>
+                  <th class="px-3 py-2 text-right">名單</th>
+                  <th class="px-3 py-2 text-right">回覆</th>
+                  <th class="px-3 py-2 text-right">未回</th>
+                  <th class="px-3 py-2 text-right">出席</th>
+                  <th class="px-3 py-2 text-right">家長</th>
+                  <th class="px-3 py-2 text-right">單位</th>
+                  <th class="px-3 py-2 text-right">人份</th>
+                </tr>
+              </thead>
+              <tbody id="overviewBody"></tbody>
+              <tfoot id="overviewFoot" class="bg-gray-50 font-bold"></tfoot>
+            </table>
+          </div>
+        </div>
+        <p id="qualityLine" class="text-xs text-gray-500 mt-2"></p>
+      </section>
+
+      <!-- 分類表 -->
+      <section id="tab-table" class="tab-panel hidden">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm border-collapse">
+              <thead class="bg-gray-50 text-gray-500">
+                <tr id="tableHead"></tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">單位 = 一次「多帶分享」的 5 人份；人份 = 單位 × 5。只計最後一次提交。</p>
+
+        <div class="mt-4 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div class="px-4 py-3 border-b border-gray-100">
+            <h3 class="font-bold">食物內容明細（廚房用）</h3>
+            <p class="text-xs text-gray-500">按分類及家長填寫的內容汇总</p>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm border-collapse">
+              <thead class="bg-gray-50 text-gray-500"><tr id="contentHead"></tr></thead>
+              <tbody id="contentBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 未回覆 -->
+      <section id="tab-missing" class="tab-panel hidden">
+        <div class="flex flex-wrap items-center gap-2 mb-3">
+          <h3 class="font-bold">未回覆名單</h3>
+          <button id="copyMissingBtn" class="no-print text-xs px-2.5 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700">複製名單</button>
+          <button id="chaseBtn" class="no-print text-xs px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white">提醒提交</button>
+        </div>
+        <div id="missingBody" class="space-y-4"></div>
+        <p id="unmatchedHint" class="hidden text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3"></p>
+      </section>
+
+      <!-- 已回覆 / 逐筆 -->
+      <section id="tab-detail" class="tab-panel hidden">
+        <div class="flex flex-wrap items-center gap-2 mb-3">
+          <h3 class="font-bold">逐筆回覆</h3>
+          <select id="detailClassSelect" class="text-sm border border-gray-300 rounded px-2 py-1"></select>
+          <label class="text-xs text-gray-500 flex items-center gap-1">
+            <input id="showSuperseded" type="checkbox" class="rounded"> 顯示舊版本
+          </label>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm border-collapse">
+              <thead class="bg-gray-50 text-gray-500">
+                <tr>
+                  <th class="px-3 py-2 text-left">姓名</th>
+                  <th class="px-3 py-2 text-left">狀態</th>
+                  <th class="px-3 py-2 text-left">出席</th>
+                  <th class="px-3 py-2 text-left">食物安排</th>
+                  <th class="px-3 py-2 text-left">分類</th>
+                  <th class="px-3 py-2 text-left">食物內容</th>
+                  <th class="px-3 py-2 text-right">人份</th>
+                  <th class="px-3 py-2 text-right">家長</th>
+                  <th class="px-3 py-2 text-right">修改</th>
+                  <th class="px-3 py-2 text-left">提交時間</th>
+                  <th class="px-3 py-2 text-left">備註</th>
+                  <th class="px-3 py-2 text-center">動作</th>
+                </tr>
+              </thead>
+              <tbody id="detailBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 待處理 -->
+      <section id="tab-pending" class="tab-panel hidden">
+        <div id="pendingBody" class="space-y-4"></div>
+      </section>
+
+      <!-- 分享 -->
+      <section id="tab-share" class="tab-panel hidden">
+        <div class="space-y-4">
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <div>
+                <h3 class="font-bold">訊息 A — 活動通告（全校群）</h3>
+                <p class="text-xs text-gray-500">不含連結，可發送至全校群組</p>
+              </div>
+              <div class="no-print flex gap-2">
+                <button id="copyNoticeBtn" class="text-xs px-2.5 py-1 rounded bg-gray-100 hover:bg-gray-200">複製</button>
+                <button id="waNoticeBtn" class="text-xs px-2.5 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700">WhatsApp</button>
+              </div>
+            </div>
+            <pre id="noticeText" class="whitespace-pre-wrap text-sm bg-gray-50 border border-gray-100 rounded-lg p-3"></pre>
+          </div>
+
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <h3 class="font-bold mb-2">訊息 B — 每班連結</h3>
+            <div id="shareList" class="space-y-3"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 設定（admin） -->
+      <section id="tab-settings" class="tab-panel hidden">
+        <div class="grid lg:grid-cols-2 gap-4">
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <h3 class="font-bold mb-3">活動設定</h3>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">活動名稱</label>
+                <input id="setTitle" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">活動日期</label>
+                  <input id="setDate" type="date" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">截止日期</label>
+                  <input id="setDeadline" type="date" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">表單頂部通告全文（Rich Text）</label>
+                <div class="border border-gray-300 rounded-md overflow-hidden">
+                  <div class="flex flex-wrap gap-1 bg-gray-50 border-b border-gray-200 px-2 py-1">
+                    <button type="button" data-cmd="bold" class="w-7 h-7 rounded text-sm font-bold hover:bg-gray-200" title="粗體">B</button>
+                    <button type="button" data-cmd="italic" class="w-7 h-7 rounded text-sm italic hover:bg-gray-200" title="斜體">I</button>
+                    <button type="button" data-cmd="underline" class="w-7 h-7 rounded text-sm underline hover:bg-gray-200" title="底線">U</button>
+                    <span class="w-px bg-gray-300 mx-1"></span>
+                    <button type="button" data-cmd="insertUnorderedList" class="px-2 h-7 rounded text-xs hover:bg-gray-200" title="項目符號">• 清單</button>
+                    <button type="button" data-cmd="removeFormat" class="px-2 h-7 rounded text-xs hover:bg-gray-200" title="清除格式">清除格式</button>
+                  </div>
+                  <div id="setIntro" contenteditable="true"
+                    class="min-h-[12rem] max-h-[28rem] overflow-y-auto px-3 py-2 text-sm focus:outline-none"></div>
+                </div>
+                <p class="text-[11px] text-gray-500 mt-1">Rich text 只會顯示在後台；Google Form 描述會自動轉為純文字。</p>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">
+                  班別別名（每行 <code>分頁名=顯示名</code>，例如 <code>聖體班(1)=花地瑪堂</code>）
+                </label>
+                <textarea id="setAliases" rows="5" placeholder="聖體班(1)=花地瑪堂&#10;聖體班(2)=聖方濟各堂(B)" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"></textarea>
+                <p id="aliasHint" class="text-[11px] text-gray-500 mt-1"></p>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">訊息 A（{title} {date} {deadline}）</label>
+                <textarea id="setMsgNotice" rows="5" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">訊息 B（{class} {link}）</label>
+                <textarea id="setMsgLink" rows="5" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"></textarea>
+              </div>
+              <div class="flex flex-wrap gap-2 pt-1">
+                <button id="saveEventBtn" class="text-sm px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold">儲存並同步</button>
+                <button id="buildFormBtn" class="text-sm px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold">建立表單</button>
+                <button id="exportBtn" class="text-sm px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-gray-700">匯出分頁</button>
+                <button id="cloneBtn" class="text-sm px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-gray-700">複製成新活動</button>
+                <button id="newBtn" class="text-sm px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-gray-700">新活動</button>
+                <button id="archiveBtn" class="text-sm px-4 py-2 rounded bg-red-50 hover:bg-red-100 text-red-700">封存</button>
+              </div>
+              <p id="buildHint" class="text-xs text-gray-500"></p>
+              <p class="text-[11px] text-gray-500">「儲存並同步」會寫入設定並即時更新 9 張 Form；下面的「同步到 9 張 Form」可作手動重試。</p>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <h3 class="font-bold mb-3">手動補錄</h3>
+            <div class="space-y-3">
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">班別</label>
+                  <select id="manClass" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"></select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">姓名</label>
+                  <select id="manName" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"></select>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">出席</label>
+                  <select id="manAttend" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                    <option value="出席">出席</option>
+                    <option value="不出席">不出席</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">家長人數</label>
+                  <select id="manParents" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                    <option>0</option><option>1</option><option>2</option><option>3</option><option>4</option>
+                  </select>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">食物安排</label>
+                  <select id="manPlan" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                    <option value="不會，需學校準備">不會，需學校準備</option>
+                    <option value="會，只夠自己">會，只夠自己</option>
+                    <option value="會，多帶分享">會，多帶分享</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">份量（人份）</label>
+                  <select id="manUnits" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                    <option value="0">不分享</option><option value="5">5</option><option value="10">10</option>
+                    <option value="15">15</option><option value="20">20</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">分類</label>
+                <select id="manCategory" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"></select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">食物內容</label>
+                <input id="manContent" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="例如：炒飯">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">備註</label>
+                <input id="manNote" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+              </div>
+              <button id="manualBtn" class="text-sm px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold">儲存補錄</button>
+              <p class="text-xs text-gray-500">補錄將寫入 <code>_manual</code>，並成為該學生的最後一版。</p>
+            </div>
+          </div>
+
+          <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <div>
+                <h3 class="font-bold">表單文字（同步 9 張 Form）</h3>
+                <p class="text-xs text-gray-500">「儲存並同步」會即時更新 9 張 Form；連結及已收回應不變。下面的按鈕可作手動重試。</p>
+              </div>
+              <button id="syncFormTextBtn" class="text-sm px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold">同步到 9 張 Form</button>
+            </div>
+            <div id="formTextEditor" class="space-y-4"></div>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="js/main-food.js"></script>
+</body>
+</html>

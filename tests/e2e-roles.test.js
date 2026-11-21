@@ -277,6 +277,70 @@ test('互動：admin 仍可載入未頒發名單', async () => {
   assert.deepEqual(issues, [], `\n${issues.join('\n')}\n`);
 }, { timeout: 60_000 });
 
+test('loading overlay：showLoading 會顯示、hideLoading 會收起', async () => {
+  const page = await B.role('admin');
+  try {
+    await page.visit('class_portal.html', 1200);
+
+    const shown = await page._evaluate(`(async () => {
+      window.showLoading('測試載入…');
+      await new Promise(r => setTimeout(r, 320));
+      const el = document.getElementById('appLoadingOverlay');
+      const txt = document.getElementById('appLoadingText');
+      return { display: el ? el.style.display : 'missing', text: txt ? txt.textContent : '' };
+    })()`);
+    assert.equal(shown.display, 'flex', 'showLoading 後遮罩應該顯示');
+    assert.equal(shown.text, '測試載入…');
+
+    const hidden = await page._evaluate(`(async () => {
+      window.hideLoading();
+      await new Promise(r => setTimeout(r, 260));
+      const el = document.getElementById('appLoadingOverlay');
+      return el ? el.style.display : 'missing';
+    })()`);
+    assert.equal(hidden, 'none', 'hideLoading 後遮罩應該收起');
+  } finally {
+    await page.close();
+  }
+}, { timeout: 60_000 });
+
+test('food.html：admin 載入活動、統計及食物內容', async () => {
+  const page = await B.role('admin');
+  try {
+    const r = await page.visit('food.html', 1800);
+    assert.deepEqual(r.pageErrors, []);
+    assert.ok(r.visibleIds.includes('content'), '統計內容應該顯示');
+    const info = await page._evaluate(`(() => ({
+      options: [...document.querySelectorAll('#eventSelect option')].map(o => o.textContent),
+      roster: (document.getElementById('kpiRoster') || {}).textContent,
+      content: (document.getElementById('contentBody') || {}).textContent
+    }))()`);
+    assert.ok(info.options.some((t) => t.includes('測試膳食活動')), '活動下拉應該有測試活動');
+    assert.equal(info.roster, '2', '總覽名單數應該係 2');
+    assert.match(info.content, /炒飯/, '食物內容表應該顯示炒飯');
+
+    const editor = await page._evaluate(`(() => ({
+      titleInputs: document.querySelectorAll('#formTextEditor [data-q][data-f="title"]').length,
+      choiceInputs: document.querySelectorAll('#formTextEditor [data-q][data-f="choices"]').length,
+      listInputs: document.querySelectorAll('#formTextEditor [data-list]').length,
+      syncBtn: !!document.getElementById('syncFormTextBtn')
+    }))()`);
+    assert.equal(editor.titleInputs, 8, '表單文字編輯器應該有 8 題');
+    assert.equal(editor.choiceInputs, 3, '出席／食物安排／家長人數應可改選項');
+    assert.equal(editor.listInputs, 2, '食品分類／分享份量應可改選項');
+    assert.equal(editor.syncBtn, true, '應該有同步按鈕');
+
+    // 儲存時應該自動同步 9 張 Form（唔需要再按同步）
+    await page.click('saveEventBtn');
+    await sleep(1200);
+    const afterSave = await page.snapshot();
+    assert.ok(afterSave.apiCalls.includes('saveFoodEvent'), '應該呼叫 saveFoodEvent');
+    assert.ok(afterSave.apiCalls.includes('syncFoodFormText'), '儲存後應該自動呼叫 syncFoodFormText');
+  } finally {
+    await page.close();
+  }
+}, { timeout: 60_000 });
+
 test('anon：未登入一律返 index.html', async () => {
   await runCases('anon', [
     ['index.html', { pathname: '/index.html' }],

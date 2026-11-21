@@ -96,6 +96,7 @@ const track = (name, fn) => (...args) => {
   return fn(...args);
 };
 const CLASSES = ${j(CLASSES)};
+const FOOD_CLASS = CLASSES[0];
 export const getAllClasses = track('getAllClasses', async () => CLASSES);
 export const getStats = track('getStats', async (email, cls) => ({
   totalRecords: 0, achievedStudents: 0, redeemedCount: 0, class: cls || '*'
@@ -118,6 +119,91 @@ export const backupFirestoreToDrive = track('backupFirestoreToDrive', async () =
 export const importClassCalendarDoc = track('importClassCalendarDoc', async () => ({}));
 export const publishClassCalendarDoc = track('publishClassCalendarDoc', async () => ({}));
 export const seedCalendarConfigs = track('seedCalendarConfigs', async () => ({}));
+
+// 膳食回覆（food.html）
+export const getFoodEvents = track('getFoodEvents', async () => {
+  const role = (window.__testRole || 'admin');
+  return {
+    role,
+    events: [{
+      eventId: 'test-event',
+      title: '測試膳食活動',
+      date: '2027-01-03',
+      deadline: '2026-12-13',
+      status: 'open',
+      classNames: [FOOD_CLASS],
+      classLinks: { [FOOD_CLASS]: 'https://example.test/form' },
+      formIds: { [FOOD_CLASS]: 'form-test' },
+      hasForm: true,
+      formId: 'form-test',
+      categories: ['主食', '小食'],
+      unitSize: 5,
+      shareUnits: [5, 10],
+      version: 1,
+      formIntro: '測試通告',
+      formIntroHtml: '<b>測試通告</b>',
+      shareMessageNotice: '通告 A',
+      shareMessageLink: '【{class}】{link}',
+      classAliases: { [FOOD_CLASS]: FOOD_CLASS },
+      classSheets: { [FOOD_CLASS]: FOOD_CLASS }
+    }]
+  };
+});
+
+export const getFoodStats = track('getFoodStats', async () => ({
+  eventId: 'test-event',
+  classNames: [FOOD_CLASS],
+  categories: ['主食', '小食'],
+  unitSize: 5,
+  totals: { roster: 2, responded: 1, missing: 1, attending: 1, parents: 0, shareUnits: 1, sharePersons: 5 },
+  classes: [{
+    name: FOOD_CLASS,
+    roster: 2,
+    responded: 1,
+    missing: 1,
+    attending: 1,
+    parents: 0,
+    shareUnits: 1,
+    sharePersons: 5,
+    missingNames: ['B Lee'],
+    students: [{
+      name: 'A Chan', status: 'ok', edited: 1, ts: '2026-12-01T10:00:00+08:00',
+      attend: '出席', plan: '會，多帶分享', category: '主食', content: '炒飯',
+      units: 5, parents: 0, note: ''
+    }]
+  }],
+  table: [{ category: '主食', classes: { [FOOD_CLASS]: 1 }, units: 1, persons: 5 }],
+  contents: [{ category: '主食', content: '炒飯', classes: { [FOOD_CLASS]: 1 }, units: 1, persons: 5 }],
+  quality: { rows: 1, duplicates: 0, unmatched: 0, inactive: 0, late: 0 },
+  rows: []
+}));
+
+export const getFoodShare = track('getFoodShare', async () => ({
+  notice: '通告 A',
+  perClass: [{ class: FOOD_CLASS, link: 'https://example.test/form', text: '【一年級】報名' }]
+}));
+
+export const getFoodClasses = track('getFoodClasses', async () => CLASSES);
+export const saveFoodEvent = track('saveFoodEvent', async (ev) => ({
+  ...ev,
+  hasForm: true,
+  formIds: { [FOOD_CLASS]: 'form-test' },
+  classNames: [FOOD_CLASS],
+  classLinks: { [FOOD_CLASS]: 'https://example.test/form' }
+}));
+export const buildFoodForm = track('buildFoodForm', async () => ({
+  formUrl: 'https://example.test/form',
+  classLinks: { [FOOD_CLASS]: 'https://example.test/form' }
+}));
+export const cloneFoodEvent = track('cloneFoodEvent', async () => ({
+  eventId: 'clone', title: 'clone', date: '2027-01-03', deadline: '2026-12-13',
+  status: 'draft', classNames: [], classLinks: {}, hasForm: false
+}));
+export const archiveFoodEvent = track('archiveFoodEvent', async () => ({ ok: true }));
+export const addFoodManual = track('addFoodManual', async () => ({ ok: true }));
+export const includeFoodStudent = track('includeFoodStudent', async () => ({ ok: true }));
+export const exportFoodSheet = track('exportFoodSheet', async () => ({ ok: true }));
+export const syncFoodFormText = track('syncFoodFormText', async () => ({ updated: 1 }));
 `;
 
 /** 喺任何 page script 之前執行：設定角色 cache、firebase 替身、實用嘅測試 hook */

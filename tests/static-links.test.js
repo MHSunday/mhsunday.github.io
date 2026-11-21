@@ -176,3 +176,26 @@ test('每個 HTML 頁都有 <title>', () => {
   }
   assert.deepEqual(missing, []);
 });
+
+test('所有頁面都載入全站 loading.js', () => {
+  const missing = [];
+  for (const file of htmlFiles) {
+    const html = read(file);
+    if (!/src=["'][^"']*js\/loading\.js["']/.test(html)) missing.push(file);
+  }
+  assert.deepEqual(missing, [], `以下頁面未載入 js/loading.js：${missing.join(', ')}`);
+});
+
+test('loading.js 提供 showLoading / hideLoading 並包裝 fetch', () => {
+  const code = read('js/loading.js');
+  assert.match(code, /window\.showLoading\s*=/);
+  assert.match(code, /window\.hideLoading\s*=/);
+  assert.match(code, /appLoadingOverlay/);
+  assert.match(code, /window\.fetch\s*=/);
+});
+
+test('food.html 使用全站 loading.js，不再自建 overlay', () => {
+  const html = read('food.html');
+  assert.match(html, /js\/loading\.js/);
+  assert.doesNotMatch(html, /id="loadingOverlay"/);
+});
