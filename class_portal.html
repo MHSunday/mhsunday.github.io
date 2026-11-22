@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>班級 Portal</title>
   <script src="js/loading.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -61,6 +61,21 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="望廈主日學">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+  <style id="safeAreaStyle">
+    :root {
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+    }
+    body {
+      padding-top: var(--safe-top) !important;
+      padding-bottom: var(--safe-bottom) !important;
+      padding-left: var(--safe-left) !important;
+      padding-right: var(--safe-right) !important;
+    }
+  </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
 
