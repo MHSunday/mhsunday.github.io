@@ -105,6 +105,35 @@
     window.fetch = wrapped;
   }
 
+  // iOS 主畫面 App：如果 Safari 回報 safe-area 為 0，用螢幕高度補救
+  function applySafeAreaFallback() {
+    if (!window.navigator.standalone) return; // 只限 iOS standalone
+
+    var probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:env(safe-area-inset-top,0px);pointer-events:none;visibility:hidden;';
+    document.body.appendChild(probe);
+
+    var top = probe.getBoundingClientRect().height;
+    probe.style.height = 'env(safe-area-inset-bottom,0px)';
+    var bottom = probe.getBoundingClientRect().height;
+    probe.remove();
+
+    var screenH = (window.screen && window.screen.height) || 0;
+    var notch = screenH >= 780;
+    if (top < 1) {
+      document.documentElement.style.setProperty('--safe-top', (notch ? 47 : 20) + 'px');
+    }
+    if (bottom < 1 && notch) {
+      document.documentElement.style.setProperty('--safe-bottom', '34px');
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applySafeAreaFallback);
+  } else {
+    applySafeAreaFallback();
+  }
+
   // 頁面跳轉時即時顯示，避免使用者以為點擊無反應
   document.addEventListener('click', function (e) {
     var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
