@@ -27,7 +27,36 @@ function fmt(d) {
 }
 function todayStr() { return fmt(new Date()); }
 
+function initMobileNav() {
+  const toggle = $('menuToggle');
+  const links = $('navLinks');
+  if (!toggle || !links) return;
+
+  const close = () => {
+    links.classList.remove('open');
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.textContent = '☰ 選單';
+  };
+  const open = () => {
+    links.classList.add('open');
+    toggle.setAttribute('aria-expanded', 'true');
+    toggle.textContent = '✕ 關閉';
+  };
+
+  toggle.addEventListener('click', () => {
+    if (links.classList.contains('open')) close();
+    else open();
+  });
+
+  links.querySelectorAll('a').forEach((a) => a.addEventListener('click', close));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') close();
+  });
+}
+
 async function init(role) {
+  initMobileNav();
   $('logoutBtn').addEventListener('click', () => logout());
 
   if (role && role.role === 'admin') {
@@ -149,7 +178,7 @@ function renderActions(p) {
     { label: '全年矩陣', desc: '睇全年出席', href: `rollcall.html?class=${encodeURIComponent(p.className)}&tab=matrix` },
     { label: '出席統計', desc: '每位學生出席／彌撒次數', href: `rollcall.html?class=${encodeURIComponent(p.className)}&tab=mass` },
     { label: '彌撒獎勵', desc: '每 5 次彌撒 1 個獎勵', href: `reward.html?class=${encodeURIComponent(p.className)}` },
-    { label: '膳食回覆', desc: '活動報名、未回覆、分類表', href: 'food.html' },
+    { label: '活動回覆', desc: '活動報名、未回覆、分類表', href: 'food.html' },
     { label: '上堂日曆', desc: '睇全年日曆', href: 'calendar.html' },
     { label: '學生名單', desc: `${p.rosterCount} 人`, href: '#details' }
   ];

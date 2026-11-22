@@ -214,6 +214,10 @@ test('staff：只可進入校務團頁面，其餘一律返 staff.html', async (
       visibleIds: ['reportSection'],
       hiddenIds: ['inputSection', 'checkSection']
     }],
+    ['food.html', {
+      pathname: '/food.html',
+      visibleIds: ['content', 'overviewBody']
+    }],
     ['form.html', { pathname: '/staff.html' }],
     ['redeem.html', { pathname: '/redeem.html', messageIncludes: '只有管理員' }],
     ['redeem_simplified.html', { pathname: '/redeem_simplified.html', messageIncludes: '只有管理員' }],
@@ -315,7 +319,7 @@ test('food.html：admin 載入活動、統計及食物內容', async () => {
       roster: (document.getElementById('kpiRoster') || {}).textContent,
       content: (document.getElementById('contentBody') || {}).textContent
     }))()`);
-    assert.ok(info.options.some((t) => t.includes('測試膳食活動')), '活動下拉應該有測試活動');
+    assert.ok(info.options.some((t) => t.includes('測試活動')), '活動下拉應該有測試活動');
     assert.equal(info.roster, '2', '總覽名單數應該係 2');
     assert.match(info.content, /炒飯/, '食物內容表應該顯示炒飯');
 

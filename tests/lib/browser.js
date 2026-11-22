@@ -189,6 +189,20 @@ export class RolePage {
 
     await sleep(waitMs);
 
+    // 手機版：如果頁面有漢堡選單，先打開再 snapshot，
+    // 令導覽 link 可以被測試檢查（等同用戶點開選單）。
+    try {
+      await this._evaluate(`(() => {
+        const btn = document.getElementById('menuToggle');
+        if (!btn) return false;
+        const cs = getComputedStyle(btn);
+        if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+        btn.click();
+        return true;
+      })()`);
+      await sleep(120);
+    } catch (_) { /* ignore */ }
+
     let snapshot;
     try {
       snapshot = await this._evaluate(SNAPSHOT_EXPR);

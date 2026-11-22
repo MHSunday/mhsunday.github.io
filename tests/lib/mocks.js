@@ -120,14 +120,14 @@ export const importClassCalendarDoc = track('importClassCalendarDoc', async () =
 export const publishClassCalendarDoc = track('publishClassCalendarDoc', async () => ({}));
 export const seedCalendarConfigs = track('seedCalendarConfigs', async () => ({}));
 
-// 膳食回覆（food.html）
+// 活動回覆（food.html）
 export const getFoodEvents = track('getFoodEvents', async () => {
   const role = (window.__testRole || 'admin');
   return {
     role,
     events: [{
       eventId: 'test-event',
-      title: '測試膳食活動',
+      title: '測試活動',
       date: '2027-01-03',
       deadline: '2026-12-13',
       status: 'open',

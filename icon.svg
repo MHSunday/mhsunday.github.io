@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- 背景（如需透明背景可刪除此行） -->
+  <rect id="bg" width="512" height="512" rx="96" fill="#FAE32C"/>
+
+  <!-- 十字架橫向綠翼 -->
+  <rect x="64" y="111" width="384" height="204" fill="#84BD47" stroke="#0A291E" stroke-width="16" stroke-linejoin="miter"/>
+
+  <!-- 十字架直向白柱 -->
+  <rect x="154" y="64" width="204" height="384" fill="#FFFFFF" stroke="#0A291E" stroke-width="16" stroke-linejoin="miter"/>
+
+  <!-- 內部圖騰：SFX 字樣 -->
+  <g fill="#0A291E">
+    <!-- F（長直桿連雙橫槓） -->
+    <path d="M 213 106 H 294 V 118 H 226 V 131 H 294 V 143 H 226 V 346 H 213 Z"/>
+    <!-- S（左側書法弧線） -->
+    <path d="M 208 171 C 194 173, 187 184, 189 198 C 190 208, 196 216, 196 226 C 196 236, 190 245, 180 252 L 182 255 C 195 248, 204 238, 204 225 C 204 214, 197 206, 197 196 C 197 185, 201 178, 209 175 Z"/>
+    <!-- X（右側交叉） -->
+    <polygon points="237,170 249,170 302,254 290,254"/>
+    <polygon points="287,170 298,170 246,254 235,254"/>
+  </g>
+
+  <!-- 聖神白鴿 -->
+  <path d="M 278 305 C 283 302, 286 299, 285 295 C 280 289, 282 279, 291 278 C 295 278, 297 281, 298 285 C 303 279, 308 276, 314 274 C 312 280, 309 284, 306 288 C 313 287, 319 287, 325 288 C 318 293, 310 296, 303 298 C 311 301, 317 305, 321 311 C 313 319, 299 321, 289 314 C 285 311, 282 308, 278 305 Z"
+        fill="#FFFFFF" stroke="#0A291E" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>
+
+  <!-- 展開的聖經與十字架 -->
+  <g stroke="#0A291E" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M 210 346 Q 233 343 256 347 Q 279 343 302 346 L 324 396 L 188 396 Z" fill="#FFFFFF" stroke-width="6"/>
+    <path d="M 193 389 Q 225 384 256 394 Q 287 384 319 389" fill="none" stroke-width="4.5"/>
+    <line x1="256" y1="347" x2="256" y2="395" stroke-width="5.5"/>
+    <line x1="234" y1="363" x2="278" y2="363" stroke-width="5.5"/>
+  </g>
+
+  <!-- 聖經上方蓮花／火舌 -->
+  <g fill="#FFFFFF" stroke="#0A291E" stroke-width="4.5" stroke-linejoin="round">
+    <path d="M 251 345 C 244 344, 239 336, 241 323 C 247 328, 251 335, 253 344 Z"/>
+    <path d="M 261 345 C 268 344, 273 336, 271 323 C 265 328, 261 335, 259 344 Z"/>
+    <path d="M 256 315 C 262 325, 263 336, 259 346 L 253 346 C 249 336, 250 325, 256 315 Z"/>
+  </g>
+</svg>

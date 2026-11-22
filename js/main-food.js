@@ -1,4 +1,4 @@
-﻿// js/main-food.js — 膳食回覆（admin 全域 / teacher 自己班 / staff 唯讀分類表）
+﻿// js/main-food.js — 活動回覆（admin 全域 / teacher 自己班 / staff 唯讀分類表）
 import {
   getFoodEvents, getFoodStats, getFoodShare, getFoodClasses,
   saveFoodEvent, buildFoodForm, cloneFoodEvent, archiveFoodEvent,
@@ -25,7 +25,7 @@ const STATUS_CLASS = {
 };
 
 const TABS = [
-  { id: 'overview', label: '總覽', roles: ['admin'] },
+  { id: 'overview', label: '總覽', roles: ['admin', 'staff'] },
   { id: 'table', label: '分類表', roles: ['admin', 'teacher', 'staff'] },
   { id: 'missing', label: '未回覆', roles: ['admin', 'teacher'] },
   { id: 'detail', label: '逐筆', roles: ['admin', 'teacher'] },
@@ -148,8 +148,8 @@ async function loadEvents(preferId) {
     share = null;
     $('emptyState').classList.remove('hidden');
     $('emptyText').textContent = userRole === 'admin'
-      ? '未有膳食活動。'
-      : '目前未有適合你的膳食活動。';
+      ? '暫無活動。'
+      : '目前沒有適合你的活動。';
     $('emptyCreateBtn').classList.toggle('hidden', userRole !== 'admin');
     $('content').classList.add('hidden');
     return;
@@ -190,7 +190,7 @@ async function reload(force = false) {
         statsError = err.message || '未知錯誤';
         setMessage(`讀取統計失敗：${statsError}`, 'error');
       }
-      if (!share || shareEventId !== id) {
+      if (userRole !== 'staff' && (!share || shareEventId !== id)) {
         try {
           share = await getFoodShare(id);
           shareEventId = id;
@@ -307,6 +307,7 @@ function renderOverview() {
       <td class="px-3 py-2 text-right kpi-number">${c.shareUnits}</td>
       <td class="px-3 py-2 text-right kpi-number">${c.sharePersons}</td>`;
     tr.addEventListener('click', () => {
+      if (userRole !== 'admin' && userRole !== 'teacher') return;
       const sel = $('detailClassSelect');
       if (sel) sel.value = c.name;
       switchTab('detail');
@@ -1013,7 +1014,7 @@ async function onNew() {
   window.showLoading('建立活動…');
   try {
     const ev = await saveFoodEvent({
-      title: '新膳食活動',
+      title: '新活動',
       date: today,
       deadline: today,
       formIntro: '',
@@ -1066,7 +1067,7 @@ function bindEvents() {
     const id = e.target.value;
     const found = events.find(x => x.eventId === id);
     if (found) event = found;
-    activeTab = userRole === 'staff' ? 'table' : 'overview';
+    activeTab = 'overview';
     await reload(true);
   });
 
@@ -1122,7 +1123,7 @@ function bindEvents() {
 
 onRoleLoaded(async (role) => {
   userRole = (role && role.role) || 'teacher';
-  activeTab = userRole === 'staff' ? 'table' : 'overview';
+  activeTab = 'overview';
   $('showArchivedWrap').classList.toggle('hidden', userRole !== 'admin');
   bindEvents();
   window.showLoading('載入活動…');
