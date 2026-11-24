@@ -194,6 +194,27 @@ test('loading.js 提供 showLoading / hideLoading 並包裝 fetch', () => {
   assert.match(code, /window\.fetch\s*=/);
 });
 
+test('所有頁面都載入全站 refresh.js', () => {
+  const missing = [];
+  for (const file of htmlFiles) {
+    const html = read(file);
+    if (!/src=["'][^"']*js\/refresh\.js["']/.test(html)) missing.push(file);
+  }
+  assert.deepEqual(missing, [], `以下頁面未載入 js/refresh.js：${missing.join(', ')}`);
+});
+
+test('refresh.js 會清快取、unregister SW 並 cache-busting reload', () => {
+  const code = read('js/refresh.js');
+  assert.match(code, /appRefreshBtn/);
+  assert.match(code, /caches\.keys\(\)/);
+  assert.match(code, /serviceWorker\.getRegistrations\(\)/);
+  assert.match(code, /sessionStorage\.removeItem\('userRole'\)/);
+  assert.match(code, /localStorage\.removeItem\('userRoleCache'\)/);
+  assert.match(code, /searchParams\.set\('_r'/);
+  assert.match(code, /location\.replace/);
+  assert.match(code, /cache:\s*'reload'/);
+});
+
 test('food.html 使用全站 loading.js，不再自建 overlay', () => {
   const html = read('food.html');
   assert.match(html, /js\/loading\.js/);
