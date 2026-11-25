@@ -680,7 +680,7 @@ function renderFormTextEditor() {
 
   const rows = [
     { key: 'name', label: '姓名', note: '選項自動用該班學生名單' },
-    { key: 'attend', label: '出席', choices: true },
+    { key: 'attend', label: '出席', choices: true, note: '「不出席」會跳過其餘題目直接提交，請保留「不出席」字樣' },
     { key: 'plan', label: '食物安排', choices: true, note: '「多帶」選項會跳去分享頁，請保留「多帶」字樣' },
     { key: 'category', label: '食品分類', list: 'categories', note: '這些選項亦會用於統計' },
     { key: 'content', label: '食物內容', note: '短答' },
@@ -723,14 +723,19 @@ function renderFormTextEditor() {
         <input data-ft="confirmation" value="${escapeHtml(t.confirmation || '')}"
           class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
       </div>
-      <div class="grid sm:grid-cols-2 gap-3">
+      <div class="grid sm:grid-cols-3 gap-3">
         <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">第 2 頁標題（分享食物）</label>
+          <label class="block text-xs font-medium text-gray-600 mb-1">第 2 頁標題（食物安排）</label>
+          <input data-ft="pages.plan" value="${escapeHtml(pages.plan || '')}"
+            class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">第 3 頁標題（分享食物）</label>
           <input data-ft="pages.share" value="${escapeHtml(pages.share || '')}"
             class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
         </div>
         <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">第 3 頁標題（家長及備註）</label>
+          <label class="block text-xs font-medium text-gray-600 mb-1">第 4 頁標題（家長及備註）</label>
           <input data-ft="pages.other" value="${escapeHtml(pages.other || '')}"
             class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
         </div>
@@ -740,7 +745,7 @@ function renderFormTextEditor() {
 }
 
 function collectFormText() {
-  const formText = { confirmation: '', pages: { share: '', other: '' }, questions: {} };
+  const formText = { confirmation: '', pages: { plan: '', share: '', other: '' }, questions: {} };
   const lists = { categories: [], shareUnits: [] };
 
   document.querySelectorAll('[data-ft]').forEach(el => {
